@@ -577,6 +577,7 @@ fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
     let const &record = records.begin()[entry_index];
     process_entry process{};
     process.pid = static_cast<i64>(record.kp_proc.p_pid);
+    process.parent_pid = static_cast<i64>(record.kp_eproc.e_ppid);
     process.name = String{StringView{record.kp_proc.p_comm}};
     process.owner_id = static_cast<u32>(record.kp_eproc.e_ucred.cr_uid);
     process.state = process_state_letter(record.kp_proc.p_stat);
@@ -596,8 +597,10 @@ fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
             static_cast<u64>(task_info.pti_resident_size) / 1024;
         process.virtual_kib =
             static_cast<u64>(task_info.pti_virtual_size) / 1024;
-        process.cpu_ticks = static_cast<u64>(task_info.pti_total_user +
-                                             task_info.pti_total_system);
+        process.cpu_milliseconds =
+            static_cast<u64>(task_info.pti_total_user +
+                             task_info.pti_total_system) /
+            1000000;
       }
     }
 
@@ -636,7 +639,21 @@ static donteliminate fn nth_space_field(StringView text, usize index) wontthrow
   return StringView{};
 }
 
-static fn linux_process_real_uid(StringView process_directory) throws
+static fn leading_digits(StringView line, usize offset) wontthrow -> StringView
+{
+  while (offset < line.length && (line[offset] == ' ' || line[offset] == '\t'))
+    offset++;
+
+  usize digit_end_position = offset;
+  while (digit_end_position < line.length && line[digit_end_position] >= '0' &&
+         line[digit_end_position] <= '9')
+    digit_end_position++;
+
+  return line.substring_of_length(offset, digit_end_position - offset);
+}
+
+static fn linux_process_real_uid(StringView process_directory,
+                                 i64 *parent_pid_out = nullptr) throws
     -> Maybe<u32>
 {
   let const status =
@@ -649,15 +666,21 @@ static fn linux_process_real_uid(StringView process_directory) throws
     let const line = text.substring_of_length(line_start_position,
                                               position - line_start_position);
     line_start_position = position + 1;
+
+    if (parent_pid_out != nullptr && line.length > 5 &&
+        line.substring_of_length(0, 5) == StringView{"PPid:"})
+    {
+      if (let const parsed = leading_digits(line, 5).to<i64>();
+          !parsed.is_error())
+        *parent_pid_out = parsed.value();
+      continue;
+    }
+
     if (line.length < 5 ||
         line.substring_of_length(0, 5) != StringView{"Uid:\t"})
       continue;
-    usize digit_end_position = 5;
-    while (digit_end_position < line.length &&
-           line[digit_end_position] >= '0' && line[digit_end_position] <= '9')
-      digit_end_position++;
-    let const uid =
-        line.substring_of_length(5, digit_end_position - 5).to<u32>();
+
+    let const uid = leading_digits(line, 4).to<u32>();
     return uid.is_error() ? Maybe<u32>{None} : Maybe<u32>{uid.value()};
   }
 
@@ -692,7 +715,8 @@ fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
     process.pid = parsed_pid.value();
     process.name = steal(*command_name);
 
-    if (let const uid = linux_process_real_uid(process_directory.view()))
+    if (let const uid = linux_process_real_uid(process_directory.view(),
+                                               &process.parent_pid))
       process.owner_id = *uid;
 
     if (let command_line =
@@ -729,12 +753,18 @@ fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
           let const fields = text.substring(after_name_position);
           let const state = nth_space_field(fields, 0);
           if (!state.is_empty()) process.state = state[0];
+          u64 cpu_tick_count = 0;
           if (let const user_ticks = nth_space_field(fields, 11).to<i64>();
               !user_ticks.is_error())
-            process.cpu_ticks += static_cast<u64>(user_ticks.value());
+            cpu_tick_count += static_cast<u64>(user_ticks.value());
           if (let const system_ticks = nth_space_field(fields, 12).to<i64>();
               !system_ticks.is_error())
-            process.cpu_ticks += static_cast<u64>(system_ticks.value());
+            cpu_tick_count += static_cast<u64>(system_ticks.value());
+          let const ticks_per_second = ::sysconf(_SC_CLK_TCK);
+          if (ticks_per_second > 0)
+            process.cpu_milliseconds =
+                static_cast<u64>(static_cast<u128>(cpu_tick_count) * 1000 /
+                                 static_cast<u64>(ticks_per_second));
         }
       }
 
@@ -1103,6 +1133,1070 @@ fn read_malloc_heap_stats(malloc_heap_stats &stats) wontthrow -> bool
 #else
   unused(stats);
   return false;
+#endif
+}
+
+#if defined __linux__
+
+static fn read_small_file(const char *path, char *buffer,
+                          usize capacity) wontthrow -> usize
+{
+  let const file_fd = ::open(path, O_RDONLY | O_CLOEXEC);
+  if (file_fd < 0) return 0;
+  defer { ::close(file_fd); };
+
+  usize total_length = 0;
+  while (total_length + 1 < capacity) {
+    let const read_length =
+        ::read(file_fd, buffer + total_length, capacity - 1 - total_length);
+    if (read_length <= 0) break;
+
+    total_length += static_cast<usize>(read_length);
+  }
+
+  buffer[total_length] = '\0';
+  return total_length;
+}
+
+static fn each_line(StringView text, usize &position) wontthrow -> StringView
+{
+  let const start_position = position;
+  while (position < text.length && text[position] != '\n')
+    position++;
+
+  let const line =
+      text.substring_of_length(start_position, position - start_position);
+  if (position < text.length) position++;
+
+  return line;
+}
+
+static fn parse_decimal_word(StringView word, u64 &value) wontthrow -> bool
+{
+  if (word.is_empty()) return false;
+
+  u64 parsed = 0;
+  for (usize index = 0; index < word.length; index++) {
+    let const character = word[index];
+    if (character < '0' || character > '9') return false;
+    let const digit = static_cast<u64>(character - '0');
+    if (parsed > (UINT64_MAX - digit) / 10) return false;
+    parsed = parsed * 10 + digit;
+  }
+
+  value = parsed;
+  return true;
+}
+
+static fn parse_decimal_words(StringView text, u64 *values,
+                              usize value_capacity) wontthrow -> usize
+{
+  usize value_count = 0;
+  usize position = 0;
+  while (position < text.length && value_count < value_capacity) {
+    let const word = text.next_ascii_whitespace_word(position);
+    if (word.is_empty()) continue;
+    if (!parse_decimal_word(word, values[value_count])) break;
+    value_count++;
+  }
+
+  return value_count;
+}
+
+static fn read_pressure_totals(const char *path, u64 &some_microseconds,
+                               u64 &full_microseconds) wontthrow -> bool
+{
+  char buffer[512];
+  let const length = read_small_file(path, buffer, sizeof(buffer));
+  if (length == 0) return false;
+
+  let const text = StringView{buffer, length};
+  usize position = 0;
+  bool has_some = false;
+  bool has_full = false;
+  while (position < text.length) {
+    let const line = each_line(text, position);
+    let const total_position = line.find_substring("total=");
+    if (!total_position.has_value()) continue;
+    let const total = leading_digits(line, *total_position + 6).to<u64>();
+    if (total.is_error()) continue;
+
+    if (line.starts_with("some ")) {
+      some_microseconds = total.value();
+      has_some = true;
+    } else if (line.starts_with("full ")) {
+      full_microseconds = total.value();
+      has_full = true;
+    }
+  }
+
+  return has_some || has_full;
+}
+
+#endif
+
+fn read_system_activity_status(system_activity_status &status) wontthrow -> bool
+{
+#if defined __APPLE__
+  let const host_port = mach_host_self();
+  host_cpu_load_info_data_t cpu{};
+  mach_msg_type_number_t cpu_count = HOST_CPU_LOAD_INFO_COUNT;
+  if (host_statistics(host_port, HOST_CPU_LOAD_INFO,
+                      reinterpret_cast<host_info_t>(&cpu),
+                      &cpu_count) == KERN_SUCCESS)
+  {
+    status.cpu_user_units = static_cast<u64>(cpu.cpu_ticks[CPU_STATE_USER]) +
+                            cpu.cpu_ticks[CPU_STATE_NICE];
+    status.cpu_system_units = cpu.cpu_ticks[CPU_STATE_SYSTEM];
+    status.cpu_idle_units = cpu.cpu_ticks[CPU_STATE_IDLE];
+    status.available_fields |= static_cast<u32>(system_activity_field::Cpu);
+  }
+
+  vm_size_t page_bytes = 4096;
+  unused(host_page_size(host_port, &page_bytes));
+  vm_statistics64_data_t vm{};
+  mach_msg_type_number_t vm_count = HOST_VM_INFO64_COUNT;
+  if (host_statistics64(host_port, HOST_VM_INFO64,
+                        reinterpret_cast<host_info64_t>(&vm),
+                        &vm_count) == KERN_SUCCESS)
+  {
+    status.page_input_bytes = vm.pageins * static_cast<u64>(page_bytes);
+    status.page_output_bytes = vm.pageouts * static_cast<u64>(page_bytes);
+    status.page_fault_count = vm.faults;
+    status.available_fields |= static_cast<u32>(system_activity_field::Paging) |
+                               static_cast<u32>(system_activity_field::Faults);
+  }
+
+  return status.available_fields != 0;
+#elif defined __linux__
+  char stat_buffer[16384];
+  let const stat_length =
+      read_small_file("/proc/stat", stat_buffer, sizeof(stat_buffer));
+  if (stat_length != 0) {
+    let const text = StringView{stat_buffer, stat_length};
+    usize position = 0;
+    while (position < text.length) {
+      let const line = each_line(text, position);
+      if (line.starts_with("cpu ")) {
+        u64 values[10]{};
+        let const value_count =
+            parse_decimal_words(line.substring(4), values, countof(values));
+        if (value_count >= 4) {
+          status.cpu_user_units = values[0] + values[1];
+          status.cpu_system_units = values[2];
+          status.cpu_idle_units = values[3];
+          if (value_count > 4) status.cpu_wait_units = values[4];
+          if (value_count > 6) {
+            status.cpu_system_units += values[5] + values[6];
+          }
+          if (value_count > 7) status.cpu_stolen_units = values[7];
+          status.available_fields |=
+              static_cast<u32>(system_activity_field::Cpu);
+        }
+      } else if (line.starts_with("procs_running ")) {
+        let const value = leading_digits(line, 14).to<u64>();
+        if (!value.is_error()) {
+          status.runnable_process_count = value.value();
+          status.available_fields |=
+              static_cast<u32>(system_activity_field::Scheduler);
+        }
+      } else if (line.starts_with("procs_blocked ")) {
+        let const value = leading_digits(line, 14).to<u64>();
+        if (!value.is_error()) {
+          status.blocked_process_count = value.value();
+          status.available_fields |=
+              static_cast<u32>(system_activity_field::Scheduler);
+        }
+      }
+    }
+  }
+
+  char vm_buffer[32768];
+  let const vm_length =
+      read_small_file("/proc/vmstat", vm_buffer, sizeof(vm_buffer));
+  if (vm_length != 0) {
+    let const text = StringView{vm_buffer, vm_length};
+    usize position = 0;
+    while (position < text.length) {
+      let const line = each_line(text, position);
+      struct vm_field
+      {
+        StringView name;
+        u64 system_activity_status::*field;
+        u64 multiplier;
+        system_activity_field capability;
+      };
+      static constexpr vm_field FIELDS[] = {
+          {"pgpgin ",     &system_activity_status::page_input_bytes,       1024,
+           system_activity_field::Paging},
+          {"pgpgout ",    &system_activity_status::page_output_bytes,      1024,
+           system_activity_field::Paging},
+          {"pgfault ",    &system_activity_status::page_fault_count,       1,
+           system_activity_field::Faults},
+          {"pgmajfault ", &system_activity_status::major_page_fault_count, 1,
+           system_activity_field::Faults},
+      };
+      for (let const &known : FIELDS) {
+        if (!line.starts_with(known.name)) continue;
+        let const value = leading_digits(line, known.name.length).to<u64>();
+        if (!value.is_error()) {
+          status.*known.field = value.value() * known.multiplier;
+          status.available_fields |= static_cast<u32>(known.capability);
+        }
+        break;
+      }
+    }
+  }
+
+  if (read_pressure_totals("/proc/pressure/cpu",
+                           status.cpu_some_stall_microseconds,
+                           status.cpu_some_stall_microseconds))
+  {
+    status.available_fields |=
+        static_cast<u32>(system_activity_field::CpuStall);
+  }
+  if (read_pressure_totals("/proc/pressure/memory",
+                           status.memory_some_stall_microseconds,
+                           status.memory_full_stall_microseconds))
+  {
+    status.available_fields |=
+        static_cast<u32>(system_activity_field::MemoryStall);
+  }
+  if (read_pressure_totals("/proc/pressure/io",
+                           status.io_some_stall_microseconds,
+                           status.io_full_stall_microseconds))
+  {
+    status.available_fields |= static_cast<u32>(system_activity_field::IoStall);
+  }
+
+  return status.available_fields != 0;
+#else
+  unused(status);
+  return false;
+#endif
+}
+
+fn read_network_interface_statistics() throws
+    -> ArrayList<network_interface_statistics_entry>
+{
+  let result = ArrayList<network_interface_statistics_entry>{heap_allocator()};
+#if defined __APPLE__
+  int name_mib[6] = {CTL_NET, PF_ROUTE, 0, 0, NET_RT_IFLIST2, 0};
+  usize byte_length = 0;
+  if (::sysctl(name_mib, 6, nullptr, &byte_length, nullptr, 0) != 0) {
+    return result;
+  }
+  let storage = ArrayList<u8>{heap_allocator()};
+  storage.reserve(byte_length);
+  if (::sysctl(name_mib, 6, storage.begin(), &byte_length, nullptr, 0) != 0) {
+    return result;
+  }
+
+  usize position = 0;
+  while (position + sizeof(if_msghdr) <= byte_length) {
+    let const *header =
+        reinterpret_cast<const if_msghdr *>(storage.begin() + position);
+    if (header->ifm_msglen == 0 || position + header->ifm_msglen > byte_length)
+      break;
+    if (header->ifm_type == RTM_IFINFO2 &&
+        header->ifm_msglen >= sizeof(if_msghdr2))
+    {
+      let const *info = reinterpret_cast<const if_msghdr2 *>(header);
+      int data_mib[6] = {CTL_NET,      PF_LINK,         NETLINK_GENERIC,
+                         IFMIB_IFDATA, info->ifm_index, IFDATA_GENERAL};
+      struct ifmibdata data{};
+      usize data_length = sizeof(data);
+      if (::sysctl(data_mib, 6, &data, &data_length, nullptr, 0) == 0 &&
+          data_length >= sizeof(data))
+      {
+        result.push(network_interface_statistics_entry{
+            String{data.ifmd_name},
+            data.ifmd_data.ifi_ibytes,
+            data.ifmd_data.ifi_obytes,
+            data.ifmd_data.ifi_ipackets,
+            data.ifmd_data.ifi_opackets,
+            data.ifmd_data.ifi_ierrors,
+            data.ifmd_data.ifi_oerrors,
+            0,
+            data.ifmd_snd_drops,
+            static_cast<u32>(network_statistics_field::ReceiveBytes) |
+                static_cast<u32>(network_statistics_field::TransmitBytes) |
+                static_cast<u32>(network_statistics_field::ReceivePackets) |
+                static_cast<u32>(network_statistics_field::TransmitPackets) |
+                static_cast<u32>(network_statistics_field::ReceiveErrors) |
+                static_cast<u32>(network_statistics_field::TransmitErrors) |
+                static_cast<u32>(network_statistics_field::TransmitDrops),
+        });
+      }
+    }
+    position += header->ifm_msglen;
+  }
+#elif defined __linux__
+  char buffer[65536];
+  let const length = read_small_file("/proc/net/dev", buffer, sizeof(buffer));
+  if (length == 0) return result;
+
+  let const text = StringView{buffer, length};
+  usize position = 0;
+  while (position < text.length) {
+    let const line = each_line(text, position);
+    let const colon_position = line.find_character(':');
+    if (!colon_position.has_value()) continue;
+    u64 values[16]{};
+    if (parse_decimal_words(line.substring(*colon_position + 1), values,
+                            countof(values)) < countof(values))
+    {
+      continue;
+    }
+    result.push(network_interface_statistics_entry{
+        String{line.substring_of_length(0, *colon_position).trim_blanks()},
+        values[0],
+        values[8],
+        values[1],
+        values[9],
+        values[2],
+        values[10],
+        values[3],
+        values[11],
+        UINT8_MAX,
+    });
+  }
+#endif
+  return result;
+}
+
+fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool
+{
+#if defined __APPLE__
+  int name_mib[4] = {CTL_NET, PF_INET, IPPROTO_TCP, TCPCTL_STATS};
+  struct tcpstat native{};
+  usize native_length = sizeof(native);
+  if (::sysctl(name_mib, 4, &native, &native_length, nullptr, 0) != 0) {
+    return false;
+  }
+  statistics.active_open_count = native.tcps_connattempt;
+  statistics.passive_open_count = native.tcps_accepts;
+  statistics.received_segment_count = native.tcps_rcvtotal;
+  statistics.sent_segment_count = native.tcps_sndtotal;
+  statistics.retransmitted_segment_count = native.tcps_sndrexmitpack;
+  statistics.input_error_count = static_cast<u64>(native.tcps_rcvbadsum) +
+                                 native.tcps_rcvbadoff + native.tcps_rcvshort;
+  return true;
+#elif defined __linux__
+  char buffer[32768];
+  let const length = read_small_file("/proc/net/snmp", buffer, sizeof(buffer));
+  if (length == 0) return false;
+
+  let const text = StringView{buffer, length};
+  StringView header;
+  usize position = 0;
+  while (position < text.length) {
+    let const line = each_line(text, position);
+    if (!line.starts_with("Tcp:")) continue;
+    if (header.is_empty()) {
+      header = line.substring(4);
+      continue;
+    }
+
+    usize name_position = 0;
+    usize value_position = 4;
+    while (name_position < header.length && value_position < line.length) {
+      let const name = header.next_ascii_whitespace_word(name_position);
+      let const value_word = line.next_ascii_whitespace_word(value_position);
+      u64 value = 0;
+      if (!parse_decimal_word(value_word, value)) continue;
+      struct tcp_field
+      {
+        StringView name;
+        u64 tcp_statistics::*field;
+      };
+      static constexpr tcp_field FIELDS[] = {
+          {"ActiveOpens",  &tcp_statistics::active_open_count          },
+          {"PassiveOpens", &tcp_statistics::passive_open_count         },
+          {"InSegs",       &tcp_statistics::received_segment_count     },
+          {"OutSegs",      &tcp_statistics::sent_segment_count         },
+          {"RetransSegs",  &tcp_statistics::retransmitted_segment_count},
+          {"InErrs",       &tcp_statistics::input_error_count          },
+      };
+      for (let const &known : FIELDS) {
+        if (name == known.name) statistics.*known.field = value;
+      }
+    }
+    return true;
+  }
+  return false;
+#else
+  unused(statistics);
+  return false;
+#endif
+}
+
+fn read_disk_io_snapshot(Allocator allocator) throws -> disk_io_snapshot
+{
+  disk_io_snapshot snapshot{ArrayList<disk_io_status>{allocator},
+                            monotonic_nanos()};
+#if defined __APPLE__
+  let *matching = IOServiceMatching(kIOBlockStorageDriverClass);
+  if (matching == nullptr) return snapshot;
+  io_iterator_t iterator = IO_OBJECT_NULL;
+  if (IOServiceGetMatchingServices(kIOMainPortDefault, matching, &iterator) !=
+      KERN_SUCCESS)
+  {
+    return snapshot;
+  }
+  defer { IOObjectRelease(iterator); };
+
+  let const do_read_number = [](CFDictionaryRef dictionary, const char *key,
+                                u64 &value) wontthrow -> bool {
+    let const key_text = CFStringCreateWithCString(kCFAllocatorDefault, key,
+                                                   kCFStringEncodingUTF8);
+    if (key_text == nullptr) return false;
+    defer { CFRelease(key_text); };
+    let const raw = CFDictionaryGetValue(dictionary, key_text);
+    if (raw == nullptr || CFGetTypeID(raw) != CFNumberGetTypeID()) return false;
+    i64 signed_value = 0;
+    if (!CFNumberGetValue(static_cast<CFNumberRef>(raw), kCFNumberSInt64Type,
+                          &signed_value) ||
+        signed_value < 0)
+    {
+      return false;
+    }
+    value = static_cast<u64>(signed_value);
+    return true;
+  };
+
+  io_object_t service = IO_OBJECT_NULL;
+  while ((service = IOIteratorNext(iterator)) != IO_OBJECT_NULL) {
+    defer { IOObjectRelease(service); };
+    let const raw_statistics = IORegistryEntryCreateCFProperty(
+        service, CFSTR(kIOBlockStorageDriverStatisticsKey), kCFAllocatorDefault,
+        0);
+    if (raw_statistics == nullptr ||
+        CFGetTypeID(raw_statistics) != CFDictionaryGetTypeID())
+    {
+      if (raw_statistics != nullptr) CFRelease(raw_statistics);
+      continue;
+    }
+    defer { CFRelease(raw_statistics); };
+    let const dictionary = static_cast<CFDictionaryRef>(raw_statistics);
+
+    char name_buffer[256]{};
+    let const raw_name = IORegistryEntrySearchCFProperty(
+        service, kIOServicePlane, CFSTR("BSD Name"), kCFAllocatorDefault,
+        kIORegistryIterateRecursively);
+    if (raw_name != nullptr) {
+      if (CFGetTypeID(raw_name) == CFStringGetTypeID()) {
+        unused(CFStringGetCString(static_cast<CFStringRef>(raw_name),
+                                  name_buffer, sizeof(name_buffer),
+                                  kCFStringEncodingUTF8));
+      }
+      CFRelease(raw_name);
+    }
+    if (name_buffer[0] == '\0') {
+      io_name_t fallback_name{};
+      if (IORegistryEntryGetName(service, fallback_name) != KERN_SUCCESS) {
+        continue;
+      }
+      std::snprintf(name_buffer, sizeof(name_buffer), "%s", fallback_name);
+    }
+
+    disk_io_status status{};
+    status.name = String{allocator, name_buffer};
+    struct disk_field
+    {
+      const char *name;
+      u64 disk_io_status::*field;
+      disk_io_field capability;
+    };
+    static constexpr disk_field FIELDS[] = {
+        {kIOBlockStorageDriverStatisticsBytesReadKey,
+         &disk_io_status::read_bytes,             disk_io_field::ReadBytes     },
+        {kIOBlockStorageDriverStatisticsBytesWrittenKey,
+         &disk_io_status::written_bytes,          disk_io_field::WrittenBytes  },
+        {kIOBlockStorageDriverStatisticsReadsKey,
+         &disk_io_status::read_operation_count,   disk_io_field::ReadOperations},
+        {kIOBlockStorageDriverStatisticsWritesKey,
+         &disk_io_status::write_operation_count,
+         disk_io_field::WriteOperations                                        },
+        {kIOBlockStorageDriverStatisticsTotalReadTimeKey,
+         &disk_io_status::read_time_nanoseconds,  disk_io_field::ReadTime      },
+        {kIOBlockStorageDriverStatisticsTotalWriteTimeKey,
+         &disk_io_status::write_time_nanoseconds, disk_io_field::WriteTime     },
+        {kIOBlockStorageDriverStatisticsReadErrorsKey,
+         &disk_io_status::read_error_count,       disk_io_field::ReadErrors    },
+        {kIOBlockStorageDriverStatisticsWriteErrorsKey,
+         &disk_io_status::write_error_count,      disk_io_field::WriteErrors   },
+        {kIOBlockStorageDriverStatisticsReadRetriesKey,
+         &disk_io_status::read_retry_count,       disk_io_field::ReadRetries   },
+        {kIOBlockStorageDriverStatisticsWriteRetriesKey,
+         &disk_io_status::write_retry_count,      disk_io_field::WriteRetries  },
+    };
+    for (let const &field : FIELDS) {
+      if (do_read_number(dictionary, field.name, status.*field.field)) {
+        status.available_fields |= static_cast<u32>(field.capability);
+      }
+    }
+    if (status.available_fields != 0) snapshot.disks.push(steal(status));
+  }
+#elif defined __linux__
+  char buffer[65536];
+  let const length = read_small_file("/proc/diskstats", buffer, sizeof(buffer));
+  if (length == 0) return snapshot;
+
+  let const text = StringView{buffer, length};
+  usize position = 0;
+  while (position < text.length) {
+    let const line = each_line(text, position);
+    usize word_position = 0;
+    unused(line.next_ascii_whitespace_word(word_position));
+    unused(line.next_ascii_whitespace_word(word_position));
+    let const name = line.next_ascii_whitespace_word(word_position);
+    if (name.is_empty()) continue;
+    u64 values[17]{};
+    let const value_count = parse_decimal_words(line.substring(word_position),
+                                                values, countof(values));
+    if (value_count < 11) continue;
+
+    constexpr u32 AVAILABLE =
+        static_cast<u32>(disk_io_field::ReadBytes) |
+        static_cast<u32>(disk_io_field::WrittenBytes) |
+        static_cast<u32>(disk_io_field::ReadOperations) |
+        static_cast<u32>(disk_io_field::WriteOperations) |
+        static_cast<u32>(disk_io_field::ReadTime) |
+        static_cast<u32>(disk_io_field::WriteTime) |
+        static_cast<u32>(disk_io_field::BusyTime) |
+        static_cast<u32>(disk_io_field::WeightedBusyTime) |
+        static_cast<u32>(disk_io_field::QueueDepth);
+    snapshot.disks.push(disk_io_status{
+        String{allocator, name},
+        values[2] * 512,
+        values[6] * 512,
+        values[0],
+        values[4],
+        values[3] * 1000000,
+        values[7] * 1000000,
+        values[9] * 1000000,
+        0,
+        values[10] * 1000000,
+        values[8],
+        0,
+        0,
+        0,
+        0,
+        AVAILABLE,
+    });
+  }
+#endif
+  return snapshot;
+}
+
+fn system_uptime_seconds() wontthrow -> Maybe<u64>
+{
+#if defined __APPLE__
+  struct timeval boot_time{};
+  usize boot_time_length = sizeof(boot_time);
+  int name_mib[2] = {CTL_KERN, KERN_BOOTTIME};
+  if (::sysctl(name_mib, 2, &boot_time, &boot_time_length, nullptr, 0) != 0)
+    return None;
+  if (boot_time.tv_sec <= 0) return None;
+
+  let const now = ::time(nullptr);
+  if (now <= boot_time.tv_sec) return None;
+
+  return static_cast<u64>(now - boot_time.tv_sec);
+#elif defined __linux__
+  char buffer[128];
+  if (read_small_file("/proc/uptime", buffer, sizeof(buffer)) == 0) return None;
+
+  return static_cast<u64>(std::strtoull(buffer, nullptr, 10));
+#else
+  return None;
+#endif
+}
+
+fn read_memory_status(memory_status &status) wontthrow -> bool
+{
+#if defined __APPLE__
+  u64 memory_bytes = 0;
+  usize memory_bytes_length = sizeof(memory_bytes);
+  if (::sysctlbyname("hw.memsize", &memory_bytes, &memory_bytes_length, nullptr,
+                     0) != 0)
+    return false;
+  status.total_kib = memory_bytes / 1024;
+
+  let const host_port = mach_host_self();
+  vm_size_t page_bytes = 0;
+  if (host_page_size(host_port, &page_bytes) != KERN_SUCCESS ||
+      page_bytes < 1024)
+  {
+    page_bytes = 4096;
+  }
+
+  vm_statistics64_data_t vm_stats{};
+  mach_msg_type_number_t vm_stats_count = HOST_VM_INFO64_COUNT;
+  if (host_statistics64(host_port, HOST_VM_INFO64,
+                        reinterpret_cast<host_info64_t>(&vm_stats),
+                        &vm_stats_count) == KERN_SUCCESS)
+  {
+    let const page_kib = static_cast<u64>(page_bytes) / 1024;
+    status.free_kib = static_cast<u64>(vm_stats.free_count) * page_kib;
+    status.available_kib = (static_cast<u64>(vm_stats.free_count) +
+                            static_cast<u64>(vm_stats.inactive_count) +
+                            static_cast<u64>(vm_stats.purgeable_count)) *
+                           page_kib;
+  }
+
+  struct xsw_usage swap{};
+  usize swap_length = sizeof(swap);
+  if (::sysctlbyname("vm.swapusage", &swap, &swap_length, nullptr, 0) == 0) {
+    status.swap_total_kib = swap.xsu_total / 1024;
+    status.swap_free_kib = swap.xsu_avail / 1024;
+  }
+
+  return true;
+#elif defined __linux__
+  struct meminfo_field
+  {
+    StringView name;
+    u64 memory_status::*field;
+  };
+
+  static constexpr meminfo_field MEMINFO_FIELDS[] = {
+      {"MemTotal",     &memory_status::total_kib     },
+      {"MemFree",      &memory_status::free_kib      },
+      {"MemAvailable", &memory_status::available_kib },
+      {"SwapTotal",    &memory_status::swap_total_kib},
+      {"SwapFree",     &memory_status::swap_free_kib },
+  };
+
+  char buffer[8192];
+  let const length = read_small_file("/proc/meminfo", buffer, sizeof(buffer));
+  if (length == 0) return false;
+
+  let const text = StringView{buffer, length};
+  usize position = 0;
+  while (position < text.length) {
+    let const line = each_line(text, position);
+    let const colon_position = line.find_character(':');
+    if (!colon_position.has_value()) continue;
+
+    let const name = line.substring_of_length(0, *colon_position);
+    for (let const &known : MEMINFO_FIELDS) {
+      if (name != known.name) continue;
+
+      if (let const parsed =
+              leading_digits(line, *colon_position + 1).to<u64>();
+          !parsed.is_error())
+        status.*known.field = parsed.value();
+
+      break;
+    }
+  }
+
+  if (status.available_kib == 0) status.available_kib = status.free_kib;
+  return status.total_kib != 0;
+#else
+  unused(status);
+  return false;
+#endif
+}
+
+fn read_swap_status(swap_status &status) wontthrow -> bool
+{
+#if defined __APPLE__
+  struct xsw_usage swap{};
+  usize swap_length = sizeof(swap);
+  if (::sysctlbyname("vm.swapusage", &swap, &swap_length, nullptr, 0) != 0) {
+    return false;
+  }
+  status.total_bytes = swap.xsu_total;
+  status.used_bytes = swap.xsu_used;
+  status.free_bytes = swap.xsu_avail;
+  status.has_encryption_state = true;
+  status.is_encrypted = swap.xsu_encrypted != 0;
+
+  let const host_port = mach_host_self();
+  vm_size_t page_bytes = 4096;
+  unused(host_page_size(host_port, &page_bytes));
+  vm_statistics64_data_t vm_stats{};
+  mach_msg_type_number_t vm_stats_count = HOST_VM_INFO64_COUNT;
+  if (host_statistics64(host_port, HOST_VM_INFO64,
+                        reinterpret_cast<host_info64_t>(&vm_stats),
+                        &vm_stats_count) == KERN_SUCCESS)
+  {
+    status.input_bytes = static_cast<u64>(vm_stats.swapins) * page_bytes;
+    status.output_bytes = static_cast<u64>(vm_stats.swapouts) * page_bytes;
+    status.has_activity = true;
+  }
+
+  return true;
+#elif defined __linux__
+  memory_status memory{};
+  if (!read_memory_status(memory)) return false;
+  status.total_bytes = memory.swap_total_kib * 1024;
+  status.free_bytes = memory.swap_free_kib * 1024;
+  status.used_bytes = status.total_bytes > status.free_bytes
+                          ? status.total_bytes - status.free_bytes
+                          : 0;
+
+  char buffer[16384];
+  let const length = read_small_file("/proc/vmstat", buffer, sizeof(buffer));
+  if (length == 0) return true;
+
+  u64 input_pages = 0;
+  u64 output_pages = 0;
+  let const text = StringView{buffer, length};
+  usize position = 0;
+  while (position < text.length) {
+    let const line = each_line(text, position);
+    if (line.starts_with("pswpin ")) {
+      if (let const parsed = leading_digits(line, 7).to<u64>();
+          !parsed.is_error())
+        input_pages = parsed.value();
+    } else if (line.starts_with("pswpout ")) {
+      if (let const parsed = leading_digits(line, 8).to<u64>();
+          !parsed.is_error())
+        output_pages = parsed.value();
+    }
+  }
+
+  let const page_bytes = ::sysconf(_SC_PAGESIZE);
+  if (page_bytes > 0) {
+    status.input_bytes = input_pages * static_cast<u64>(page_bytes);
+    status.output_bytes = output_pages * static_cast<u64>(page_bytes);
+    status.has_activity = true;
+  }
+
+  return true;
+#else
+  unused(status);
+  return false;
+#endif
+}
+
+fn read_process_io_status(i64 pid, process_io_status &status) wontthrow -> bool
+{
+#if defined __APPLE__
+  rusage_info_v2 usage{};
+  if (::proc_pid_rusage(static_cast<int>(pid), RUSAGE_INFO_V2,
+                        reinterpret_cast<rusage_info_t *>(&usage)) != 0)
+  {
+    return false;
+  }
+  status.read_bytes = usage.ri_diskio_bytesread;
+  status.written_bytes = usage.ri_diskio_byteswritten;
+  return true;
+#elif defined __linux__
+  char path[64];
+  let const path_length = std::snprintf(path, sizeof(path), "/proc/%lld/io",
+                                        static_cast<long long>(pid));
+  if (path_length <= 0 || static_cast<usize>(path_length) >= sizeof(path)) {
+    return false;
+  }
+
+  char buffer[2048];
+  let const length = read_small_file(path, buffer, sizeof(buffer));
+  if (length == 0) return false;
+
+  let const text = StringView{buffer, length};
+  usize position = 0;
+  while (position < text.length) {
+    let const line = each_line(text, position);
+    struct io_field
+    {
+      StringView name;
+      u64 process_io_status::*field;
+    };
+    static constexpr io_field FIELDS[] = {
+        {"read_bytes:",  &process_io_status::read_bytes           },
+        {"write_bytes:", &process_io_status::written_bytes        },
+        {"syscr:",       &process_io_status::read_operation_count },
+        {"syscw:",       &process_io_status::write_operation_count},
+    };
+    for (let const &known : FIELDS) {
+      if (!line.starts_with(known.name)) continue;
+      if (let const parsed = leading_digits(line, known.name.length).to<u64>();
+          !parsed.is_error())
+        status.*known.field = parsed.value();
+      if (known.name == "syscr:" || known.name == "syscw:") {
+        status.has_operation_counts = true;
+      }
+      break;
+    }
+  }
+
+  return true;
+#else
+  unused(pid);
+  unused(status);
+  return false;
+#endif
+}
+
+fn processor_model_name(Allocator allocator) throws -> Maybe<String>
+{
+#if defined __APPLE__
+  usize name_length = 0;
+  if (::sysctlbyname("machdep.cpu.brand_string", nullptr, &name_length, nullptr,
+                     0) != 0 ||
+      name_length == 0)
+  {
+    return None;
+  }
+
+  ArrayList<char> buffer{allocator};
+  buffer.reserve(name_length + 1);
+  if (::sysctlbyname("machdep.cpu.brand_string", buffer.begin(), &name_length,
+                     nullptr, 0) != 0)
+    return None;
+
+  buffer.begin()[name_length] = '\0';
+  return String{allocator, StringView{buffer.begin()}};
+#elif defined __linux__
+  static constexpr StringView KNOWN_KEYS[] = {
+      "model name", "Model name", "Hardware", "cpu model", "Processor"};
+  char buffer[16384];
+  let const length = read_small_file("/proc/cpuinfo", buffer, sizeof(buffer));
+  if (length == 0) return None;
+
+  let const text = StringView{buffer, length};
+  usize position = 0;
+  while (position < text.length) {
+    let const line = each_line(text, position);
+    let const colon_position = line.find_character(':');
+    if (!colon_position.has_value()) continue;
+
+    let name = line.substring_of_length(0, *colon_position);
+    while (!name.is_empty() &&
+           (name[name.length - 1] == ' ' || name[name.length - 1] == '\t'))
+      name = name.substring_of_length(0, name.length - 1);
+
+    bool is_known = false;
+    for (let const &known : KNOWN_KEYS) {
+      if (name != known) continue;
+
+      is_known = true;
+      break;
+    }
+    if (!is_known) continue;
+
+    let value = line.substring(*colon_position + 1);
+    while (!value.is_empty() && (value[0] == ' ' || value[0] == '\t'))
+      value = value.substring(1);
+    if (value.is_empty()) continue;
+
+    return String{allocator, value};
+  }
+
+  return None;
+#else
+  unused(allocator);
+  return None;
+#endif
+}
+
+#if defined __APPLE__
+
+static pure fn open_flags_access(int open_flags) wontthrow -> char
+{
+  switch (open_flags & O_ACCMODE) {
+  case O_RDONLY: return 'r';
+  case O_WRONLY: return 'w';
+  default: break;
+  }
+
+  return 'u';
+}
+
+#endif
+
+fn has_process_open_file_listing() wontthrow -> bool
+{
+#if defined __APPLE__ || defined __linux__
+  return true;
+#else
+  return false;
+#endif
+}
+
+fn list_process_open_files(i64 pid, Allocator allocator) throws
+    -> ArrayList<process_open_file>
+{
+  ArrayList<process_open_file> files{allocator};
+  let const do_push = [&files, allocator](StringView path,
+                                          i64 descriptor_number, u64 size,
+                                          u64 file_id, process_file_use use,
+                                          char access) throws -> void {
+    if (path.is_empty()) return;
+
+    files.push(process_open_file{
+        String{allocator, path},
+        descriptor_number, size, file_id, use,
+        access
+    });
+  };
+
+#if defined __APPLE__
+  let const process_id = static_cast<pid_t>(pid);
+  struct proc_vnodepathinfo vnode_paths{};
+  if (::proc_pidinfo(process_id, PROC_PIDVNODEPATHINFO, 0, &vnode_paths,
+                     sizeof(vnode_paths)) == sizeof(vnode_paths))
+  {
+    do_push(StringView{vnode_paths.pvi_cdir.vip_path}, -1, 0,
+            static_cast<u64>(vnode_paths.pvi_cdir.vip_vi.vi_stat.vst_ino),
+            process_file_use::Cwd, 'r');
+    do_push(StringView{vnode_paths.pvi_rdir.vip_path}, -1, 0,
+            static_cast<u64>(vnode_paths.pvi_rdir.vip_vi.vi_stat.vst_ino),
+            process_file_use::Root, 'r');
+  }
+
+  char executable_path[PROC_PIDPATHINFO_MAXSIZE];
+  if (::proc_pidpath(process_id, executable_path, sizeof(executable_path)) > 0)
+    do_push(StringView{executable_path}, -1, 0, 0, process_file_use::Executable,
+            'r');
+
+  let descriptor_bytes =
+      ::proc_pidinfo(process_id, PROC_PIDLISTFDS, 0, nullptr, 0);
+  if (descriptor_bytes <= 0) return files;
+
+  ArrayList<struct proc_fdinfo> descriptors{allocator};
+  descriptors.reserve(static_cast<usize>(descriptor_bytes) /
+                      sizeof(struct proc_fdinfo));
+  descriptor_bytes = ::proc_pidinfo(process_id, PROC_PIDLISTFDS, 0,
+                                    descriptors.begin(), descriptor_bytes);
+  if (descriptor_bytes <= 0) return files;
+
+  let const descriptor_count =
+      static_cast<usize>(descriptor_bytes) / sizeof(struct proc_fdinfo);
+  for (usize descriptor_position = 0; descriptor_position < descriptor_count;
+       descriptor_position++)
+  {
+    let const &descriptor = descriptors.begin()[descriptor_position];
+    let const descriptor_number = static_cast<i64>(descriptor.proc_fd);
+
+    switch (descriptor.proc_fdtype) {
+    case PROX_FDTYPE_VNODE: {
+      struct vnode_fdinfowithpath vnode{};
+      if (::proc_pidfdinfo(process_id, descriptor.proc_fd,
+                           PROC_PIDFDVNODEPATHINFO, &vnode,
+                           sizeof(vnode)) != sizeof(vnode))
+        break;
+
+      do_push(StringView{vnode.pvip.vip_path}, descriptor_number,
+              static_cast<u64>(vnode.pvip.vip_vi.vi_stat.vst_size),
+              static_cast<u64>(vnode.pvip.vip_vi.vi_stat.vst_ino),
+              process_file_use::File,
+              open_flags_access(vnode.pfi.fi_openflags));
+      break;
+    }
+
+    case PROX_FDTYPE_SOCKET:
+      do_push("[socket]", descriptor_number, 0, 0, process_file_use::File, 'u');
+      break;
+
+    case PROX_FDTYPE_PIPE:
+      do_push("[pipe]", descriptor_number, 0, 0, process_file_use::File, 'u');
+      break;
+
+    default:
+      do_push("[other]", descriptor_number, 0, 0, process_file_use::File, 'u');
+      break;
+    }
+  }
+
+  return files;
+#elif defined __linux__
+  char process_path[64];
+  let const process_path_length =
+      std::snprintf(process_path, sizeof(process_path), "/proc/%lld",
+                    static_cast<long long>(pid));
+  if (process_path_length <= 0 ||
+      static_cast<usize>(process_path_length) >= sizeof(process_path))
+    return files;
+
+  struct named_reference
+  {
+    StringView name;
+    process_file_use use;
+  };
+
+  static constexpr named_reference REFERENCES[] = {
+      {"cwd",  process_file_use::Cwd       },
+      {"root", process_file_use::Root      },
+      {"exe",  process_file_use::Executable},
+  };
+
+  for (let const &reference : REFERENCES) {
+    let const reference_path =
+        String{process_path} + "/" + String{reference.name};
+    let const target = read_symlink(reference_path.view(), allocator);
+    if (!target.has_value()) continue;
+
+    do_push(target->view(), -1, 0, 0, reference.use, 'r');
+  }
+
+  let const descriptor_root = String{process_path} + "/fd";
+  DIR *descriptor_directory = ::opendir(descriptor_root.c_str());
+  if (descriptor_directory == nullptr) return files;
+  defer { ::closedir(descriptor_directory); };
+
+  let const descriptor_directory_fd = ::dirfd(descriptor_directory);
+  for (struct dirent *entry = ::readdir(descriptor_directory); entry != nullptr;
+       entry = ::readdir(descriptor_directory))
+  {
+    let const name = StringView{entry->d_name};
+    if (name.is_empty() || !name.is_all_decimal_digits()) continue;
+
+    let const parsed_number = name.to<i64>();
+    if (parsed_number.is_error()) continue;
+
+    let const link_path = descriptor_root + "/" + String{name};
+    let const target = read_symlink(link_path.view(), allocator);
+    if (!target.has_value()) continue;
+
+    struct stat descriptor_status{};
+    u64 size = 0;
+    u64 file_id = 0;
+    if (::fstatat(descriptor_directory_fd, entry->d_name, &descriptor_status,
+                  0) == 0)
+    {
+      size = static_cast<u64>(descriptor_status.st_size);
+      file_id = static_cast<u64>(descriptor_status.st_ino);
+    }
+
+    char access = 'u';
+    let const info_path = String{process_path} + "/fdinfo/" + String{name};
+    char info_buffer[512];
+    if (read_small_file(info_path.c_str(), info_buffer, sizeof(info_buffer)) !=
+        0)
+    {
+      let const info_text = StringView{info_buffer};
+      usize info_position = 0;
+      while (info_position < info_text.length) {
+        let const line = each_line(info_text, info_position);
+        if (line.length < 6 ||
+            line.substring_of_length(0, 6) != StringView{"flags:"})
+          continue;
+
+        let const flags = std::strtol(line.data + 6, nullptr, 8);
+        switch (flags & O_ACCMODE) {
+        case O_RDONLY: access = 'r'; break;
+        case O_WRONLY: access = 'w'; break;
+        default: break;
+        }
+
+        break;
+      }
+    }
+
+    do_push(target->view(), parsed_number.value(), size, file_id,
+            process_file_use::File, access);
+  }
+
+  return files;
+#else
+  unused(pid);
+  return files;
 #endif
 }
 

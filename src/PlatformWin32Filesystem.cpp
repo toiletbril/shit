@@ -635,6 +635,24 @@ cold fn list_directory_typed(StringView dir) throws
   return entries;
 }
 
+cold fn list_directory_status(StringView dir, Allocator allocator) throws
+    -> Maybe<ArrayList<directory_status_entry>>
+{
+  let children = list_directory_typed(dir);
+  if (!children.has_value()) return None;
+
+  let entries = ArrayList<directory_status_entry>{allocator};
+  entries.reserve(children->count());
+  for (let &child : *children) {
+    let const path = PathBuilder{dir}.append(child.name.view()).build();
+    directory_status_entry entry{steal(child)};
+    entry.has_status = stat_path(path.text().view(), entry.status);
+    entries.push(steal(entry));
+  }
+
+  return entries;
+}
+
 fn open_file_descriptor(StringView path, file_open_mode mode)
     -> Maybe<descriptor>
 {
@@ -1135,10 +1153,61 @@ fn stat_filesystem(StringView path, filesystem_status &status) wontthrow -> bool
     return false;
   constexpr u64 block_size = 512;
   status.block_size = block_size;
+  status.fundamental_block_size = block_size;
   status.total_blocks = total.QuadPart / block_size;
   status.free_blocks = free.QuadPart / block_size;
   status.available_blocks = available.QuadPart / block_size;
+
+  wchar_t volume_name[MAX_PATH + 1]{};
+  wchar_t filesystem_name[MAX_PATH + 1]{};
+  DWORD serial_number = 0;
+  DWORD component_length = 0;
+  DWORD volume_flags = 0;
+  if (GetVolumeInformationW(wide_path->begin(), volume_name, MAX_PATH,
+                            &serial_number, &component_length, &volume_flags,
+                            filesystem_name, MAX_PATH) != 0)
+  {
+    status.name_max = component_length;
+    status.filesystem_id = serial_number;
+    let const converted = wide_to_utf8(
+        filesystem_name, static_cast<usize>(lstrlenW(filesystem_name)),
+        heap_allocator());
+    if (converted.has_value()) {
+      let const name = converted->view();
+      let const copied_length = name.length < sizeof(status.type_name) - 1
+                                    ? name.length
+                                    : sizeof(status.type_name) - 1;
+      for (usize index = 0; index < copied_length; index++)
+        status.type_name[index] = name[index];
+    }
+  }
+
   return true;
+}
+
+pure fn device_major(u64 device_id) wontthrow -> u32
+{
+  unused(device_id);
+  return 0;
+}
+
+pure fn device_minor(u64 device_id) wontthrow -> u32
+{
+  return static_cast<u32>(device_id);
+}
+
+static pure fn drive_type_name(UINT drive_type) wontthrow -> StringView
+{
+  switch (drive_type) {
+  case DRIVE_REMOVABLE: return "removable";
+  case DRIVE_FIXED: return "fixed";
+  case DRIVE_REMOTE: return "remote";
+  case DRIVE_CDROM: return "cdrom";
+  case DRIVE_RAMDISK: return "ramdisk";
+  default: break;
+  }
+
+  return "unknown";
 }
 
 fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>
@@ -1154,11 +1223,71 @@ fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>
     let drive = wide_to_utf8(drives + position, drive_length, heap_allocator());
     if (!drive.has_value()) return result;
     let target = drive.take();
-    result.push(mounted_filesystem{target.clone(), steal(target)});
+
+    let filesystem_type = String{heap_allocator()};
+    wchar_t type_buffer[MAX_PATH + 1]{};
+    if (GetVolumeInformationW(drives + position, nullptr, 0, nullptr, nullptr,
+                              nullptr, type_buffer, countof(type_buffer)) != 0)
+    {
+      if (let const named = wide_to_utf8(
+              type_buffer, static_cast<usize>(lstrlenW(type_buffer)),
+              heap_allocator());
+          named.has_value())
+        filesystem_type = named->clone();
+    }
+
+    let const options =
+        String{drive_type_name(GetDriveTypeW(drives + position))};
+    result.push(mounted_filesystem{target.clone(), steal(target),
+                                   steal(filesystem_type), steal(options)});
     position += drive_length + 1;
   }
 
   return result;
+}
+
+fn sync_filesystems() wontthrow -> bool
+{
+  wchar_t drives[512];
+  let const length = GetLogicalDriveStringsW(countof(drives), drives);
+  if (length == 0 || length >= countof(drives)) return false;
+
+  bool was_any_flushed = false;
+  usize position = 0;
+  while (position < length && drives[position] != L'\0') {
+    let const drive_length = static_cast<usize>(lstrlenW(drives + position));
+    if (GetDriveTypeW(drives + position) == DRIVE_FIXED && drive_length >= 2) {
+      wchar_t volume_path[8] = {L'\\', L'\\', L'.', L'\\', drives[position],
+                                L':',  L'\0'};
+      let const volume = CreateFileW(volume_path, GENERIC_WRITE,
+                                     FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                     nullptr, OPEN_EXISTING, 0, nullptr);
+      if (volume != INVALID_HANDLE_VALUE) {
+        if (FlushFileBuffers(volume) != 0) was_any_flushed = true;
+
+        CloseHandle(volume);
+      }
+    }
+
+    position += drive_length + 1;
+  }
+
+  return was_any_flushed;
+}
+
+fn sync_path(StringView path, bool is_data_only) wontthrow -> bool
+{
+  unused(is_data_only);
+  let const wide_path = utf8_to_wide(path, heap_allocator());
+  if (!wide_path.has_value()) return false;
+
+  let const target = CreateFileW(
+      wide_path->begin(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+      nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+  if (target == INVALID_HANDLE_VALUE) return false;
+  defer { CloseHandle(target); };
+
+  return FlushFileBuffers(target) != 0;
 }
 
 fn current_executable_path() wontthrow -> Maybe<String>
@@ -1301,6 +1430,96 @@ fn stat_path_following(StringView path, file_status &status) wontthrow -> bool
 {
   let const resolved = canonical_path(Path{path});
   return resolved.has_value() && stat_path(resolved->text().view(), status);
+}
+
+fn execute_batched_syscalls(const batched_syscall *operations,
+                            usize operation_count,
+                            batched_syscall_result *results) wontthrow -> void
+{
+  if (operation_count == 0) return;
+  if (operations == nullptr || results == nullptr) return;
+
+  for (usize index = 0; index < operation_count; index++) {
+    let const &operation = operations[index];
+    let &result = results[index];
+    result = {operation.request_id, 0, 0};
+    if (operation.byte_count > static_cast<usize>(MAXDWORD) ||
+        operation.byte_offset > 0x7fffffffffffffffULL)
+    {
+      result.error_number = EINVAL;
+      continue;
+    }
+
+    switch (operation.syscall_id) {
+    case batched_syscall_id::Read:
+    case batched_syscall_id::Write: {
+      let const buffer = operation.syscall_id == batched_syscall_id::Read
+                             ? operation.output_buffer
+                             : operation.input_buffer;
+      if (operation.fd == KOSH_INVALID_FD ||
+          (buffer == nullptr && operation.byte_count != 0))
+      {
+        result.error_number = EINVAL;
+        continue;
+      }
+
+      LARGE_INTEGER zero{};
+      LARGE_INTEGER saved_position{};
+      if (SetFilePointerEx(operation.fd, zero, &saved_position, FILE_CURRENT) ==
+          FALSE)
+      {
+        result.error_number = static_cast<i32>(GetLastError());
+        continue;
+      }
+      defer
+      {
+        unused(SetFilePointerEx(operation.fd, saved_position, nullptr,
+                                FILE_BEGIN));
+      };
+
+      LARGE_INTEGER requested_position{};
+      requested_position.QuadPart =
+          static_cast<LONGLONG>(operation.byte_offset);
+      if (SetFilePointerEx(operation.fd, requested_position, nullptr,
+                           FILE_BEGIN) == FALSE)
+      {
+        result.error_number = static_cast<i32>(GetLastError());
+        continue;
+      }
+
+      let const transferred =
+          operation.syscall_id == batched_syscall_id::Read
+              ? read_fd(operation.fd, operation.output_buffer,
+                        operation.byte_count)
+              : write_fd(operation.fd, operation.input_buffer,
+                         operation.byte_count);
+      if (transferred.has_value()) {
+        result.transferred_byte_count = *transferred;
+      } else {
+        result.error_number = static_cast<i32>(GetLastError());
+        if (result.error_number == 0) result.error_number = errno;
+      }
+      break;
+    }
+    case batched_syscall_id::Lstat:
+    case batched_syscall_id::Stat:
+      if (operation.path == nullptr || operation.status == nullptr) {
+        result.error_number = EINVAL;
+        continue;
+      }
+      SetLastError(ERROR_SUCCESS);
+      if (!(operation.syscall_id == batched_syscall_id::Lstat
+                ? stat_path(operation.path->text().view(), *operation.status)
+                : stat_path_following(operation.path->text().view(),
+                                      *operation.status)))
+      {
+        result.error_number = static_cast<i32>(GetLastError());
+        if (result.error_number == 0) result.error_number = errno;
+      }
+      break;
+    default: result.error_number = EINVAL; break;
+    }
+  }
 }
 
 fn format_mode_string(u32 mode) throws -> String

@@ -356,12 +356,20 @@ LINK_LIBRARIES += -lpthread
 endif
 endif
 
+ifeq ($(TARGET), Darwin)
+LINK_LIBRARIES += \
+	-framework CoreFoundation \
+	-framework IOKit
+endif
+
 # Missing Windows libraries.
 ifeq ($(TARGET), Windows_NT)
 LINK_LIBRARIES += \
 	-luserenv \
 	-ladvapi32 \
-	-lrstrtmgr
+	-liphlpapi \
+	-lrstrtmgr \
+	-lws2_32
 endif
 
 ifeq ($(TARGET), Windows_NT)

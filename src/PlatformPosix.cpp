@@ -495,6 +495,271 @@ fn get_hostname() throws -> Maybe<String>
   return String{buffer};
 }
 
+fn network_interface_addresses() throws -> ArrayList<network_interface_address>
+{
+  let result = ArrayList<network_interface_address>{heap_allocator()};
+  struct ifaddrs *interfaces = nullptr;
+  if (::getifaddrs(&interfaces) != 0) return result;
+  defer { ::freeifaddrs(interfaces); };
+
+  for (let *current = interfaces; current != nullptr;
+       current = current->ifa_next)
+  {
+    if (current->ifa_name == nullptr || current->ifa_addr == nullptr) continue;
+
+    let const family = current->ifa_addr->sa_family;
+    if (family != AF_INET && family != AF_INET6) continue;
+
+    char address[NI_MAXHOST]{};
+    let const address_length = family == AF_INET ? sizeof(struct sockaddr_in)
+                                                 : sizeof(struct sockaddr_in6);
+    if (::getnameinfo(current->ifa_addr, static_cast<socklen_t>(address_length),
+                      address, sizeof(address), nullptr, 0,
+                      NI_NUMERICHOST) != 0)
+    {
+      continue;
+    }
+
+    result.push(network_interface_address{
+        String{current->ifa_name},
+        family == AF_INET ? network_address_family::IPv4
+                          : network_address_family::IPv6,
+        String{address},
+    });
+  }
+
+  return result;
+}
+
+#if defined __APPLE__
+
+static pure fn socket_state_of(int state) wontthrow -> network_socket_state
+{
+  switch (state) {
+  case TSI_S_CLOSED: return network_socket_state::Closed;
+  case TSI_S_LISTEN: return network_socket_state::Listen;
+  case TSI_S_SYN_SENT: return network_socket_state::SynSent;
+  case TSI_S_SYN_RECEIVED: return network_socket_state::SynReceived;
+  case TSI_S_ESTABLISHED: return network_socket_state::Established;
+  case TSI_S__CLOSE_WAIT: return network_socket_state::CloseWait;
+  case TSI_S_FIN_WAIT_1: return network_socket_state::FinWait1;
+  case TSI_S_CLOSING: return network_socket_state::Closing;
+  case TSI_S_LAST_ACK: return network_socket_state::LastAck;
+  case TSI_S_FIN_WAIT_2: return network_socket_state::FinWait2;
+  case TSI_S_TIME_WAIT: return network_socket_state::TimeWait;
+  default: return network_socket_state::Unknown;
+  }
+}
+
+static fn socket_address(const struct in_sockinfo &info, bool is_local,
+                         network_address_family family) throws -> String
+{
+  char buffer[INET6_ADDRSTRLEN]{};
+  const opaque *address = nullptr;
+  int native_family = AF_INET;
+  if (family == network_address_family::IPv4) {
+    address =
+        is_local
+            ? static_cast<const opaque *>(&info.insi_laddr.ina_46.i46a_addr4)
+            : static_cast<const opaque *>(&info.insi_faddr.ina_46.i46a_addr4);
+  } else {
+    native_family = AF_INET6;
+    address = is_local ? static_cast<const opaque *>(&info.insi_laddr.ina_6)
+                       : static_cast<const opaque *>(&info.insi_faddr.ina_6);
+  }
+
+  if (::inet_ntop(native_family, address, buffer, sizeof(buffer)) == nullptr) {
+    return String{"*"};
+  }
+
+  return String{buffer};
+}
+
+#endif
+
+fn has_network_socket_listing() wontthrow -> bool
+{
+#if defined __APPLE__
+  return true;
+#else
+  return false;
+#endif
+}
+
+fn network_sockets(bool should_include_process_ids) throws
+    -> ArrayList<network_socket_entry>
+{
+  let result = ArrayList<network_socket_entry>{heap_allocator()};
+
+#if defined __APPLE__
+  let const processes = enumerate_processes();
+  for (let const &process : processes) {
+    let const process_id = static_cast<pid_t>(process.pid);
+    let descriptor_bytes =
+        ::proc_pidinfo(process_id, PROC_PIDLISTFDS, 0, nullptr, 0);
+    if (descriptor_bytes <= 0) continue;
+
+    ArrayList<struct proc_fdinfo> descriptors{heap_allocator()};
+    descriptors.reserve(static_cast<usize>(descriptor_bytes) /
+                        sizeof(struct proc_fdinfo));
+    descriptor_bytes = ::proc_pidinfo(process_id, PROC_PIDLISTFDS, 0,
+                                      descriptors.begin(), descriptor_bytes);
+    if (descriptor_bytes <= 0) continue;
+
+    let const descriptor_count =
+        static_cast<usize>(descriptor_bytes) / sizeof(struct proc_fdinfo);
+    for (usize index = 0; index < descriptor_count; index++) {
+      let const &descriptor = descriptors.begin()[index];
+      if (descriptor.proc_fdtype != PROX_FDTYPE_SOCKET) continue;
+
+      struct socket_fdinfo socket{};
+      if (::proc_pidfdinfo(process_id, descriptor.proc_fd, PROC_PIDFDSOCKETINFO,
+                           &socket, sizeof(socket)) != sizeof(socket))
+      {
+        continue;
+      }
+
+      let const &info = socket.psi;
+      if (info.soi_family != AF_INET && info.soi_family != AF_INET6) continue;
+      if (info.soi_protocol != IPPROTO_TCP && info.soi_protocol != IPPROTO_UDP)
+      {
+        continue;
+      }
+
+      let const protocol = info.soi_protocol == IPPROTO_TCP
+                               ? network_socket_protocol::Tcp
+                               : network_socket_protocol::Udp;
+      let const family = info.soi_family == AF_INET
+                             ? network_address_family::IPv4
+                             : network_address_family::IPv6;
+      let const &internet = protocol == network_socket_protocol::Tcp
+                                ? info.soi_proto.pri_tcp.tcpsi_ini
+                                : info.soi_proto.pri_in;
+      result.push(network_socket_entry{
+          socket_address(internet, true, family),
+          socket_address(internet, false, family),
+          info.soi_so,
+          info.soi_rcv.sbi_cc,
+          info.soi_snd.sbi_cc,
+          should_include_process_ids ? static_cast<u32>(process.pid) : 0,
+          ntohs(static_cast<u16>(internet.insi_lport)),
+          ntohs(static_cast<u16>(internet.insi_fport)),
+          protocol,
+          family,
+          protocol == network_socket_protocol::Tcp
+              ? socket_state_of(info.soi_proto.pri_tcp.tcpsi_state)
+              : network_socket_state::Unconnected,
+      });
+    }
+  }
+#else
+  unused(should_include_process_ids);
+#endif
+
+  result.sort(
+      [](const network_socket_entry &left, const network_socket_entry &right) {
+        if (left.identity != right.identity)
+          return left.identity < right.identity;
+        return left.process_id < right.process_id;
+      });
+
+  return result;
+}
+
+static fn probe_one_address(const struct addrinfo *candidate,
+                            u32 timeout_milliseconds) wontthrow
+    -> connect_probe_result
+{
+  let const handle = ::socket(candidate->ai_family, candidate->ai_socktype,
+                              candidate->ai_protocol);
+  if (handle < 0) return connect_probe_result::Unreachable;
+
+  let const previous_flags = ::fcntl(handle, F_GETFL, 0);
+  if (previous_flags >= 0) {
+    ::fcntl(handle, F_SETFL, previous_flags | O_NONBLOCK);
+  }
+
+  connect_probe_result result = connect_probe_result::Unreachable;
+  let const started =
+      ::connect(handle, candidate->ai_addr, candidate->ai_addrlen);
+
+  if (started == 0) {
+    result = connect_probe_result::Connected;
+  } else if (errno != EINPROGRESS) {
+    result = errno == ECONNREFUSED ? connect_probe_result::Refused
+                                   : connect_probe_result::Unreachable;
+  } else {
+    struct pollfd waited{};
+    waited.fd = handle;
+    waited.events = POLLOUT;
+
+    let const ready =
+        ::poll(&waited, 1, static_cast<int>(timeout_milliseconds));
+    if (ready == 0) {
+      result = connect_probe_result::TimedOut;
+    } else if (ready > 0) {
+      int pending = 0;
+      socklen_t pending_length = sizeof(pending);
+      if (::getsockopt(handle, SOL_SOCKET, SO_ERROR, &pending,
+                       &pending_length) != 0)
+      {
+        result = connect_probe_result::Unreachable;
+      } else if (pending == 0) {
+        result = connect_probe_result::Connected;
+      } else if (pending == ECONNREFUSED) {
+        result = connect_probe_result::Refused;
+      } else if (pending == ETIMEDOUT) {
+        result = connect_probe_result::TimedOut;
+      } else {
+        result = connect_probe_result::Unreachable;
+      }
+    }
+  }
+
+  ::close(handle);
+  return result;
+}
+
+fn probe_tcp_connect(StringView host, u16 port,
+                     u32 timeout_milliseconds) wontthrow -> connect_probe_result
+{
+  const String host_string{host};
+  char service[8]{};
+  usize digit_count = 0;
+  u16 remaining = port;
+  char reversed[8]{};
+  do {
+    reversed[digit_count] = static_cast<char>('0' + (remaining % 10));
+    remaining /= 10;
+    digit_count++;
+  } while (remaining != 0 && digit_count < sizeof(reversed));
+
+  for (usize index = 0; index < digit_count; index++)
+    service[index] = reversed[digit_count - index - 1];
+
+  struct addrinfo request{};
+  request.ai_family = AF_UNSPEC;
+  request.ai_socktype = SOCK_STREAM;
+
+  struct addrinfo *resolved = nullptr;
+  if (::getaddrinfo(host_string.c_str(), service, &request, &resolved) != 0) {
+    return connect_probe_result::Unreachable;
+  }
+
+  connect_probe_result result = connect_probe_result::Unreachable;
+  for (const struct addrinfo *candidate = resolved; candidate != nullptr;
+       candidate = candidate->ai_next)
+  {
+    result = probe_one_address(candidate, timeout_milliseconds);
+    if (result == connect_probe_result::Connected) break;
+
+    if (result == connect_probe_result::Refused) break;
+  }
+
+  ::freeaddrinfo(resolved);
+  return result;
+}
+
 fn get_processor_counts() wontthrow -> processor_counts
 {
   let const online = sysconf(_SC_NPROCESSORS_ONLN);
@@ -575,6 +840,30 @@ fn enumerate_users() throws -> ArrayList<String>
   }
 
   return users;
+}
+
+fn enumerate_groups() throws -> ArrayList<String>
+{
+  ArrayList<String> groups{heap_allocator()};
+  let group_path = StringView{"/etc/group"};
+#if !defined NDEBUG
+  if (let const test_path = std::getenv("KOSH_TEST_GROUP");
+      test_path != nullptr)
+    group_path = test_path;
+#endif
+
+  let const contents = Path{group_path}.read_entire_file();
+  if (!contents) return groups;
+
+  let const text = contents->view();
+  for (let const &line : utils::split_lines(text)) {
+    let const name = passwd_field(line, 0);
+    if (!name.is_empty() && line.find_character(':').has_value()) {
+      groups.push(String{name});
+    }
+  }
+
+  return groups;
 }
 
 static pid_t PARENT_SHELL_PID = getpid();
@@ -1304,6 +1593,11 @@ cold fn last_system_error_message() throws -> String
 fn last_system_error_is_missing_file() wontthrow -> bool
 {
   return errno == ENOENT;
+}
+
+fn set_last_system_error(i32 error_number) wontthrow -> void
+{
+  errno = error_number;
 }
 
 static fn make_sigset_impl(int first, ...) wontthrow -> sigset_t

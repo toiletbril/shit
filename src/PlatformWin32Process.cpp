@@ -1828,6 +1828,11 @@ fn last_system_error_is_missing_file() wontthrow -> bool
   return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
 }
 
+fn set_last_system_error(i32 error_number) wontthrow -> void
+{
+  SetLastError(static_cast<DWORD>(error_number));
+}
+
 static fn handle_interrupt(int s) -> void
 {
   unused(s);
@@ -2215,13 +2220,210 @@ fn enumerate_processes(process_detail detail) throws -> ArrayList<process_entry>
 
     process_entry process{};
     process.pid = static_cast<i64>(entry.th32ProcessID);
+    process.parent_pid = static_cast<i64>(entry.th32ParentProcessID);
     process.name = name.take();
     /* The snapshot exposes only the executable name, used as the command line.
      */
     process.command_line = process.name.clone();
+    if (detail == process_detail::ResourceStats) {
+      let const handle =
+          OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ,
+                      FALSE, entry.th32ProcessID);
+      if (handle != nullptr) {
+        FILETIME creation_time{};
+        FILETIME exit_time{};
+        FILETIME kernel_time{};
+        FILETIME user_time{};
+        if (GetProcessTimes(handle, &creation_time, &exit_time, &kernel_time,
+                            &user_time) != 0)
+          process.cpu_milliseconds =
+              (filetime_ticks(kernel_time) + filetime_ticks(user_time)) / 10000;
+
+        PROCESS_MEMORY_COUNTERS memory{};
+        memory.cb = sizeof(memory);
+        if (GetProcessMemoryInfo(handle, &memory, sizeof(memory)) != 0) {
+          process.resident_kib = memory.WorkingSetSize / 1024;
+          process.virtual_kib = memory.PagefileUsage / 1024;
+        }
+        CloseHandle(handle);
+      }
+    }
     processes.push(steal(process));
   } while (Process32NextW(snapshot, &entry) != 0);
   return processes;
+}
+
+fn system_uptime_seconds() wontthrow -> Maybe<u64>
+{
+  return static_cast<u64>(GetTickCount64() / 1000);
+}
+
+fn read_memory_status(memory_status &status) wontthrow -> bool
+{
+  MEMORYSTATUSEX memory{};
+  memory.dwLength = sizeof(memory);
+  if (GlobalMemoryStatusEx(&memory) == 0) return false;
+
+  status.total_kib = memory.ullTotalPhys / 1024;
+  status.free_kib = memory.ullAvailPhys / 1024;
+  status.available_kib = status.free_kib;
+  status.swap_total_kib = memory.ullTotalPageFile / 1024;
+  status.swap_free_kib = memory.ullAvailPageFile / 1024;
+  return true;
+}
+
+fn read_swap_status(swap_status &status) wontthrow -> bool
+{
+  struct page_file_context
+  {
+    swap_status *status;
+    u64 page_bytes;
+  };
+  SYSTEM_INFO system{};
+  GetSystemInfo(&system);
+  page_file_context context{&status, system.dwPageSize};
+  let const do_collect = [](LPVOID raw_context,
+                            PENUM_PAGE_FILE_INFORMATION information,
+                            LPCWSTR name) -> BOOL {
+    unused(name);
+    let *context = static_cast<page_file_context *>(raw_context);
+    context->status->total_bytes +=
+        static_cast<u64>(information->TotalSize) * context->page_bytes;
+    context->status->used_bytes +=
+        static_cast<u64>(information->TotalInUse) * context->page_bytes;
+    return TRUE;
+  };
+  if (EnumPageFilesW(do_collect, &context) == FALSE) return false;
+  status.free_bytes = status.total_bytes > status.used_bytes
+                          ? status.total_bytes - status.used_bytes
+                          : 0;
+  return true;
+}
+
+fn read_process_io_status(i64 pid, process_io_status &status) wontthrow -> bool
+{
+  if (pid < 0 || pid > UINT32_MAX) return false;
+  let const process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE,
+                                  static_cast<DWORD>(pid));
+  if (process == nullptr) return false;
+  defer { CloseHandle(process); };
+
+  IO_COUNTERS counters{};
+  if (GetProcessIoCounters(process, &counters) == FALSE) return false;
+  status.read_bytes = counters.ReadTransferCount;
+  status.written_bytes = counters.WriteTransferCount;
+  status.read_operation_count = counters.ReadOperationCount;
+  status.write_operation_count = counters.WriteOperationCount;
+  status.has_operation_counts = true;
+  return true;
+}
+
+fn read_system_activity_status(system_activity_status &status) wontthrow -> bool
+{
+  FILETIME idle_time{};
+  FILETIME kernel_time{};
+  FILETIME user_time{};
+  if (GetSystemTimes(&idle_time, &kernel_time, &user_time) != FALSE) {
+    status.cpu_idle_units = filetime_ticks(idle_time);
+    let const kernel_units = filetime_ticks(kernel_time);
+    status.cpu_system_units = kernel_units > status.cpu_idle_units
+                                  ? kernel_units - status.cpu_idle_units
+                                  : 0;
+    status.cpu_user_units = filetime_ticks(user_time);
+    status.available_fields |= static_cast<u32>(system_activity_field::Cpu);
+  }
+
+  return status.available_fields != 0;
+}
+
+static fn hundred_nanosecond_units_to_nanoseconds(i64 units) wontthrow -> u64
+{
+  if (units <= 0) return 0;
+  let const unsigned_units = static_cast<u64>(units);
+  return unsigned_units > UINT64_MAX / 100 ? UINT64_MAX : unsigned_units * 100;
+}
+
+fn read_disk_io_snapshot(Allocator allocator) throws -> disk_io_snapshot
+{
+  disk_io_snapshot snapshot{ArrayList<disk_io_status>{allocator},
+                            monotonic_nanos()};
+  constexpr u32 AVAILABLE = static_cast<u32>(disk_io_field::ReadBytes) |
+                            static_cast<u32>(disk_io_field::WrittenBytes) |
+                            static_cast<u32>(disk_io_field::ReadOperations) |
+                            static_cast<u32>(disk_io_field::WriteOperations) |
+                            static_cast<u32>(disk_io_field::ReadTime) |
+                            static_cast<u32>(disk_io_field::WriteTime) |
+                            static_cast<u32>(disk_io_field::IdleTime) |
+                            static_cast<u32>(disk_io_field::QueueDepth);
+
+  for (u32 disk_index = 0; disk_index < 64; disk_index++) {
+    let path =
+        String{"\\\\.\\PhysicalDrive"} + String::from(disk_index, allocator);
+    let const wide_path = utf8_to_wide(path.view(), allocator);
+    if (!wide_path.has_value()) continue;
+    let const handle =
+        CreateFileW(wide_path->begin(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (handle == INVALID_HANDLE_VALUE) continue;
+    defer { CloseHandle(handle); };
+
+    DISK_PERFORMANCE performance{};
+    DWORD returned_byte_count = 0;
+    if (DeviceIoControl(handle, IOCTL_DISK_PERFORMANCE, nullptr, 0,
+                        &performance, sizeof(performance), &returned_byte_count,
+                        nullptr) == FALSE ||
+        returned_byte_count < sizeof(performance))
+    {
+      continue;
+    }
+
+    snapshot.disks.push(disk_io_status{
+        String{"PhysicalDrive"} + String::from(disk_index, allocator),
+        performance.BytesRead.QuadPart < 0
+            ? 0
+            : static_cast<u64>(performance.BytesRead.QuadPart),
+        performance.BytesWritten.QuadPart < 0
+            ? 0
+            : static_cast<u64>(performance.BytesWritten.QuadPart),
+        performance.ReadCount,
+        performance.WriteCount,
+        hundred_nanosecond_units_to_nanoseconds(performance.ReadTime.QuadPart),
+        hundred_nanosecond_units_to_nanoseconds(performance.WriteTime.QuadPart),
+        0,
+        hundred_nanosecond_units_to_nanoseconds(performance.IdleTime.QuadPart),
+        0,
+        performance.QueueDepth,
+        0,
+        0,
+        0,
+        0,
+        AVAILABLE,
+    });
+  }
+
+  return snapshot;
+}
+
+fn processor_model_name(Allocator allocator) throws -> Maybe<String>
+{
+  wchar_t name_buffer[256]{};
+  DWORD name_bytes = sizeof(name_buffer);
+  let const status = RegGetValueW(
+      HKEY_LOCAL_MACHINE, L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
+      L"ProcessorNameString", RRF_RT_REG_SZ, nullptr, name_buffer, &name_bytes);
+  if (status != ERROR_SUCCESS) return None;
+
+  return wide_to_utf8(name_buffer, static_cast<usize>(lstrlenW(name_buffer)),
+                      allocator);
+}
+
+fn has_process_open_file_listing() wontthrow -> bool { return false; }
+
+fn list_process_open_files(i64 pid, Allocator allocator) throws
+    -> ArrayList<process_open_file>
+{
+  unused(pid);
+  return ArrayList<process_open_file>{allocator};
 }
 
 static fn utf8_to_absolute_wide_path(StringView path,

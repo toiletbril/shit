@@ -827,6 +827,234 @@ fn get_hostname() throws -> Maybe<String>
   return koshka::None;
 }
 
+static fn ensure_winsock_started() wontthrow -> bool
+{
+  static bool is_started = false;
+  static bool did_try = false;
+  if (did_try) return is_started;
+
+  WSADATA data{};
+  is_started = WSAStartup(MAKEWORD(2, 2), &data) == 0;
+  did_try = true;
+  return is_started;
+}
+
+fn network_interface_addresses() throws -> ArrayList<network_interface_address>
+{
+  let result = ArrayList<network_interface_address>{heap_allocator()};
+  if (!ensure_winsock_started()) return result;
+
+  ULONG buffer_bytes = 16384;
+  ArrayList<u64> storage{heap_allocator()};
+  IP_ADAPTER_ADDRESSES *adapters = nullptr;
+  ULONG query_status = ERROR_BUFFER_OVERFLOW;
+  for (usize attempt_count = 0; attempt_count < 4; attempt_count++) {
+    storage.reserve((static_cast<usize>(buffer_bytes) + sizeof(u64) - 1) /
+                    sizeof(u64));
+    adapters = reinterpret_cast<IP_ADAPTER_ADDRESSES *>(storage.begin());
+    query_status =
+        GetAdaptersAddresses(AF_UNSPEC,
+                             GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST |
+                                 GAA_FLAG_SKIP_DNS_SERVER,
+                             nullptr, adapters, &buffer_bytes);
+    if (query_status != ERROR_BUFFER_OVERFLOW) break;
+  }
+
+  if (query_status != NO_ERROR) return result;
+
+  for (let *adapter = adapters; adapter != nullptr; adapter = adapter->Next) {
+    if (adapter->FriendlyName == nullptr) continue;
+
+    let const interface_name = wide_to_utf8(
+        adapter->FriendlyName,
+        static_cast<usize>(lstrlenW(adapter->FriendlyName)), heap_allocator());
+    if (!interface_name.has_value()) continue;
+
+    for (let *unicast = adapter->FirstUnicastAddress; unicast != nullptr;
+         unicast = unicast->Next)
+    {
+      if (unicast->Address.lpSockaddr == nullptr) continue;
+
+      let const family = unicast->Address.lpSockaddr->sa_family;
+      if (family != AF_INET && family != AF_INET6) continue;
+
+      char address[NI_MAXHOST]{};
+      if (::getnameinfo(
+              unicast->Address.lpSockaddr,
+              static_cast<socklen_t>(unicast->Address.iSockaddrLength), address,
+              sizeof(address), nullptr, 0, NI_NUMERICHOST) != 0)
+      {
+        continue;
+      }
+
+      result.push(network_interface_address{
+          String{interface_name->view()},
+          family == AF_INET ? network_address_family::IPv4
+                            : network_address_family::IPv6,
+          String{address},
+      });
+    }
+  }
+
+  return result;
+}
+
+fn read_network_interface_statistics() throws
+    -> ArrayList<network_interface_statistics_entry>
+{
+  let result = ArrayList<network_interface_statistics_entry>{heap_allocator()};
+  MIB_IF_TABLE2 *table = nullptr;
+  if (GetIfTable2(&table) != NO_ERROR || table == nullptr) return result;
+  defer { FreeMibTable(table); };
+
+  result.reserve(table->NumEntries);
+  for (ULONG index = 0; index < table->NumEntries; index++) {
+    let const &row = table->Table[index];
+    let const interface_name = wide_to_utf8(
+        row.Alias, static_cast<usize>(lstrlenW(row.Alias)), heap_allocator());
+    if (!interface_name.has_value()) continue;
+
+    result.push(network_interface_statistics_entry{
+        steal(*interface_name),
+        row.InOctets,
+        row.OutOctets,
+        row.InUcastPkts + row.InNUcastPkts,
+        row.OutUcastPkts + row.OutNUcastPkts,
+        row.InErrors,
+        row.OutErrors,
+        row.InDiscards,
+        row.OutDiscards,
+        UINT8_MAX,
+    });
+  }
+
+  return result;
+}
+
+fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool
+{
+  bool has_statistics = false;
+  constexpr ULONG FAMILIES[] = {AF_INET, AF_INET6};
+  for (let const family : FAMILIES) {
+    MIB_TCPSTATS native{};
+    if (GetTcpStatisticsEx(&native, family) != NO_ERROR) continue;
+
+    statistics.active_open_count += native.dwActiveOpens;
+    statistics.passive_open_count += native.dwPassiveOpens;
+    statistics.received_segment_count += native.dwInSegs;
+    statistics.sent_segment_count += native.dwOutSegs;
+    statistics.retransmitted_segment_count += native.dwRetransSegs;
+    statistics.input_error_count += native.dwInErrs;
+    has_statistics = true;
+  }
+
+  return has_statistics;
+}
+
+fn has_network_socket_listing() wontthrow -> bool { return false; }
+
+fn network_sockets(bool should_include_process_ids) throws
+    -> ArrayList<network_socket_entry>
+{
+  unused(should_include_process_ids);
+  return ArrayList<network_socket_entry>{heap_allocator()};
+}
+
+static fn probe_one_address(const struct addrinfo *candidate,
+                            u32 timeout_milliseconds) wontthrow
+    -> connect_probe_result
+{
+  let const handle = ::socket(candidate->ai_family, candidate->ai_socktype,
+                              candidate->ai_protocol);
+  if (handle == INVALID_SOCKET) return connect_probe_result::Unreachable;
+
+  u_long is_nonblocking = 1;
+  ioctlsocket(handle, FIONBIO, &is_nonblocking);
+
+  connect_probe_result result = connect_probe_result::Unreachable;
+  let const started = ::connect(handle, candidate->ai_addr,
+                                static_cast<int>(candidate->ai_addrlen));
+
+  if (started == 0) {
+    result = connect_probe_result::Connected;
+  } else if (WSAGetLastError() != WSAEWOULDBLOCK) {
+    result = WSAGetLastError() == WSAECONNREFUSED
+                 ? connect_probe_result::Refused
+                 : connect_probe_result::Unreachable;
+  } else {
+    WSAPOLLFD waited{};
+    waited.fd = handle;
+    waited.events = POLLWRNORM;
+
+    let const ready =
+        WSAPoll(&waited, 1, static_cast<INT>(timeout_milliseconds));
+    if (ready == 0) {
+      result = connect_probe_result::TimedOut;
+    } else if (ready > 0) {
+      int pending = 0;
+      int pending_length = sizeof(pending);
+      if (getsockopt(handle, SOL_SOCKET, SO_ERROR,
+                     reinterpret_cast<char *>(&pending), &pending_length) != 0)
+      {
+        result = connect_probe_result::Unreachable;
+      } else if (pending == 0) {
+        result = connect_probe_result::Connected;
+      } else if (pending == WSAECONNREFUSED) {
+        result = connect_probe_result::Refused;
+      } else if (pending == WSAETIMEDOUT) {
+        result = connect_probe_result::TimedOut;
+      } else {
+        result = connect_probe_result::Unreachable;
+      }
+    }
+  }
+
+  closesocket(handle);
+  return result;
+}
+
+fn probe_tcp_connect(StringView host, u16 port,
+                     u32 timeout_milliseconds) wontthrow -> connect_probe_result
+{
+  if (!ensure_winsock_started()) return connect_probe_result::Unreachable;
+
+  const String host_string{host};
+  char service[8]{};
+  usize digit_count = 0;
+  u16 remaining = port;
+  char reversed[8]{};
+  do {
+    reversed[digit_count] = static_cast<char>('0' + (remaining % 10));
+    remaining /= 10;
+    digit_count++;
+  } while (remaining != 0 && digit_count < sizeof(reversed));
+
+  for (usize index = 0; index < digit_count; index++)
+    service[index] = reversed[digit_count - index - 1];
+
+  struct addrinfo request{};
+  request.ai_family = AF_UNSPEC;
+  request.ai_socktype = SOCK_STREAM;
+
+  struct addrinfo *resolved = nullptr;
+  if (::getaddrinfo(host_string.c_str(), service, &request, &resolved) != 0) {
+    return connect_probe_result::Unreachable;
+  }
+
+  connect_probe_result result = connect_probe_result::Unreachable;
+  for (const struct addrinfo *candidate = resolved; candidate != nullptr;
+       candidate = candidate->ai_next)
+  {
+    result = probe_one_address(candidate, timeout_milliseconds);
+    if (result == connect_probe_result::Connected) break;
+
+    if (result == connect_probe_result::Refused) break;
+  }
+
+  ::freeaddrinfo(resolved);
+  return result;
+}
+
 fn get_processor_counts() wontthrow -> processor_counts
 {
   processor_counts counts{};
@@ -910,6 +1138,11 @@ fn enumerate_users() throws -> ArrayList<String>
   if (current_user.has_value()) users.push(current_user.take());
 
   return users;
+}
+
+fn enumerate_groups() throws -> ArrayList<String>
+{
+  return ArrayList<String>{heap_allocator()};
 }
 
 static DWORD PARENT_SHELL_PID = GetCurrentProcessId();

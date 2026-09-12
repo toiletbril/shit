@@ -18,9 +18,13 @@
 /* clang-format off */
 #if defined __linux__ || defined BSD || defined __APPLE__ ||                   \
     defined __COSMOPOLITAN__
+#include <arpa/inet.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <glob.h>
+#include <ifaddrs.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <poll.h>
 #include <pthread.h>
 #include <pwd.h>
@@ -46,15 +50,27 @@
 #include <sched.h>
 #include <sys/sysmacros.h>
 #include <sys/syscall.h>
+#include <sys/vfs.h>
 #endif
 #if defined __GLIBC__
 #include <malloc.h>
 #endif
 #if defined __APPLE__
+#pragma push_macro("cold")
+#undef cold
+#include <CoreFoundation/CoreFoundation.h>
+#include <IOKit/IOKitLib.h>
+#include <IOKit/storage/IOBlockStorageDriver.h>
+#pragma pop_macro("cold")
 #include <dlfcn.h>
 #include <libproc.h>
 #include <mach-o/dyld.h>
+#include <mach/mach.h>
 #include <malloc/malloc.h>
+#include <net/if.h>
+#include <net/if_mib.h>
+#include <net/route.h>
+#include <netinet/tcp_var.h>
 #include <sys/proc.h>
 #include <sys/proc_info.h>
 #include <sys/sysctl.h>
@@ -74,7 +90,10 @@ extern "C" void __lsan_disable(void);
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
+#include <iphlpapi.h>
 #ifndef WC_ERR_INVALID_CHARS
 #define WC_ERR_INVALID_CHARS 0x00000080
 #endif
@@ -430,6 +449,7 @@ fn make_os_args(const ArrayList<String> &args) throws -> os_args;
 
 fn last_system_error_message() throws -> String;
 fn last_system_error_is_missing_file() wontthrow -> bool;
+fn set_last_system_error(i32 error_number) wontthrow -> void;
 
 fn wait_and_monitor_process(process p, bool *was_stopped = nullptr) throws
     -> i32;
@@ -469,17 +489,18 @@ fn process_from_pid(i64 pid) wontthrow -> process;
 struct process_entry
 {
   i64 pid{0};
+  i64 parent_pid{0};
   String name{heap_allocator()};
   String command_line{heap_allocator()};
   /* The BSD aux columns, filled only when resource stats are requested. */
   u64 virtual_kib{0};
   u64 resident_kib{0};
-  u64 cpu_ticks{0};
+  u64 cpu_milliseconds{0};
   u32 owner_id{0};
   char state{'?'};
 };
 
-static_assert(sizeof(usize) != 8 || sizeof(process_entry) == 152);
+static_assert(sizeof(usize) != 8 || sizeof(process_entry) == 160);
 
 /* Every process the current user can see, for the koshkit pkill and killall
    utilities to match a name against. Empty on a platform with no process
@@ -519,6 +540,20 @@ fn scan_process_file_users(const ArrayList<process_file_query> &queries,
 fn process_owner_name(u32 pid, u32 owner_id, Allocator allocator) throws
     -> Maybe<String>;
 
+struct process_open_file
+{
+  String path{heap_allocator()};
+  i64 descriptor_number{-1};
+  u64 size{0};
+  u64 file_id{0};
+  process_file_use use{process_file_use::File};
+  char access{'u'};
+};
+
+fn has_process_open_file_listing() wontthrow -> bool;
+fn list_process_open_files(i64 pid, Allocator allocator) throws
+    -> ArrayList<process_open_file>;
+
 fn make_directory(StringView path, u32 mode) wontthrow -> bool;
 fn set_file_mode(StringView path, u32 mode) wontthrow -> bool;
 fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
@@ -539,20 +574,164 @@ fn read_symlink(StringView path, Allocator allocator) wontthrow
 struct filesystem_status
 {
   u64 block_size{0};
+  u64 fundamental_block_size{0};
   u64 total_blocks{0};
   u64 free_blocks{0};
   u64 available_blocks{0};
+  u64 total_files{0};
+  u64 free_files{0};
+  u64 name_max{0};
+  u64 filesystem_id{0};
+  u64 type_id{0};
+  char type_name[16]{};
 };
 
 struct mounted_filesystem
 {
   String source{heap_allocator()};
   String target{heap_allocator()};
+  String type{heap_allocator()};
+  String options{heap_allocator()};
 };
 
 fn stat_filesystem(StringView path, filesystem_status &status) wontthrow
     -> bool;
 fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>;
+
+fn sync_filesystems() wontthrow -> bool;
+
+fn sync_path(StringView path, bool is_data_only) wontthrow -> bool;
+
+struct memory_status
+{
+  u64 total_kib{0};
+  u64 available_kib{0};
+  u64 free_kib{0};
+  u64 swap_total_kib{0};
+  u64 swap_free_kib{0};
+};
+
+fn read_memory_status(memory_status &status) wontthrow -> bool;
+
+struct swap_status
+{
+  u64 total_bytes{0};
+  u64 used_bytes{0};
+  u64 free_bytes{0};
+  u64 input_bytes{0};
+  u64 output_bytes{0};
+  bool has_activity{false};
+  bool has_encryption_state{false};
+  bool is_encrypted{false};
+};
+
+fn read_swap_status(swap_status &status) wontthrow -> bool;
+
+struct process_io_status
+{
+  u64 read_bytes{0};
+  u64 written_bytes{0};
+  u64 read_operation_count{0};
+  u64 write_operation_count{0};
+  bool has_operation_counts{false};
+};
+
+fn read_process_io_status(i64 pid, process_io_status &status) wontthrow -> bool;
+
+enum class system_activity_field : u32
+{
+  Cpu = 1u << 0,
+  Paging = 1u << 1,
+  Faults = 1u << 2,
+  Scheduler = 1u << 3,
+  CpuStall = 1u << 4,
+  MemoryStall = 1u << 5,
+  IoStall = 1u << 6,
+};
+
+struct system_activity_status
+{
+  u64 cpu_user_units{0};
+  u64 cpu_system_units{0};
+  u64 cpu_idle_units{0};
+  u64 cpu_wait_units{0};
+  u64 cpu_stolen_units{0};
+  u64 page_input_bytes{0};
+  u64 page_output_bytes{0};
+  u64 page_fault_count{0};
+  u64 major_page_fault_count{0};
+  u64 runnable_process_count{0};
+  u64 blocked_process_count{0};
+  u64 cpu_some_stall_microseconds{0};
+  u64 memory_some_stall_microseconds{0};
+  u64 memory_full_stall_microseconds{0};
+  u64 io_some_stall_microseconds{0};
+  u64 io_full_stall_microseconds{0};
+  u32 available_fields{0};
+
+  pure fn has_field(system_activity_field field) const wontthrow -> bool
+  {
+    return (available_fields & static_cast<u32>(field)) != 0;
+  }
+};
+
+fn read_system_activity_status(system_activity_status &status) wontthrow
+    -> bool;
+
+enum class disk_io_field : u32
+{
+  ReadBytes = 1u << 0,
+  WrittenBytes = 1u << 1,
+  ReadOperations = 1u << 2,
+  WriteOperations = 1u << 3,
+  ReadTime = 1u << 4,
+  WriteTime = 1u << 5,
+  BusyTime = 1u << 6,
+  IdleTime = 1u << 7,
+  WeightedBusyTime = 1u << 8,
+  QueueDepth = 1u << 9,
+  ReadErrors = 1u << 10,
+  WriteErrors = 1u << 11,
+  ReadRetries = 1u << 12,
+  WriteRetries = 1u << 13,
+};
+
+struct disk_io_status
+{
+  String name{heap_allocator()};
+  u64 read_bytes{0};
+  u64 written_bytes{0};
+  u64 read_operation_count{0};
+  u64 write_operation_count{0};
+  u64 read_time_nanoseconds{0};
+  u64 write_time_nanoseconds{0};
+  u64 busy_time_nanoseconds{0};
+  u64 idle_time_nanoseconds{0};
+  u64 weighted_busy_time_nanoseconds{0};
+  u64 queue_depth{0};
+  u64 read_error_count{0};
+  u64 write_error_count{0};
+  u64 read_retry_count{0};
+  u64 write_retry_count{0};
+  u32 available_fields{0};
+
+  pure fn has_field(disk_io_field field) const wontthrow -> bool
+  {
+    return (available_fields & static_cast<u32>(field)) != 0;
+  }
+};
+
+struct disk_io_snapshot
+{
+  ArrayList<disk_io_status> disks{heap_allocator()};
+  u64 sampled_at_nanoseconds{0};
+};
+
+fn read_disk_io_snapshot(Allocator allocator) throws -> disk_io_snapshot;
+
+fn system_uptime_seconds() wontthrow -> Maybe<u64>;
+
+fn processor_model_name(Allocator allocator) throws -> Maybe<String>;
 
 fn divide_u128_by_u64(u64 high, u64 low, u64 divisor, u64 &remainder) wontthrow
     -> u64;
@@ -584,6 +763,45 @@ struct file_status
 
 static_assert(sizeof(usize) != 8 || sizeof(file_status) == 104);
 
+enum class batched_syscall_id : u8
+{
+  Read = 0,
+  Write = 1,
+  Lstat = 2,
+  Stat = 3,
+};
+
+struct batched_syscall
+{
+  const Path *path{nullptr};
+  const opaque *input_buffer{nullptr};
+  opaque *output_buffer{nullptr};
+  file_status *status{nullptr};
+  u64 request_id{0};
+  u64 byte_offset{0};
+  usize byte_count{0};
+  descriptor fd{KOSH_INVALID_FD};
+  batched_syscall_id syscall_id{batched_syscall_id::Read};
+};
+
+struct batched_syscall_result
+{
+  u64 request_id{0};
+  usize transferred_byte_count{0};
+  i32 error_number{0};
+};
+
+fn execute_batched_syscalls(const batched_syscall *syscalls,
+                            usize syscall_count,
+                            batched_syscall_result *results) wontthrow -> void;
+
+struct directory_status_entry
+{
+  Path::directory_child child;
+  file_status status{};
+  bool has_status{false};
+};
+
 /* Two observations describe the same untouched file. The device and file
    identity is compared only when both observations carry it, because a
    filesystem that reports no identity would otherwise never match. */
@@ -614,6 +832,9 @@ fn process_file_query_is_supported(const file_status &status,
 fn format_mode_string(u32 mode) throws -> String;
 
 fn file_type_letter(u32 mode) wontthrow -> char;
+
+pure fn device_major(u64 device_id) wontthrow -> u32;
+pure fn device_minor(u64 device_id) wontthrow -> u32;
 
 /* The user name for a numeric uid and the group name for a numeric gid, read
    directly from /etc/passwd and /etc/group, so the static build stays free of
@@ -874,6 +1095,8 @@ fn restore_current_directory(const DirectoryReference &reference) wontthrow
 cold fn list_directory(StringView dir) throws -> Maybe<ArrayList<String>>;
 cold fn list_directory_typed(StringView dir) throws
     -> Maybe<ArrayList<Path::directory_child>>;
+cold fn list_directory_status(StringView dir, Allocator allocator) throws
+    -> Maybe<ArrayList<directory_status_entry>>;
 
 /* The user and system seconds the shell and its children have consumed. Every
    field is zero on a platform with no process accounting. */
@@ -1005,6 +1228,121 @@ fn get_login_user() throws -> Maybe<String>;
 
 fn get_hostname() throws -> Maybe<String>;
 
+enum class network_address_family : u8
+{
+  IPv4,
+  IPv6,
+};
+
+struct network_interface_address
+{
+  String interface_name{heap_allocator()};
+  network_address_family family{network_address_family::IPv4};
+  String address{heap_allocator()};
+};
+
+fn network_interface_addresses() throws -> ArrayList<network_interface_address>;
+
+enum class network_statistics_field : u32
+{
+  ReceiveBytes = 1u << 0,
+  TransmitBytes = 1u << 1,
+  ReceivePackets = 1u << 2,
+  TransmitPackets = 1u << 3,
+  ReceiveErrors = 1u << 4,
+  TransmitErrors = 1u << 5,
+  ReceiveDrops = 1u << 6,
+  TransmitDrops = 1u << 7,
+};
+
+struct network_interface_statistics_entry
+{
+  String interface_name{heap_allocator()};
+  u64 receive_bytes{0};
+  u64 transmit_bytes{0};
+  u64 receive_packet_count{0};
+  u64 transmit_packet_count{0};
+  u64 receive_error_count{0};
+  u64 transmit_error_count{0};
+  u64 receive_drop_count{0};
+  u64 transmit_drop_count{0};
+  u32 available_fields{0};
+
+  pure fn has_field(network_statistics_field field) const wontthrow -> bool
+  {
+    return (available_fields & static_cast<u32>(field)) != 0;
+  }
+};
+
+fn read_network_interface_statistics() throws
+    -> ArrayList<network_interface_statistics_entry>;
+
+struct tcp_statistics
+{
+  u64 active_open_count{0};
+  u64 passive_open_count{0};
+  u64 received_segment_count{0};
+  u64 sent_segment_count{0};
+  u64 retransmitted_segment_count{0};
+  u64 input_error_count{0};
+};
+
+fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool;
+
+enum class network_socket_protocol : u8
+{
+  Tcp,
+  Udp,
+};
+
+enum class network_socket_state : u8
+{
+  Unconnected,
+  Listen,
+  SynSent,
+  SynReceived,
+  Established,
+  CloseWait,
+  FinWait1,
+  Closing,
+  LastAck,
+  FinWait2,
+  TimeWait,
+  Closed,
+  Unknown,
+};
+
+struct network_socket_entry
+{
+  String local_address{heap_allocator()};
+  String peer_address{heap_allocator()};
+  u64 identity{0};
+  u64 receive_queue_bytes{0};
+  u64 send_queue_bytes{0};
+  u32 process_id{0};
+  u16 local_port{0};
+  u16 peer_port{0};
+  network_socket_protocol protocol{network_socket_protocol::Tcp};
+  network_address_family family{network_address_family::IPv4};
+  network_socket_state state{network_socket_state::Unknown};
+};
+
+fn has_network_socket_listing() wontthrow -> bool;
+fn network_sockets(bool should_include_process_ids) throws
+    -> ArrayList<network_socket_entry>;
+
+enum class connect_probe_result : u8
+{
+  Connected,
+  Refused,
+  TimedOut,
+  Unreachable,
+};
+
+fn probe_tcp_connect(StringView host, u16 port,
+                     u32 timeout_milliseconds) wontthrow
+    -> connect_probe_result;
+
 struct user_session
 {
   String user{heap_allocator()};
@@ -1027,6 +1365,8 @@ fn get_home_directory() throws -> Maybe<Path>;
 fn get_home_for_user(StringView username) throws -> Maybe<Path>;
 
 fn enumerate_users() throws -> ArrayList<String>;
+
+fn enumerate_groups() throws -> ArrayList<String>;
 
 /* The interactive shell blocks the terminal-generated signals, a
    non-interactive script leaves those at their default. SIGINT routes to the
