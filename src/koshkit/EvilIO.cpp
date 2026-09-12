@@ -82,11 +82,31 @@ fn read_process_io_rows(Allocator allocator, Maybe<i64> selected_pid,
                         bool should_include_idle) throws -> ArrayList<io_row>
 {
   let rows = ArrayList<io_row>{allocator};
-  for (let const &process : os::enumerate_processes()) {
+  let const processes = os::enumerate_processes();
+  let process_ids = ArrayList<i64>{allocator};
+  let process_positions = ArrayList<usize>{allocator};
+  process_ids.reserve(processes.count());
+  process_positions.reserve(processes.count());
+  for (usize process_position = 0; process_position < processes.count();
+       process_position++)
+  {
+    let const &process = processes[process_position];
     if (selected_pid.has_value() && process.pid != *selected_pid) continue;
 
-    os::process_io_status status{};
-    if (!os::read_process_io_status(process.pid, status)) continue;
+    process_ids.push(process.pid);
+    process_positions.push(process_position);
+  }
+
+  let statuses = ArrayList<os::process_io_status>{allocator};
+  let availability = ArrayList<u8>{allocator};
+  os::read_process_io_statuses(process_ids, statuses, availability);
+  for (usize query_position = 0; query_position < process_ids.count();
+       query_position++)
+  {
+    if (availability[query_position] == 0) continue;
+
+    let const &process = processes[process_positions[query_position]];
+    let const &status = statuses[query_position];
     if (!should_include_idle && !selected_pid.has_value() &&
         status.read_bytes == 0 && status.written_bytes == 0)
     {

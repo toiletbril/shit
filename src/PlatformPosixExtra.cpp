@@ -2023,6 +2023,40 @@ fn read_swap_status(swap_status &status) wontthrow -> bool
 #endif
 }
 
+#if defined __linux__
+static fn parse_linux_process_io_status(StringView text,
+                                        process_io_status &status) wontthrow
+    -> void
+{
+  struct io_field
+  {
+    StringView name;
+    u64 process_io_status::*field;
+  };
+  static constexpr io_field FIELDS[] = {
+      {"read_bytes:",  &process_io_status::read_bytes           },
+      {"write_bytes:", &process_io_status::written_bytes        },
+      {"syscr:",       &process_io_status::read_operation_count },
+      {"syscw:",       &process_io_status::write_operation_count},
+  };
+
+  usize position = 0;
+  while (position < text.length) {
+    let const line = each_line(text, position);
+    for (let const &known : FIELDS) {
+      if (!line.starts_with(known.name)) continue;
+      if (let const parsed = leading_digits(line, known.name.length).to<u64>();
+          !parsed.is_error())
+        status.*known.field = parsed.value();
+      if (known.name == "syscr:" || known.name == "syscw:") {
+        status.has_operation_counts = true;
+      }
+      break;
+    }
+  }
+}
+#endif
+
 fn read_process_io_status(i64 pid, process_io_status &status) wontthrow -> bool
 {
 #if defined __APPLE__
@@ -2047,38 +2081,90 @@ fn read_process_io_status(i64 pid, process_io_status &status) wontthrow -> bool
   let const length = read_small_file(path, buffer, sizeof(buffer));
   if (length == 0) return false;
 
-  let const text = StringView{buffer, length};
-  usize position = 0;
-  while (position < text.length) {
-    let const line = each_line(text, position);
-    struct io_field
-    {
-      StringView name;
-      u64 process_io_status::*field;
-    };
-    static constexpr io_field FIELDS[] = {
-        {"read_bytes:",  &process_io_status::read_bytes           },
-        {"write_bytes:", &process_io_status::written_bytes        },
-        {"syscr:",       &process_io_status::read_operation_count },
-        {"syscw:",       &process_io_status::write_operation_count},
-    };
-    for (let const &known : FIELDS) {
-      if (!line.starts_with(known.name)) continue;
-      if (let const parsed = leading_digits(line, known.name.length).to<u64>();
-          !parsed.is_error())
-        status.*known.field = parsed.value();
-      if (known.name == "syscr:" || known.name == "syscw:") {
-        status.has_operation_counts = true;
-      }
-      break;
-    }
-  }
+  parse_linux_process_io_status(StringView{buffer, length}, status);
 
   return true;
 #else
   unused(pid);
   unused(status);
   return false;
+#endif
+}
+
+fn read_process_io_statuses(const ArrayList<i64> &process_ids,
+                            ArrayList<process_io_status> &statuses,
+                            ArrayList<u8> &availability) throws -> void
+{
+  statuses.clear();
+  availability.clear();
+  statuses.reserve(process_ids.count());
+  availability.reserve(process_ids.count());
+  for (usize index = 0; index < process_ids.count(); index++) {
+    statuses.push({});
+    availability.push(0);
+  }
+
+#if defined __linux__
+  constexpr usize PROCESS_IO_BATCH_COUNT = 64;
+  struct process_io_probe
+  {
+    descriptor fd{KOSH_INVALID_FD};
+    usize process_position{0};
+    char bytes[2048]{};
+  };
+
+  process_io_probe probes[PROCESS_IO_BATCH_COUNT]{};
+  usize probe_count = 0;
+  let batch = Batch{statuses.allocator()};
+  let results = ArrayList<BatchResult>{statuses.allocator()};
+  batch.reserve(PROCESS_IO_BATCH_COUNT);
+  results.reserve(PROCESS_IO_BATCH_COUNT);
+  let const do_flush_probes = [&]() throws -> void {
+    batch.clear();
+    for (usize index = 0; index < probe_count; index++) {
+      batch.add(BatchOperation::read(probes[index].fd, probes[index].bytes,
+                                     sizeof(probes[index].bytes)));
+    }
+    batch.execute(results);
+    for (usize index = 0; index < probe_count; index++) {
+      let const &result = results[index];
+      if (result.error_number == 0 && result.transferred_byte_count != 0) {
+        let const process_position = probes[index].process_position;
+        parse_linux_process_io_status(
+            StringView{probes[index].bytes, result.transferred_byte_count},
+            statuses[process_position]);
+        availability[process_position] = 1;
+      }
+      unused(close_fd(probes[index].fd));
+    }
+    probe_count = 0;
+  };
+
+  for (usize process_position = 0; process_position < process_ids.count();
+       process_position++)
+  {
+    char path[64];
+    let const path_length =
+        std::snprintf(path, sizeof(path), "/proc/%lld/io",
+                      static_cast<long long>(process_ids[process_position]));
+    if (path_length <= 0 || static_cast<usize>(path_length) >= sizeof(path)) {
+      continue;
+    }
+
+    let const opened = open_file_descriptor(path, file_open_mode::Read);
+    if (!opened.has_value()) continue;
+
+    probes[probe_count].fd = *opened;
+    probes[probe_count].process_position = process_position;
+    probe_count++;
+    if (probe_count == PROCESS_IO_BATCH_COUNT) do_flush_probes();
+  }
+  if (probe_count != 0) do_flush_probes();
+#else
+  for (usize index = 0; index < process_ids.count(); index++) {
+    availability[index] =
+        read_process_io_status(process_ids[index], statuses[index]) ? 1 : 0;
+  }
 #endif
 }
 

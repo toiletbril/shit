@@ -2318,6 +2318,22 @@ fn read_process_io_status(i64 pid, process_io_status &status) wontthrow -> bool
   return true;
 }
 
+fn read_process_io_statuses(const ArrayList<i64> &process_ids,
+                            ArrayList<process_io_status> &statuses,
+                            ArrayList<u8> &availability) throws -> void
+{
+  statuses.clear();
+  availability.clear();
+  statuses.reserve(process_ids.count());
+  availability.reserve(process_ids.count());
+  for (let const process_id : process_ids) {
+    process_io_status status{};
+    let const is_available = read_process_io_status(process_id, status);
+    statuses.push(status);
+    availability.push(is_available ? 1 : 0);
+  }
+}
+
 fn read_system_activity_status(system_activity_status &status) wontthrow -> bool
 {
   FILETIME idle_time{};

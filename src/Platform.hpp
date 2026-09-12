@@ -654,6 +654,9 @@ struct process_io_status
 };
 
 fn read_process_io_status(i64 pid, process_io_status &status) wontthrow -> bool;
+fn read_process_io_statuses(const ArrayList<i64> &process_ids,
+                            ArrayList<process_io_status> &statuses,
+                            ArrayList<u8> &availability) throws -> void;
 
 enum class system_activity_field : u32
 {

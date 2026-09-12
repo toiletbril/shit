@@ -1477,7 +1477,17 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
         let const chunk_index = operation_index - operation_start;
         let &result = results[operation_index];
         if (completion.res < 0) {
-          result.error_number = -completion.res;
+          let const error_number = -completion.res;
+          let const operation_kind = operations[operation_index].syscall_id;
+          if ((operation_kind == batched_syscall_id::Read ||
+               operation_kind == batched_syscall_id::Write) &&
+              (error_number == EOPNOTSUPP || error_number == EINVAL ||
+               error_number == ESPIPE))
+          {
+            execute_batched_syscall_direct(operations[operation_index], result);
+          } else {
+            result.error_number = error_number;
+          }
         } else if (operations[operation_index].syscall_id ==
                        batched_syscall_id::Lstat ||
                    operations[operation_index].syscall_id ==
