@@ -38,14 +38,18 @@ fn Sync::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (FLAG_SYNC_DATA.is_enabled() && FLAG_SYNC_FILESYSTEM.is_enabled()) {
-    report_soft_koshkit_error(ec, cxt, "sync: cannot combine -d with -f",
-                              "select one of the two modes");
+    let conflict_location = FLAG_SYNC_DATA.value_location();
+    if (FLAG_SYNC_FILESYSTEM.position() > FLAG_SYNC_DATA.position())
+      conflict_location = FLAG_SYNC_FILESYSTEM.value_location();
+    KOSHKIT_REPORT_ERROR_AT(conflict_location, "cannot combine -d with -f",
+                            "select one of the two modes");
     return 1;
   }
 
@@ -66,11 +70,14 @@ fn Sync::execute(const ExecContext &ec, EvalContext &cxt,
 
   i32 status = 0;
   let const is_data_only = FLAG_SYNC_DATA.is_enabled();
-  for (let const &operand : operands) {
+  for (usize operand_index = 0; operand_index < operands.count();
+       operand_index++)
+  {
+    let const &operand = operands[operand_index];
     if (!os::sync_path(operand.view(), is_data_only)) {
-      report_soft_koshkit_error(ec, cxt,
-                                "sync: cannot flush '" + operand +
-                                    "': " + os::last_system_error_message());
+      KOSHKIT_REPORT_ERROR_AT(operand_locations[operand_index],
+                              "cannot flush '" + operand +
+                                  "': " + os::last_system_error_message());
       status = 1;
     }
   }

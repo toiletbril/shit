@@ -160,3 +160,21 @@ echo "=== goodstat color value location ==="
 
 echo "=== goodstat path location ==="
 "$BIN" -c 'koshkit goodstat KOSH_MISSING_PATH' 2>&1
+
+echo "=== sync later filesystem flag location ==="
+"$BIN" -c 'koshkit sync -d -f LICENSE' 2>&1
+
+echo "=== sync later data flag location ==="
+"$BIN" -c 'koshkit sync -f -d LICENSE' 2>&1
+
+echo "=== sync path location ==="
+"$BIN" -c 'koshkit sync KOSH_MISSING_PATH' 2>&1
+
+echo "=== unlink extra operand location ==="
+"$BIN" -c 'koshkit unlink first second' 2>&1
+
+echo "=== unlink missing path location ==="
+"$BIN" -c 'koshkit unlink KOSH_MISSING_PATH' 2>&1
+
+echo "=== unlink directory location ==="
+"$BIN" -c 'koshkit unlink .' 2>&1

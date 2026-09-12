@@ -38,15 +38,13 @@ cold fn WhoAmI::execute(
 {
   let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
   let const operands =
-      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
-  defer { reset_flags(FLAG_LIST); };
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (!operands.is_empty()) {
-    report_soft_koshkit_util_error(ec, cxt, operand_locations[0],
-                                   args[0].view(),
-                                   "unexpected operand '" + operands[0] + "'");
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[0],
+                            "unexpected operand '" + operands[0] + "'");
     return 2;
   }
 

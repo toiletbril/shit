@@ -35,15 +35,16 @@ cold fn Unlink::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
   if (operands.count() > 1) {
-    report_soft_koshkit_error(ec, cxt,
-                              "unlink: extra operand '" + operands[1] + "'");
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[1],
+                            "extra operand '" + operands[1] + "'");
     return 1;
   }
 
@@ -52,15 +53,15 @@ cold fn Unlink::execute(
   let const &target = operands[0];
   let const target_path = Path{target.view()};
   if (target_path.is_directory() && !target_path.is_symbolic_link()) {
-    report_soft_koshkit_error(
-        ec, cxt, "unlink: cannot unlink '" + target + "': it is a directory");
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[0], "cannot unlink '" + target +
+                                                      "': it is a directory");
     return 1;
   }
 
   if (!remove_path(target.view(), removal_mode::SinglePath)) {
-    report_soft_koshkit_error(ec, cxt,
-                              "unlink: cannot unlink '" + target +
-                                  "': " + os::last_system_error_message());
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[0],
+                            "cannot unlink '" + target +
+                                "': " + os::last_system_error_message());
     return 1;
   }
   return 0;

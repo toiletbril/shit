@@ -246,3 +246,29 @@ note: the value is always, auto, or never.
 1:18: error: goodstat: cannot stat 'KOSH_MISSING_PATH': No such file or directory.
      1 |  koshkit goodstat KOSH_MISSING_PATH
        |                   ^~~~~~~~~~~~~~~~~
+=== sync later filesystem flag location ===
+1:17: error: sync: cannot combine -d with -f.
+     1 |  koshkit sync -d -f LICENSE
+       |                  ^~
+note: select one of the two modes.
+=== sync later data flag location ===
+1:17: error: sync: cannot combine -d with -f.
+     1 |  koshkit sync -f -d LICENSE
+       |                  ^~
+note: select one of the two modes.
+=== sync path location ===
+1:14: error: sync: cannot flush 'KOSH_MISSING_PATH': No such file or directory.
+     1 |  koshkit sync KOSH_MISSING_PATH
+       |               ^~~~~~~~~~~~~~~~~
+=== unlink extra operand location ===
+1:22: error: unlink: extra operand 'second'.
+     1 |  koshkit unlink first second
+       |                       ^~~~~~
+=== unlink missing path location ===
+1:16: error: unlink: cannot unlink 'KOSH_MISSING_PATH': No such file or directory.
+     1 |  koshkit unlink KOSH_MISSING_PATH
+       |                 ^~~~~~~~~~~~~~~~~
+=== unlink directory location ===
+1:16: error: unlink: cannot unlink '.': it is a directory.
+     1 |  koshkit unlink .
+       |                 ^
