@@ -11,6 +11,7 @@
 
 #include "../Builtin.hpp"
 #include "../Cli.hpp"
+#include "../CliColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
@@ -20,7 +21,7 @@ FLAG_LIST_DECL();
 
 HELP_SYNOPSIS_DECL("[utility] [arg ...]");
 
-HELP_DESCRIPTION_DECL("The koshkit builtin runs a bundled coreutility.");
+HELP_DESCRIPTION_DECL("The koshkit builtin runs a bundled utility.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help and list the utilities.");
 FLAG(KOSHKIT_LIST, Bool, '\0', "list", "List the utility names, one per line.");
@@ -39,13 +40,37 @@ pure fn Koshkit::kind() const wontthrow -> Builtin::Kind
   return Kind::Koshkit;
 }
 
+enum class utility_section : u8
+{
+  Posix,
+  Koshka,
+};
+
+static pure fn get_utility_section(koshkit::Utility::Kind kind) wontthrow
+    -> utility_section
+{
+  switch (kind) {
+  case koshkit::Utility::Kind::Evil:
+  case koshkit::Utility::Kind::Evilfiles:
+  case koshkit::Utility::Kind::Evilfs:
+  case koshkit::Utility::Kind::Evilnet:
+  case koshkit::Utility::Kind::Goodnode:
+  case koshkit::Utility::Kind::Evilps:
+  case koshkit::Utility::Kind::Goodstat:
+  case koshkit::Utility::Kind::Evildisk:
+  case koshkit::Utility::Kind::Evilio:
+  case koshkit::Utility::Kind::Evillogs:
+  case koshkit::Utility::Kind::Goodcore:
+  case koshkit::Utility::Kind::Evilss:
+  case koshkit::Utility::Kind::Goodfsw: return utility_section::Koshka;
+  default: return utility_section::Posix;
+  }
+}
+
 fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 {
   ASSERT(!ec.args().is_empty());
 
-  /* A bare-name invocation arrives with the utility name already at args[0],
-     so it dispatches with the name in place. The resolver sets this up when the
-     koshkit option is on. */
   if (let const chosen = koshkit::find_util(ec.args()[0].view());
       chosen.has_value())
     return koshkit::dispatch(ec, cxt, 0, chosen);
@@ -94,8 +119,6 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     for (let const &name : sorted_names) {
       let link = Path{ec.args()[2].view()};
       link.push_component(name.view());
-      /* A real file at the path is left alone so assimilate never clobbers a
-         user's binary. */
       if (link.is_symbolic_link()) os::remove_file(link.text().view());
       if (!os::create_symlink(target->view(), link.text().view())) {
         report_soft_builtin_error(ec, cxt,
@@ -115,21 +138,30 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     listing += "  koshkit [utility] [arg ...]\n";
     listing += "  koshkit --list\n";
     listing += "  koshkit --assimilate DIR\n";
-    listing += "\nUTILITIES\n";
+    listing += "\nUTILITIES\n\n";
 
-    let joined_names = String{cxt.scratch_allocator()};
+    let posix_names = ArrayList<StringView>{cxt.scratch_allocator()};
+    let koshka_names = ArrayList<StringView>{cxt.scratch_allocator()};
     for (let const &name : sorted_names) {
-      if (!joined_names.is_empty()) joined_names += ", ";
-      joined_names += name.view();
+      let const kind = koshkit::find_util(name.view());
+      ASSERT(kind.has_value());
+      switch (get_utility_section(*kind)) {
+      case utility_section::Posix: posix_names.push(name.view()); break;
+      case utility_section::Koshka: koshka_names.push(name.view()); break;
+      }
     }
-    listing += wrap_text(joined_names.view(), HELP_INDENT, HELP_WRAP_WIDTH);
-    listing += '\n';
 
-    ec.print_to_stdout(listing);
+    let const should_color = colors::stdout_wants_color();
+    append_report_name_section(listing, "POSIX", posix_names, should_color,
+                               "  ");
+    append_report_name_section(listing, "Koshka", koshka_names, should_color,
+                               "  ");
+
+    ec.print_to_stdout(format_cli_help(listing.view()));
     return 0;
   }
 
   return koshkit::dispatch(ec, cxt, 1);
 }
 
-} /* namespace koshka */
+} // namespace koshka

@@ -161,6 +161,15 @@ public:
     m_data[m_length].~T();
   }
 
+  fn truncate(usize kept_count) wontthrow -> void
+  {
+    ASSERT(kept_count <= m_length, "truncate past the end of the list");
+    while (m_length > kept_count) {
+      m_length--;
+      m_data[m_length].~T();
+    }
+  }
+
   /* The caller guarantees index is in range. */
   fn remove(usize index) throws -> void
   {

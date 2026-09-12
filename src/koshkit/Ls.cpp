@@ -3,22 +3,25 @@
  *    See the top-level LICENSE file for the licensing information.
  *
  * This file implements the ls utility. It reads and sorts directory entries,
- * filters hidden names, resolves owner and group labels, and renders compact or
- * long listings.
+ * filters hidden names, resolves owner and group labels, classifies and colors
+ * names by file type, and renders compact, long, recursive, or tree listings.
  */
 
 #include "../Cli.hpp"
+#include "../CliColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
+#include "../StaticStringMap.hpp"
 #include "../Trace.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-aA1lh] [path ...]");
+HELP_SYNOPSIS_DECL("[-aA1lhFRrtS] [-L level] [--tree] [--color when] "
+                   "[path ...]");
 
 HELP_DESCRIPTION_DECL("The ls utility lists the names in each directory.");
 
@@ -30,6 +33,20 @@ FLAG(LS_LONG, Bool, 'l', "",
      "Print the mode, owner, group, size, and time before each name.");
 FLAG(LS_HUMAN, Bool, 'h', "",
      "With -l, print the size in a human-readable form such as 4.0K.");
+FLAG(LS_CLASSIFY, Bool, 'F', "classify",
+     "Append a type indicator to each name, one of / * @ | and =.");
+FLAG(LS_SORT_TIME, Bool, 't', "", "Sort by modification time, newest first.");
+FLAG(LS_SORT_SIZE, Bool, 'S', "", "Sort by size, largest first.");
+FLAG(LS_REVERSE, Bool, 'r', "", "Reverse the sort order.");
+FLAG(LS_RECURSIVE, Bool, 'R', "recursive",
+     "List every subdirectory that is reached.");
+FLAG(LS_TREE, Bool, '\0', "tree",
+     "Draw every reached subdirectory as an indented tree.");
+FLAG(LS_LEVEL, String, 'L', "level",
+     "Descend at most this many levels with -R and --tree.");
+FLAG(LS_COLOR, String, '\0', "color",
+     "Color names by file type. The value is always, auto, or never, and auto "
+     "colors a terminal alone.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(Ls);
@@ -39,6 +56,52 @@ namespace koshka {
 namespace koshkit {
 
 static constexpr usize COLUMN_GAP = 2;
+
+enum class entry_type : u8
+{
+  Regular,
+  Directory,
+  Symlink,
+  BrokenSymlink,
+  Executable,
+  Fifo,
+  Socket,
+  Device,
+};
+
+enum class sort_key : u8
+{
+  Name,
+  Time,
+  Size,
+};
+
+struct listing_options
+{
+  sort_key key{sort_key::Name};
+  usize max_depth{0};
+  bool has_depth_limit{false};
+  bool is_reversed{false};
+  bool should_color{false};
+  bool should_classify{false};
+  bool is_long{false};
+  bool is_one_per_line{false};
+  bool is_recursive{false};
+  bool is_tree{false};
+  bool is_showing_dot_names{false};
+  bool is_listing_dot_and_dotdot{false};
+  bool needs_full_status{false};
+  bool needs_type{false};
+};
+
+struct listing_entry
+{
+  explicit listing_entry(Allocator allocator) : name(allocator) {}
+  String name;
+  os::file_status status{};
+  entry_type type{entry_type::Regular};
+  bool has_status{false};
+};
 
 /* The blocks ride along so the total line sums them without a second stat. */
 struct long_entry
@@ -92,40 +155,270 @@ static fn append_padded(String &output, StringView field, usize width,
   if (!should_pad_on_left) output.append_repeated(' ', width - field.length);
 }
 
+static pure fn entry_color(entry_type type) wontthrow -> StringView
+{
+  switch (type) {
+  case entry_type::Directory: return colors::ansi::BOLD_BLUE;
+
+  case entry_type::Symlink: return colors::ansi::BOLD_CYAN;
+
+  case entry_type::BrokenSymlink: return colors::ansi::BOLD_RED;
+
+  case entry_type::Executable: return colors::ansi::BOLD_GREEN;
+
+  case entry_type::Fifo: return colors::ansi::YELLOW;
+
+  case entry_type::Socket: return colors::ansi::BOLD_MAGENTA;
+
+  case entry_type::Device: return colors::ansi::BOLD_YELLOW;
+
+  case entry_type::Regular: break;
+  }
+
+  return StringView{};
+}
+
+static pure fn classify_suffix(entry_type type) wontthrow -> char
+{
+  switch (type) {
+  case entry_type::Directory: return '/';
+
+  case entry_type::Symlink:
+  case entry_type::BrokenSymlink: return '@';
+
+  case entry_type::Executable: return '*';
+
+  case entry_type::Fifo: return '|';
+
+  case entry_type::Socket: return '=';
+
+  case entry_type::Device:
+  case entry_type::Regular: break;
+  }
+
+  return '\0';
+}
+
+static fn append_decorated_name(String &output, const listing_entry &entry,
+                                const listing_options &options) throws -> void
+{
+  let const color =
+      options.should_color ? entry_color(entry.type) : StringView{};
+  if (!color.is_empty()) {
+    output += color;
+    output += entry.name.view();
+    output += colors::ansi::RESET;
+  } else {
+    output += entry.name.view();
+  }
+
+  if (!options.should_classify) return;
+
+  let const suffix = classify_suffix(entry.type);
+  if (suffix != '\0') output.push(suffix);
+}
+
+static pure fn decorated_width(const listing_entry &entry,
+                               const listing_options &options) wontthrow
+    -> usize
+{
+  let const has_suffix =
+      options.should_classify && classify_suffix(entry.type) != '\0';
+  return entry.name.count() + (has_suffix ? 1 : 0);
+}
+
+static fn classify_status(const Path &path, const os::file_status &status,
+                          bool should_detect_broken_links) wontthrow
+    -> entry_type
+{
+  switch (os::file_type_letter(status.mode)) {
+  case 'd': return entry_type::Directory;
+
+  case 'l': {
+    if (!should_detect_broken_links) return entry_type::Symlink;
+
+    os::file_status target_status{};
+    if (!os::stat_path_following(path.text().view(), target_status)) {
+      return entry_type::BrokenSymlink;
+    }
+
+    return entry_type::Symlink;
+  }
+
+  case 'p': return entry_type::Fifo;
+
+  case 's': return entry_type::Socket;
+
+  case 'c':
+  case 'b': return entry_type::Device;
+
+  default: break;
+  }
+
+  return (status.mode & 0111u) != 0 ? entry_type::Executable
+                                    : entry_type::Regular;
+}
+
+static fn
+make_entry(const Path &path, StringView name, const listing_options &options,
+           Path::entry_kind kind, Allocator allocator,
+           const os::directory_status_entry *known_entry = nullptr) throws
+    -> listing_entry
+{
+  listing_entry entry{allocator};
+  entry.name = String{allocator, name};
+
+  if (!options.needs_full_status) {
+    if (!options.needs_type) return entry;
+
+    if (kind == Path::entry_kind::Directory) {
+      entry.type = entry_type::Directory;
+      return entry;
+    }
+  }
+
+  if (known_entry != nullptr) {
+    if (!known_entry->has_status) return entry;
+
+    entry.status = known_entry->status;
+    entry.has_status = true;
+    entry.type = classify_status(path, entry.status, options.should_color);
+    return entry;
+  }
+
+  if (os::stat_path(path.text().view(), entry.status)) {
+    entry.has_status = true;
+    entry.type = classify_status(path, entry.status, options.should_color);
+  }
+
+  return entry;
+}
+
+static fn sort_entries(ArrayList<listing_entry> &entries,
+                       const listing_options &options) throws -> void
+{
+  let const do_compare = [&options](const listing_entry &a,
+                                    const listing_entry &b) wontthrow -> bool {
+    switch (options.key) {
+    case sort_key::Time:
+      if (a.status.modification_time != b.status.modification_time) {
+        return a.status.modification_time > b.status.modification_time;
+      }
+      break;
+
+    case sort_key::Size:
+      if (a.status.size != b.status.size) return a.status.size > b.status.size;
+      break;
+
+    case sort_key::Name: break;
+    }
+
+    return a.name.view() < b.name.view();
+  };
+
+  if (options.is_reversed) {
+    entries.sort([&do_compare](const listing_entry &a, const listing_entry &b)
+                     wontthrow -> bool { return do_compare(b, a); });
+    return;
+  }
+
+  entries.sort(do_compare);
+}
+
+static fn collect_directory(const Path &directory,
+                            const listing_options &options, Allocator allocator,
+                            ArrayList<listing_entry> &entries) throws -> bool
+{
+  let const directory_text = directory.text().view();
+  if (options.needs_full_status) {
+    let const children = os::list_directory_status(directory_text, allocator);
+    if (!children.has_value()) return false;
+
+    entries.reserve(children->count() + 2);
+    if (options.is_listing_dot_and_dotdot) {
+      entries.push(make_entry(directory, StringView{"."}, options,
+                              Path::entry_kind::Directory, allocator));
+      entries.push(make_entry(
+          PathBuilder{directory_text}.append(StringView{".."}).build(),
+          StringView{".."}, options, Path::entry_kind::Directory, allocator));
+    }
+
+    for (const os::directory_status_entry &child : *children) {
+      if (!options.is_showing_dot_names && child.child.name.starts_with(".")) {
+        continue;
+      }
+
+      let const child_path =
+          PathBuilder{directory_text}.append(child.child.name.view()).build();
+      entries.push(make_entry(child_path, child.child.name.view(), options,
+                              child.child.kind, allocator, &child));
+    }
+
+    sort_entries(entries, options);
+    return true;
+  }
+
+  let const children = Path::read_directory_typed(directory);
+  if (!children.has_value()) return false;
+
+  entries.reserve(children->count() + 2);
+
+  if (options.is_listing_dot_and_dotdot) {
+    entries.push(make_entry(directory, StringView{"."}, options,
+                            Path::entry_kind::Directory, allocator));
+    entries.push(make_entry(
+        PathBuilder{directory_text}.append(StringView{".."}).build(),
+        StringView{".."}, options, Path::entry_kind::Directory, allocator));
+  }
+
+  for (const Path::directory_child &child : *children) {
+    if (!options.is_showing_dot_names && child.name.starts_with(".")) continue;
+
+    let const child_path =
+        PathBuilder{directory_text}.append(child.name.view()).build();
+    entries.push(make_entry(child_path, child.name.view(), options, child.kind,
+                            allocator));
+  }
+
+  sort_entries(entries, options);
+  return true;
+}
+
 /* A path that cannot be stat'd renders a sparse row so the listing still names
    it. */
-static fn build_long_entry(const Path &path, StringView name,
+static fn build_long_entry(const listing_entry &entry,
+                           const listing_options &options,
                            ArrayList<id_name_entry> &uid_cache,
                            ArrayList<id_name_entry> &gid_cache,
                            Allocator allocator) throws -> long_entry
 {
-  long_entry entry{allocator};
-  entry.name = String{allocator, name};
+  long_entry row{allocator};
+  append_decorated_name(row.name, entry, options);
 
-  os::file_status status{};
-  if (!os::stat_path(path.text().view(), status)) {
-    entry.mode_string = "??????????";
-    entry.link_count = "?";
-    entry.owner = "?";
-    entry.group = "?";
-    entry.size = "?";
-    entry.time = "?";
-    return entry;
+  if (!entry.has_status) {
+    row.mode_string = "??????????";
+    row.link_count = "?";
+    row.owner = "?";
+    row.group = "?";
+    row.size = "?";
+    row.time = "?";
+    return row;
   }
 
-  entry.mode_string = os::format_mode_string(status.mode);
-  entry.link_count = String::from(status.link_count, allocator);
-  entry.owner = cached_id_name(status.owner_id, id_name_kind::Owner, uid_cache,
-                               allocator);
-  entry.group = cached_id_name(status.group_id, id_name_kind::Group, gid_cache,
-                               allocator);
-  entry.size = FLAG_LS_HUMAN.is_enabled()
-                   ? format_human_size(status.size, allocator)
-                   : String::from(status.size, allocator);
-  entry.time =
+  const os::file_status &status = entry.status;
+  row.mode_string = os::format_mode_string(status.mode);
+  row.link_count = String::from(status.link_count, allocator);
+  row.owner = cached_id_name(status.owner_id, id_name_kind::Owner, uid_cache,
+                             allocator);
+  row.group = cached_id_name(status.group_id, id_name_kind::Group, gid_cache,
+                             allocator);
+  row.size = FLAG_LS_HUMAN.is_enabled()
+                 ? format_human_size(status.size, allocator)
+                 : String::from(status.size, allocator);
+  row.time =
       utils::format_unix_timestamp(status.modification_time, "%b %e %H:%M");
-  entry.blocks = status.blocks;
-  return entry;
+  row.blocks = status.blocks;
+  return row;
 }
 
 static fn render_long_entries(const ArrayList<long_entry> &entries,
@@ -175,33 +468,40 @@ static fn column_width(const ArrayList<usize> &widths, usize column_index,
   return widest;
 }
 
-static fn render_columns(const ArrayList<StringView> &names, String &output,
+static fn render_columns(const ArrayList<listing_entry> &entries,
+                         const listing_options &options, String &output,
                          Allocator allocator) throws -> void
 {
-  let const count = names.count();
+  let const count = entries.count();
   if (count == 0) return;
+
+  ArrayList<String> cells{allocator};
+  ArrayList<usize> widths{allocator};
+  cells.reserve(count);
+  widths.reserve(count);
+  for (const listing_entry &entry : entries) {
+    let cell = String{allocator};
+    append_decorated_name(cell, entry, options);
+    cells.push(steal(cell));
+    widths.push(decorated_width(entry, options));
+  }
 
   u32 terminal_columns = 0;
   u32 terminal_rows = 0;
   let const is_terminal = os::terminal_size(terminal_columns, terminal_rows);
-  if (FLAG_LS_ONE.is_enabled() || !is_terminal) {
-    for (const StringView &name : names) {
-      output += name;
+  if (options.is_one_per_line || !is_terminal) {
+    for (const String &cell : cells) {
+      output += cell.view();
       output += '\n';
     }
     return;
   }
   const usize terminal_width = terminal_columns;
 
-  ArrayList<usize> widths{allocator};
-  widths.reserve(count);
-  for (const StringView &name : names)
-    widths.push(name.length);
-
   /* A column-major grid puts the entry at column*rows+row. */
-  usize shortest_name_length = names.front().length;
-  for (let const name : names)
-    if (name.length < shortest_name_length) shortest_name_length = name.length;
+  usize shortest_name_length = widths.front();
+  for (let const width : widths)
+    if (width < shortest_name_length) shortest_name_length = width;
   let const width_limited_columns =
       terminal_width / (shortest_name_length + COLUMN_GAP);
   let const bounded_columns =
@@ -232,7 +532,7 @@ static fn render_columns(const ArrayList<StringView> &names, String &output,
     for (usize c = 0; c < best_columns; c++) {
       let const index = c * rows + r;
       if (index >= count) continue;
-      output += names[index];
+      output += cells[index].view();
       let const has_next =
           (c + 1 < best_columns) && ((c + 1) * rows + r < count);
       if (has_next)
@@ -254,6 +554,153 @@ static fn long_total_blocks(const ArrayList<long_entry> &entries,
   return "total " + String::from(total_512_blocks / 2, allocator);
 }
 
+static fn render_entries(const ArrayList<listing_entry> &entries,
+                         const listing_options &options,
+                         bool should_print_total,
+                         ArrayList<id_name_entry> &uid_cache,
+                         ArrayList<id_name_entry> &gid_cache, String &output,
+                         Allocator allocator) throws -> void
+{
+  if (!options.is_long) {
+    render_columns(entries, options, output, allocator);
+    return;
+  }
+
+  ArrayList<long_entry> rows{allocator};
+  rows.reserve(entries.count());
+  for (const listing_entry &entry : entries)
+    rows.push(
+        build_long_entry(entry, options, uid_cache, gid_cache, allocator));
+
+  if (should_print_total) {
+    output += long_total_blocks(rows, allocator);
+    output += '\n';
+  }
+
+  render_long_entries(rows, output);
+}
+
+static pure fn is_dot_or_dotdot(StringView name) wontthrow -> bool
+{
+  return name == StringView{"."} || name == StringView{".."};
+}
+
+static fn render_tree_level(StringView directory,
+                            const listing_options &options, usize depth,
+                            String &prefix, String &output,
+                            Allocator allocator) throws -> void
+{
+  ArrayList<listing_entry> entries{allocator};
+  if (!collect_directory(Path{directory}, options, allocator, entries)) return;
+
+  for (usize index = 0; index < entries.count(); index++) {
+    const listing_entry &entry = entries[index];
+    let const is_last = index + 1 == entries.count();
+
+    output += prefix.view();
+    output += is_last ? StringView{"`-- "} : StringView{"|-- "};
+    append_decorated_name(output, entry, options);
+    output += '\n';
+
+    let const is_descending =
+        entry.type == entry_type::Directory &&
+        (!options.has_depth_limit || depth + 1 < options.max_depth);
+    if (!is_descending) continue;
+
+    let const kept_length = prefix.count();
+    prefix += is_last ? StringView{"    "} : StringView{"|   "};
+    let const child = PathBuilder{directory}.append(entry.name.view()).build();
+    render_tree_level(child.text().view(), options, depth + 1, prefix, output,
+                      allocator);
+    prefix.truncate(kept_length);
+  }
+}
+
+static fn render_directory_block(
+    StringView directory, const listing_options &options, usize depth,
+    bool should_print_header, ArrayList<id_name_entry> &uid_cache,
+    ArrayList<id_name_entry> &gid_cache, bool &has_printed_block,
+    String &output, const ExecContext &ec, EvalContext &cxt, i32 &status,
+    Allocator allocator) throws -> void
+{
+  ArrayList<listing_entry> entries{allocator};
+  if (!collect_directory(Path{directory}, options, allocator, entries)) {
+    report_soft_koshkit_error(ec, cxt,
+                              "ls: cannot open directory '" +
+                                  String{allocator, directory} + "'");
+    status = 2;
+    return;
+  }
+
+  if (should_print_header) {
+    if (has_printed_block) output += '\n';
+    output += directory;
+    output += ":\n";
+  }
+  has_printed_block = true;
+
+  render_entries(entries, options, true, uid_cache, gid_cache, output,
+                 allocator);
+
+  if (!options.is_recursive) return;
+
+  if (options.has_depth_limit && depth + 1 >= options.max_depth) return;
+
+  for (const listing_entry &entry : entries) {
+    if (entry.type != entry_type::Directory) continue;
+
+    if (is_dot_or_dotdot(entry.name.view())) continue;
+
+    let const child = PathBuilder{directory}.append(entry.name.view()).build();
+    render_directory_block(child.text().view(), options, depth + 1, true,
+                           uid_cache, gid_cache, has_printed_block, output, ec,
+                           cxt, status, allocator);
+  }
+}
+
+static fn resolve_color_mode(const ExecContext &ec, EvalContext &cxt,
+                             bool &out_should_color) throws -> bool
+{
+  if (!FLAG_LS_COLOR.is_set()) {
+    out_should_color = colors::stdout_wants_color();
+    return true;
+  }
+
+  let const selected = parse_cli_color_mode(FLAG_LS_COLOR.value());
+  if (!selected.has_value()) {
+    report_soft_koshkit_error(
+        ec, cxt,
+        "ls: invalid color mode '" +
+            String{cxt.scratch_allocator(), FLAG_LS_COLOR.value()} + "'",
+        "the value is always, auto, or never");
+    return false;
+  }
+
+  out_should_color = stdout_wants_color(*selected);
+  return true;
+}
+
+static fn resolve_depth_limit(const ExecContext &ec, EvalContext &cxt,
+                              listing_options &options) throws -> bool
+{
+  if (!FLAG_LS_LEVEL.is_set()) return true;
+
+  let const parsed =
+      utils::parse_integer_in_base(FLAG_LS_LEVEL.value(), int_base::decimal);
+  if (parsed.is_error() || parsed.value() < 1) {
+    report_soft_koshkit_error(
+        ec, cxt,
+        "ls: invalid level '" +
+            String{cxt.scratch_allocator(), FLAG_LS_LEVEL.value()} + "'",
+        "the level is a positive whole number");
+    return false;
+  }
+
+  options.has_depth_limit = true;
+  options.max_depth = static_cast<usize>(parsed.value());
+  return true;
+}
+
 Ls::Ls() = default;
 
 pure fn Ls::kind() const wontthrow -> Utility::Kind { return Kind::Ls; }
@@ -268,6 +715,39 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
+  listing_options options{};
+  if (!resolve_color_mode(ec, cxt, options.should_color)) return 2;
+
+  if (!resolve_depth_limit(ec, cxt, options)) return 2;
+
+  options.should_classify = FLAG_LS_CLASSIFY.is_enabled();
+  options.is_long = FLAG_LS_LONG.is_enabled();
+  options.is_one_per_line = FLAG_LS_ONE.is_enabled();
+  options.is_recursive = FLAG_LS_RECURSIVE.is_enabled();
+  options.is_tree = FLAG_LS_TREE.is_enabled();
+  options.is_reversed = FLAG_LS_REVERSE.is_enabled();
+
+  if (FLAG_LS_SORT_TIME.is_enabled() && FLAG_LS_SORT_SIZE.is_enabled()) {
+    options.key = FLAG_LS_SORT_TIME.position() > FLAG_LS_SORT_SIZE.position()
+                      ? sort_key::Time
+                      : sort_key::Size;
+  } else if (FLAG_LS_SORT_TIME.is_enabled()) {
+    options.key = sort_key::Time;
+  } else if (FLAG_LS_SORT_SIZE.is_enabled()) {
+    options.key = sort_key::Size;
+  }
+
+  let const is_showing_all =
+      FLAG_LS_ALL.is_enabled() &&
+      (!FLAG_LS_ALMOST_ALL.is_enabled() ||
+       FLAG_LS_ALL.position() > FLAG_LS_ALMOST_ALL.position());
+  options.is_showing_dot_names =
+      is_showing_all || FLAG_LS_ALMOST_ALL.is_enabled();
+  options.is_listing_dot_and_dotdot = is_showing_all && !options.is_tree;
+  options.needs_full_status = options.is_long || options.key != sort_key::Name;
+  options.needs_type = options.should_color || options.should_classify ||
+                       options.is_recursive || options.is_tree;
+
   ArrayList<StringView> targets{cxt.scratch_allocator()};
   if (operands.is_empty())
     targets.push(StringView{"."});
@@ -277,7 +757,7 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
 
   targets.sort();
 
-  ArrayList<StringView> file_targets{cxt.scratch_allocator()};
+  ArrayList<listing_entry> file_entries{cxt.scratch_allocator()};
   ArrayList<StringView> dir_targets{cxt.scratch_allocator()};
   ArrayList<id_name_entry> uid_cache{cxt.scratch_allocator()};
   ArrayList<id_name_entry> gid_cache{cxt.scratch_allocator()};
@@ -295,82 +775,43 @@ fn Ls::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    if (path.is_directory())
+    if (path.is_directory()) {
       dir_targets.push(target);
-    else
-      file_targets.push(target);
-  }
-
-  let const should_print_headers =
-      file_targets.count() + dir_targets.count() > 1;
-
-  if (!file_targets.is_empty()) {
-    if (FLAG_LS_LONG.is_enabled()) {
-      ArrayList<long_entry> file_entries{cxt.scratch_allocator()};
-      file_entries.reserve(file_targets.count());
-      for (const StringView &target : file_targets)
-        file_entries.push(build_long_entry(Path{target}, target, uid_cache,
-                                           gid_cache, cxt.scratch_allocator()));
-      render_long_entries(file_entries, output);
-    } else {
-      render_columns(file_targets, output, cxt.scratch_allocator());
-    }
-  }
-
-  let const is_showing_all =
-      FLAG_LS_ALL.is_enabled() &&
-      (!FLAG_LS_ALMOST_ALL.is_enabled() ||
-       FLAG_LS_ALL.position() > FLAG_LS_ALMOST_ALL.position());
-  let const is_showing_dot_names =
-      is_showing_all || FLAG_LS_ALMOST_ALL.is_enabled();
-
-  bool has_printed_block = !file_targets.is_empty();
-  for (const StringView &target : dir_targets) {
-    let const path = Path{target};
-    Maybe<ArrayList<String>> names = Path::read_directory(path);
-    if (!names.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "ls: cannot open directory '" +
-                                    String{cxt.scratch_allocator(), target} +
-                                    "'");
-      status = 2;
       continue;
     }
 
-    if (should_print_headers) {
-      if (has_printed_block) output += '\n';
-      output += target;
-      output += ":\n";
+    file_entries.push(make_entry(path, target, options,
+                                 Path::entry_kind::Unknown,
+                                 cxt.scratch_allocator()));
+  }
+
+  let const should_print_headers =
+      options.is_recursive || options.is_tree ||
+      file_entries.count() + dir_targets.count() > 1;
+
+  if (!file_entries.is_empty()) {
+    sort_entries(file_entries, options);
+    render_entries(file_entries, options, false, uid_cache, gid_cache, output,
+                   cxt.scratch_allocator());
+  }
+
+  bool has_printed_block = !file_entries.is_empty();
+  for (const StringView &target : dir_targets) {
+    if (!options.is_tree) {
+      render_directory_block(target, options, 0, should_print_headers,
+                             uid_cache, gid_cache, has_printed_block, output,
+                             ec, cxt, status, cxt.scratch_allocator());
+      continue;
     }
+
+    if (has_printed_block) output += '\n';
     has_printed_block = true;
+    output += target;
+    output += '\n';
 
-    ArrayList<StringView> visible_names{cxt.scratch_allocator()};
-    if (is_showing_all) {
-      visible_names.push(StringView{"."});
-      visible_names.push(StringView{".."});
-    }
-    for (const String &name : *names) {
-      if (!is_showing_dot_names && name.starts_with(StringView{"."})) {
-        continue;
-      }
-      visible_names.push(name.view());
-    }
-    visible_names.sort();
-
-    if (FLAG_LS_LONG.is_enabled()) {
-      ArrayList<long_entry> entries{cxt.scratch_allocator()};
-      entries.reserve(visible_names.count());
-      for (const StringView &name : visible_names) {
-        let const child = PathBuilder{target}.append(name).build();
-        entries.push(build_long_entry(child, name, uid_cache, gid_cache,
-                                      cxt.scratch_allocator()));
-      }
-      output += long_total_blocks(entries, cxt.scratch_allocator());
-      output += '\n';
-      render_long_entries(entries, output);
-    } else {
-      render_columns(visible_names, output, cxt.scratch_allocator());
-    }
+    let prefix = String{cxt.scratch_allocator()};
+    render_tree_level(target, options, 0, prefix, output,
+                      cxt.scratch_allocator());
   }
 
   ec.print_to_stdout(output);

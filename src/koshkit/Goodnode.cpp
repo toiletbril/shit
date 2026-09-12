@@ -1,0 +1,303 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements goodnode. It reports inode and filesystem metadata,
+ * calculates a CRC32C checksum, and locates an inode beneath a bounded search
+ * root.
+ */
+
+#include "../Cli.hpp"
+#include "../CliColors.hpp"
+#include "../Errors.hpp"
+#include "../Eval.hpp"
+#include "../Koshkit.hpp"
+#include "../Path.hpp"
+#include "../Platform.hpp"
+#include "../Utils.hpp"
+
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[-i inode] [-r root] [--color when] [path ...]");
+
+HELP_DESCRIPTION_DECL(
+    "The goodnode utility reports inode metadata and a CRC32C checksum.");
+
+FLAG(GOODNODE_INODE, String, 'i', "inode", "Locate this inode.");
+FLAG(GOODNODE_ROOT, String, 'r', "root", "Search beneath this path.");
+FLAG(GOODNODE_COLOR, String, '\0', "color",
+     "Set color output to always, auto, or never.");
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
+REGISTER_KOSHKIT_UTIL_FLAGS(Goodnode);
+
+namespace koshka::koshkit {
+
+namespace {
+
+fn file_crc32c(const ExecContext &ec, StringView path,
+               Allocator allocator) throws -> Maybe<String>
+{
+  let const input = open_named_or_stdin(ec, path);
+  if (!input.has_value()) return None;
+  defer
+  {
+    if (input->should_close) unused(os::close_fd(input->descriptor));
+  };
+
+  u32 crc = 0xffffffffu;
+  char buffer[65536];
+  loop
+  {
+    let const read_count =
+        os::read_fd(input->descriptor, buffer, sizeof(buffer));
+    if (!read_count.has_value()) return None;
+    if (*read_count == 0) break;
+
+    crc = os::crc32c_update(crc, buffer, *read_count);
+    if (os::INTERRUPT_REQUESTED) return None;
+  }
+
+  crc = ~crc;
+  let digest = String::from_in_base(crc, false, int_base::hex, allocator);
+  if (digest.length() < 8) {
+    let padded = String{allocator};
+    padded.append_repeated('0', 8 - digest.length());
+    padded += digest.view();
+    return padded;
+  }
+
+  return digest;
+}
+
+fn append_node_report(String &output, const ExecContext &ec, StringView path,
+                      const os::file_status &status, bool should_color,
+                      Allocator allocator) throws -> void
+{
+  append_report_text(output, path, colors::ansi::BOLD_BLUE, should_color);
+  output += '\n';
+  let body = String{allocator, "  "};
+  bool has_field = false;
+  let const do_append_field = [&](StringView name, StringView value) throws {
+    if (has_field) body += ", ";
+    append_report_inline_field(body, name, value, colors::ansi::BOLD_CYAN,
+                               should_color);
+    has_field = true;
+  };
+  do_append_field("Type", file_type_name(status));
+  do_append_field("Inode", String::from(status.file_id, allocator));
+  do_append_field("Device", String::from(status.device_id, allocator));
+  do_append_field("Links", String::from(status.link_count, allocator));
+  do_append_field("Logical size", format_human_size(status.size, allocator));
+  do_append_field("Allocated",
+                  format_human_size(status.blocks * 512, allocator));
+
+  os::filesystem_status filesystem{};
+  if (os::stat_filesystem(path, filesystem)) {
+    let const filesystem_type = StringView{filesystem.type_name};
+    do_append_field("Filesystem", filesystem_type.is_empty()
+                                      ? StringView{"unknown"}
+                                      : filesystem_type);
+    do_append_field("Filesystem ID",
+                    String::from(filesystem.filesystem_id, allocator));
+    do_append_field("Name limit", String::from(filesystem.name_max, allocator));
+  }
+
+  os::filesystem_error_counters errors{};
+  if (os::read_filesystem_error_counters(path, errors)) {
+    let const has_errors = errors.read_count != 0 || errors.write_count != 0 ||
+                           errors.flush_count != 0 ||
+                           errors.corruption_count != 0 ||
+                           errors.generation_count != 0;
+    do_append_field("Health", has_errors ? StringView{"errors recorded"}
+                                         : StringView{"no errors recorded"});
+    if (has_errors) {
+      let error_text = String{allocator, "read "};
+      error_text += String::from(errors.read_count, allocator).view();
+      error_text += ", write ";
+      error_text += String::from(errors.write_count, allocator).view();
+      error_text += ", flush ";
+      error_text += String::from(errors.flush_count, allocator).view();
+      error_text += ", corruption ";
+      error_text += String::from(errors.corruption_count, allocator).view();
+      error_text += ", generation ";
+      error_text += String::from(errors.generation_count, allocator).view();
+      do_append_field("Errors", error_text.view());
+    }
+  } else {
+    do_append_field("Health", "not verified");
+  }
+  if (status.link_count == 0) do_append_field("Link state", "unlinked");
+
+  if (os::file_type_letter(status.mode) == '-') {
+    let const digest = file_crc32c(ec, path, allocator);
+    if (digest.has_value()) do_append_field("CRC32C", digest->view());
+  }
+
+  output += body.view();
+  output += '\n';
+}
+
+fn find_inode(const Path &path, const os::file_status &status, u64 inode,
+              String &found_path) throws -> bool
+{
+  if (status.has_file_identity && status.file_id == inode) {
+    found_path = path.text().clone();
+    return true;
+  }
+  if (os::file_type_letter(status.mode) != 'd') return false;
+
+  let names = Path::read_directory(path);
+  if (!names.has_value()) return false;
+  names->sort();
+
+  let child_paths = ArrayList<Path>{heap_allocator()};
+  let child_statuses = ArrayList<os::file_status>{heap_allocator()};
+  let batch = os::Batch{heap_allocator()};
+  child_paths.reserve(names->count());
+  child_statuses.reserve(names->count());
+  batch.reserve(names->count());
+  for (let const &name : *names) {
+    child_paths.push(
+        PathBuilder{path.text().view()}.append(name.view()).build());
+    child_statuses.push({});
+  }
+  for (usize index = 0; index < child_paths.count(); index++)
+    batch.add(
+        os::BatchOperation::lstat(child_paths[index], child_statuses[index]));
+  let const results = batch.execute();
+
+  for (usize index = 0; index < child_paths.count(); index++) {
+    if (os::INTERRUPT_REQUESTED) return false;
+    if (results[index].error_number != 0) continue;
+
+    if (find_inode(child_paths[index], child_statuses[index], inode,
+                   found_path))
+      return true;
+  }
+
+  return false;
+}
+
+pure fn path_is_beneath(const Path &root, const Path &candidate) wontthrow
+    -> bool
+{
+  let const root_text = root.text().view();
+  let const candidate_text = candidate.text().view();
+  if (candidate_text == root_text) return true;
+  if (root_text.is_empty() || !candidate_text.starts_with(root_text))
+    return false;
+
+  return os::is_directory_separator(root_text[root_text.length - 1]) ||
+         (candidate_text.length > root_text.length &&
+          os::is_directory_separator(candidate_text[root_text.length]));
+}
+
+}
+
+Goodnode::Goodnode() = default;
+
+pure fn Goodnode::kind() const wontthrow -> Utility::Kind
+{
+  return Kind::Goodnode;
+}
+
+fn Goodnode::execute(
+    const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
+    const ArrayList<SourceLocation> &arg_locations) const throws -> i32
+{
+  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  defer { reset_flags(FLAG_LIST); };
+
+  KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
+
+  let const allocator = cxt.scratch_allocator();
+  let paths = ArrayList<String>{allocator};
+  for (let const &operand : operands)
+    paths.push(String{allocator, operand.view()});
+
+  if (FLAG_GOODNODE_INODE.is_set()) {
+    let const parsed = utils::parse_integer_in_base(FLAG_GOODNODE_INODE.value(),
+                                                    int_base::decimal);
+    if (parsed.is_error() || parsed.value() < 0) {
+      report_soft_koshkit_error(ec, cxt, "goodnode: invalid inode",
+                                "the inode must be a non-negative integer");
+      return 1;
+    }
+
+    let found = String{allocator};
+    let const root = FLAG_GOODNODE_ROOT.is_set() ? FLAG_GOODNODE_ROOT.value()
+                                                 : StringView{"."};
+    let const root_path = Path{root};
+    let const inode = static_cast<u64>(parsed.value());
+    if (let canonical_root = os::canonical_path(root_path);
+        canonical_root.has_value() &&
+        canonical_root->text().view() == root_path.text().view())
+    {
+      let const direct_path =
+          os::path_from_file_id(canonical_root->text().view(), inode);
+      if (direct_path.has_value() &&
+          path_is_beneath(*canonical_root, *direct_path))
+      {
+        os::file_status direct_status{};
+        if (os::stat_path(direct_path->text().view(), direct_status) &&
+            direct_status.has_file_identity && direct_status.file_id == inode)
+        {
+          found = direct_path->text().clone();
+        }
+      }
+    }
+
+    if (found.is_empty()) {
+      os::file_status root_status{};
+      if (os::stat_path(root_path.text().view(), root_status))
+        unused(find_inode(root_path, root_status, inode, found));
+    }
+
+    if (found.is_empty()) {
+      if (os::INTERRUPT_REQUESTED) return 130;
+      report_soft_koshkit_error(ec, cxt, "goodnode: inode was not found",
+                                "choose a narrower or different search root");
+      return 1;
+    }
+    paths.push(steal(found));
+  }
+
+  if (paths.is_empty()) {
+    return report_usage_error(ec, cxt, args[0].view());
+  }
+
+  cli_color_mode color_mode = cli_color_mode::Auto;
+  if (FLAG_GOODNODE_COLOR.is_set()) {
+    let const parsed = parse_cli_color_mode(FLAG_GOODNODE_COLOR.value());
+    if (!parsed.has_value()) {
+      report_soft_koshkit_error(ec, cxt, "goodnode: invalid color mode",
+                                "use always, auto, or never");
+      return 1;
+    }
+    color_mode = *parsed;
+  }
+  let const should_color = stdout_wants_color(color_mode);
+
+  let output = String{allocator};
+  i32 exit_status = 0;
+  for (let const &path : paths) {
+    os::file_status status{};
+    if (!os::stat_path(path.view(), status)) {
+      report_soft_koshkit_error(ec, cxt,
+                                "goodnode: cannot inspect '" + path +
+                                    "': " + os::last_system_error_message());
+      exit_status = 1;
+      continue;
+    }
+
+    if (!output.is_empty()) output += '\n';
+    append_node_report(output, ec, path.view(), status, should_color,
+                       allocator);
+  }
+
+  ec.print_to_stdout(output);
+  return exit_status;
+}
+
+}

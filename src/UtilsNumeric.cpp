@@ -92,6 +92,32 @@ fn format_minutes_seconds(double seconds) throws -> String
   return String{buffer};
 }
 
+fn format_duration_nanoseconds(u64 nanoseconds, Allocator allocator) throws
+    -> String
+{
+  if (nanoseconds < 1000) {
+    let result = String::from(nanoseconds, allocator);
+    result += "ns";
+    return result;
+  }
+
+  u64 divisor = 100;
+  StringView suffix = "us";
+  if (nanoseconds >= 1000000000) {
+    divisor = 100000000;
+    suffix = "s";
+  } else if (nanoseconds >= 1000000) {
+    divisor = 100000;
+    suffix = "ms";
+  }
+  let const tenths = nanoseconds / divisor;
+  let result = String::from(tenths / 10, allocator);
+  result += ".";
+  result += String::from(tenths % 10, allocator).view();
+  result += suffix;
+  return result;
+}
+
 static fn format_time_report_posix(double real_seconds, double user_seconds,
                                    double system_seconds) throws -> String
 {
@@ -777,6 +803,20 @@ fn append_ansi_c_quote_if_needed(String &out, StringView arg) throws -> bool
   }
   out += "'";
   return true;
+}
+
+fn append_shell_quoted(String &out, StringView arg) throws -> void
+{
+  if (append_ansi_c_quote_if_needed(out, arg)) return;
+
+  out.push('\'');
+  for (usize i = 0; i < arg.length; i++) {
+    if (arg[i] == '\'')
+      out += "'\\''";
+    else
+      out.push(arg[i]);
+  }
+  out.push('\'');
 }
 
 } /* namespace utils */

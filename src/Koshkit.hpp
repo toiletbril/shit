@@ -120,6 +120,23 @@ public:
     Stty,
     Tabs,
     Tput,
+    Stat,
+    Sync,
+    Watch,
+    Goodfsw,
+    Evilfiles,
+    Evilps,
+    Evil,
+    Retry,
+    Evilfs,
+    Evilnet,
+    Goodstat,
+    Goodnode,
+    Evildisk,
+    Evilio,
+    Evillogs,
+    Evilss,
+    Goodcore,
   };
 
   pure virtual Kind kind() const wontthrow = 0;
@@ -135,98 +152,115 @@ protected:
 };
 
 inline constexpr static_string_entry<Utility::Kind> KOSHKIT_ENTRIES[] = {
-    {SSK("ls"),       Utility::Kind::Ls      },
-    {SSK("ln"),       Utility::Kind::Ln      },
-    {SSK("rm"),       Utility::Kind::Rm      },
-    {SSK("mkdir"),    Utility::Kind::Mkdir   },
-    {SSK("rmdir"),    Utility::Kind::Rmdir   },
-    {SSK("cp"),       Utility::Kind::Cp      },
-    {SSK("mv"),       Utility::Kind::Mv      },
-    {SSK("cat"),      Utility::Kind::Cat     },
-    {SSK("tee"),      Utility::Kind::Tee     },
-    {SSK("touch"),    Utility::Kind::Touch   },
-    {SSK("basename"), Utility::Kind::Basename},
-    {SSK("dirname"),  Utility::Kind::Dirname },
-    {SSK("realpath"), Utility::Kind::Realpath},
-    {SSK("readlink"), Utility::Kind::Readlink},
-    {SSK("du"),       Utility::Kind::Du      },
-    {SSK("head"),     Utility::Kind::Head    },
-    {SSK("tail"),     Utility::Kind::Tail    },
-    {SSK("wc"),       Utility::Kind::Wc      },
-    {SSK("seq"),      Utility::Kind::Seq     },
-    {SSK("tr"),       Utility::Kind::Tr      },
-    {SSK("grep"),     Utility::Kind::Grep    },
-    {SSK("sort"),     Utility::Kind::Sort    },
-    {SSK("uniq"),     Utility::Kind::Uniq    },
-    {SSK("sleep"),    Utility::Kind::Sleep   },
-    {SSK("timeout"),  Utility::Kind::Timeout },
-    {SSK("env"),      Utility::Kind::Env     },
-    {SSK("printenv"), Utility::Kind::Printenv},
-    {SSK("yes"),      Utility::Kind::Yes     },
-    {SSK("pkill"),    Utility::Kind::Pkill   },
-    {SSK("killall"),  Utility::Kind::Killall },
-    {SSK("ps"),       Utility::Kind::Ps      },
-    {SSK("make"),     Utility::Kind::Make    },
-    {SSK("find"),     Utility::Kind::Find    },
-    {SSK("which"),    Utility::Kind::Which   },
-    {SSK("whoami"),   Utility::Kind::WhoAmI  },
-    {SSK("unlink"),   Utility::Kind::Unlink  },
-    {SSK("nproc"),    Utility::Kind::Nproc   },
-    {SSK("flock"),    Utility::Kind::Flock   },
-    {SSK("fuser"),    Utility::Kind::Fuser   },
-    {SSK("calc"),     Utility::Kind::Calc    },
-    {SSK("chgrp"),    Utility::Kind::Chgrp   },
-    {SSK("chmod"),    Utility::Kind::Chmod   },
-    {SSK("chown"),    Utility::Kind::Chown   },
-    {SSK("df"),       Utility::Kind::Df      },
-    {SSK("link"),     Utility::Kind::Link    },
-    {SSK("mkfifo"),   Utility::Kind::Mkfifo  },
-    {SSK("pathchk"),  Utility::Kind::Pathchk },
-    {SSK("cksum"),    Utility::Kind::Cksum   },
-    {SSK("cmp"),      Utility::Kind::Cmp     },
-    {SSK("diff"),     Utility::Kind::Diff    },
-    {SSK("comm"),     Utility::Kind::Comm    },
-    {SSK("tsort"),    Utility::Kind::Tsort   },
-    {SSK("csplit"),   Utility::Kind::Csplit  },
-    {SSK("cut"),      Utility::Kind::Cut     },
-    {SSK("expand"),   Utility::Kind::Expand  },
-    {SSK("fold"),     Utility::Kind::Fold    },
-    {SSK("nl"),       Utility::Kind::Nl      },
-    {SSK("paste"),    Utility::Kind::Paste   },
-    {SSK("pr"),       Utility::Kind::Pr      },
-    {SSK("sed"),      Utility::Kind::Sed     },
-    {SSK("split"),    Utility::Kind::Split   },
-    {SSK("unexpand"), Utility::Kind::Unexpand},
-    {SSK("file"),     Utility::Kind::File    },
-    {SSK("od"),       Utility::Kind::Od      },
-    {SSK("strings"),  Utility::Kind::Strings },
-    {SSK("cal"),      Utility::Kind::Cal     },
-    {SSK("date"),     Utility::Kind::Date    },
-    {SSK("getconf"),  Utility::Kind::Getconf },
-    {SSK("id"),       Utility::Kind::Id      },
-    {SSK("locale"),   Utility::Kind::Locale  },
-    {SSK("logname"),  Utility::Kind::Logname },
-    {SSK("tty"),      Utility::Kind::Tty     },
-    {SSK("uname"),    Utility::Kind::Uname   },
-    {SSK("who"),      Utility::Kind::Who     },
-    {SSK("bc"),       Utility::Kind::Bc      },
-    {SSK("expr"),     Utility::Kind::Expr    },
-    {SSK("xargs"),    Utility::Kind::Xargs   },
-    {SSK("logger"),   Utility::Kind::Logger  },
-    {SSK("nice"),     Utility::Kind::Nice    },
-    {SSK("nohup"),    Utility::Kind::Nohup   },
-    {SSK("renice"),   Utility::Kind::Renice  },
-    {SSK("man"),      Utility::Kind::Man     },
-    {SSK("more"),     Utility::Kind::More    },
-    {SSK("stty"),     Utility::Kind::Stty    },
-    {SSK("tabs"),     Utility::Kind::Tabs    },
-    {SSK("tput"),     Utility::Kind::Tput    },
+    {SSK("ls"),        Utility::Kind::Ls       },
+    {SSK("ln"),        Utility::Kind::Ln       },
+    {SSK("rm"),        Utility::Kind::Rm       },
+    {SSK("mkdir"),     Utility::Kind::Mkdir    },
+    {SSK("rmdir"),     Utility::Kind::Rmdir    },
+    {SSK("cp"),        Utility::Kind::Cp       },
+    {SSK("mv"),        Utility::Kind::Mv       },
+    {SSK("cat"),       Utility::Kind::Cat      },
+    {SSK("tee"),       Utility::Kind::Tee      },
+    {SSK("touch"),     Utility::Kind::Touch    },
+    {SSK("basename"),  Utility::Kind::Basename },
+    {SSK("dirname"),   Utility::Kind::Dirname  },
+    {SSK("realpath"),  Utility::Kind::Realpath },
+    {SSK("readlink"),  Utility::Kind::Readlink },
+    {SSK("du"),        Utility::Kind::Du       },
+    {SSK("head"),      Utility::Kind::Head     },
+    {SSK("tail"),      Utility::Kind::Tail     },
+    {SSK("wc"),        Utility::Kind::Wc       },
+    {SSK("seq"),       Utility::Kind::Seq      },
+    {SSK("tr"),        Utility::Kind::Tr       },
+    {SSK("grep"),      Utility::Kind::Grep     },
+    {SSK("sort"),      Utility::Kind::Sort     },
+    {SSK("uniq"),      Utility::Kind::Uniq     },
+    {SSK("sleep"),     Utility::Kind::Sleep    },
+    {SSK("timeout"),   Utility::Kind::Timeout  },
+    {SSK("env"),       Utility::Kind::Env      },
+    {SSK("printenv"),  Utility::Kind::Printenv },
+    {SSK("yes"),       Utility::Kind::Yes      },
+    {SSK("pkill"),     Utility::Kind::Pkill    },
+    {SSK("killall"),   Utility::Kind::Killall  },
+    {SSK("ps"),        Utility::Kind::Ps       },
+    {SSK("make"),      Utility::Kind::Make     },
+    {SSK("find"),      Utility::Kind::Find     },
+    {SSK("which"),     Utility::Kind::Which    },
+    {SSK("whoami"),    Utility::Kind::WhoAmI   },
+    {SSK("unlink"),    Utility::Kind::Unlink   },
+    {SSK("nproc"),     Utility::Kind::Nproc    },
+    {SSK("flock"),     Utility::Kind::Flock    },
+    {SSK("fuser"),     Utility::Kind::Fuser    },
+    {SSK("calc"),      Utility::Kind::Calc     },
+    {SSK("chgrp"),     Utility::Kind::Chgrp    },
+    {SSK("chmod"),     Utility::Kind::Chmod    },
+    {SSK("chown"),     Utility::Kind::Chown    },
+    {SSK("df"),        Utility::Kind::Df       },
+    {SSK("link"),      Utility::Kind::Link     },
+    {SSK("mkfifo"),    Utility::Kind::Mkfifo   },
+    {SSK("pathchk"),   Utility::Kind::Pathchk  },
+    {SSK("cksum"),     Utility::Kind::Cksum    },
+    {SSK("cmp"),       Utility::Kind::Cmp      },
+    {SSK("diff"),      Utility::Kind::Diff     },
+    {SSK("comm"),      Utility::Kind::Comm     },
+    {SSK("tsort"),     Utility::Kind::Tsort    },
+    {SSK("csplit"),    Utility::Kind::Csplit   },
+    {SSK("cut"),       Utility::Kind::Cut      },
+    {SSK("expand"),    Utility::Kind::Expand   },
+    {SSK("fold"),      Utility::Kind::Fold     },
+    {SSK("nl"),        Utility::Kind::Nl       },
+    {SSK("paste"),     Utility::Kind::Paste    },
+    {SSK("pr"),        Utility::Kind::Pr       },
+    {SSK("sed"),       Utility::Kind::Sed      },
+    {SSK("split"),     Utility::Kind::Split    },
+    {SSK("unexpand"),  Utility::Kind::Unexpand },
+    {SSK("file"),      Utility::Kind::File     },
+    {SSK("od"),        Utility::Kind::Od       },
+    {SSK("strings"),   Utility::Kind::Strings  },
+    {SSK("cal"),       Utility::Kind::Cal      },
+    {SSK("date"),      Utility::Kind::Date     },
+    {SSK("getconf"),   Utility::Kind::Getconf  },
+    {SSK("id"),        Utility::Kind::Id       },
+    {SSK("locale"),    Utility::Kind::Locale   },
+    {SSK("logname"),   Utility::Kind::Logname  },
+    {SSK("tty"),       Utility::Kind::Tty      },
+    {SSK("uname"),     Utility::Kind::Uname    },
+    {SSK("who"),       Utility::Kind::Who      },
+    {SSK("bc"),        Utility::Kind::Bc       },
+    {SSK("expr"),      Utility::Kind::Expr     },
+    {SSK("xargs"),     Utility::Kind::Xargs    },
+    {SSK("logger"),    Utility::Kind::Logger   },
+    {SSK("nice"),      Utility::Kind::Nice     },
+    {SSK("nohup"),     Utility::Kind::Nohup    },
+    {SSK("renice"),    Utility::Kind::Renice   },
+    {SSK("man"),       Utility::Kind::Man      },
+    {SSK("more"),      Utility::Kind::More     },
+    {SSK("stty"),      Utility::Kind::Stty     },
+    {SSK("tabs"),      Utility::Kind::Tabs     },
+    {SSK("tput"),      Utility::Kind::Tput     },
+    {SSK("stat"),      Utility::Kind::Stat     },
+    {SSK("sync"),      Utility::Kind::Sync     },
+    {SSK("watch"),     Utility::Kind::Watch    },
+    {SSK("goodfsw"),   Utility::Kind::Goodfsw  },
+    {SSK("evilfiles"), Utility::Kind::Evilfiles},
+    {SSK("evilps"),    Utility::Kind::Evilps   },
+    {SSK("evil"),      Utility::Kind::Evil     },
+    {SSK("retry"),     Utility::Kind::Retry    },
+    {SSK("evilfs"),    Utility::Kind::Evilfs   },
+    {SSK("evilnet"),   Utility::Kind::Evilnet  },
+    {SSK("goodnode"),  Utility::Kind::Goodnode },
+    {SSK("goodstat"),  Utility::Kind::Goodstat },
+    {SSK("evildisk"),  Utility::Kind::Evildisk },
+    {SSK("evilio"),    Utility::Kind::Evilio   },
+    {SSK("evillogs"),  Utility::Kind::Evillogs },
+    {SSK("evilss"),    Utility::Kind::Evilss   },
+    {SSK("goodcore"),  Utility::Kind::Goodcore },
 };
 
 inline constexpr StaticStringMap KOSHKIT_UTILS{KOSHKIT_ENTRIES};
 
 inline constexpr usize KOSHKIT_UTIL_COUNT =
-    static_cast<usize>(Utility::Kind::Tput) + 1;
+    static_cast<usize>(Utility::Kind::Goodcore) + 1;
 
 /* A utility with no registration reads back null. */
 fn register_koshkit_util_flags(Utility::Kind chosen,
@@ -242,6 +276,14 @@ fn koshkit_util_flag_list(Utility::Kind chosen) wontthrow -> const FlagList *;
 fn find_util(StringView name) throws -> Maybe<Utility::Kind>;
 
 fn util_names() throws -> const ArrayList<String> &;
+
+fn resolve_util_program(EvalContext &cxt, StringView name) throws
+    -> Maybe<Path>;
+fn capture_util_program_output(const Path &program, ArrayList<String> arguments,
+                               u64 timeout_nanoseconds) throws -> Maybe<String>;
+fn capture_util_program_output(EvalContext &cxt, StringView name,
+                               ArrayList<String> arguments,
+                               u64 timeout_nanoseconds) throws -> Maybe<String>;
 
 fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
     -> ArrayList<String>;
@@ -397,7 +439,24 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   U_CASE(More);                                                                \
   U_CASE(Stty);                                                                \
   U_CASE(Tabs);                                                                \
-  U_CASE(Tput)
+  U_CASE(Tput);                                                                \
+  U_CASE(Stat);                                                                \
+  U_CASE(Sync);                                                                \
+  U_CASE(Watch);                                                               \
+  U_CASE(Goodfsw);                                                             \
+  U_CASE(Evilfiles);                                                           \
+  U_CASE(Evilps);                                                              \
+  U_CASE(Evil);                                                                \
+  U_CASE(Retry);                                                               \
+  U_CASE(Evilfs);                                                              \
+  U_CASE(Evilnet);                                                             \
+  U_CASE(Goodnode);                                                            \
+  U_CASE(Goodstat);                                                            \
+  U_CASE(Evildisk);                                                            \
+  U_CASE(Evilio);                                                              \
+  U_CASE(Evillogs);                                                            \
+  U_CASE(Evilss);                                                              \
+  U_CASE(Goodcore)
 
 #define UTILITY_STRUCT(u)                                                      \
   class u : public Utility                                                     \
@@ -498,6 +557,23 @@ UTILITY_STRUCT(More);
 UTILITY_STRUCT(Stty);
 UTILITY_STRUCT(Tabs);
 UTILITY_STRUCT(Tput);
+UTILITY_STRUCT(Stat);
+UTILITY_STRUCT(Sync);
+UTILITY_STRUCT(Watch);
+UTILITY_STRUCT(Goodfsw);
+UTILITY_STRUCT(Evilfiles);
+UTILITY_STRUCT(Evilps);
+UTILITY_STRUCT(Evil);
+UTILITY_STRUCT(Retry);
+UTILITY_STRUCT(Evilfs);
+UTILITY_STRUCT(Evilnet);
+UTILITY_STRUCT(Goodnode);
+UTILITY_STRUCT(Goodstat);
+UTILITY_STRUCT(Evildisk);
+UTILITY_STRUCT(Evilio);
+UTILITY_STRUCT(Evillogs);
+UTILITY_STRUCT(Evilss);
+UTILITY_STRUCT(Goodcore);
 
 fn read_fd_to_string(os::descriptor fd) throws -> Maybe<String>;
 fn confirm_koshkit_action(const ExecContext &ec, StringView prompt) throws
@@ -512,6 +588,19 @@ enum class removal_mode : u8
 };
 
 fn remove_path(StringView path, removal_mode mode) throws -> bool;
+
+enum class copy_file_result : u8
+{
+  Success,
+  SourceOpenFailed,
+  DestinationOpenFailed,
+  ReadFailed,
+  WriteFailed,
+};
+
+fn copy_file_contents(StringView source, StringView destination,
+                      bool should_force) throws -> copy_file_result;
+fn make_directories(const Path &directory, u32 mode) wontthrow -> bool;
 fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
     -> Maybe<String>;
 fn print_environment(const ExecContext &ec, EvalContext &cxt) throws -> void;
@@ -533,6 +622,15 @@ fn source_list_from_operands(const ArrayList<String> &operands,
     -> ArrayList<StringView>;
 
 fn format_human_size(u64 bytes, Allocator allocator) throws -> String;
+fn scaled_filesystem_blocks(u64 block_count, u64 block_size,
+                            u64 output_unit) wontthrow -> u64;
+fn filesystem_usage_percent(u64 used, u64 available) wontthrow -> u64;
+pure fn file_type_name(const os::file_status &status) wontthrow -> StringView;
+fn describe_file_type(StringView path, const os::file_status &status,
+                      Allocator allocator) throws -> Maybe<String>;
+fn format_file_timestamp(i64 seconds, u32 nanoseconds,
+                         Allocator allocator) throws -> String;
+fn get_init_system_name(Allocator allocator) throws -> String;
 
 fn parse_koshkit_duration_seconds(StringView text, StringView utility_name,
                                   Allocator allocator) throws -> f64;

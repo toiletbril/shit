@@ -20,7 +20,8 @@ FLAG_LIST_DECL();
 HELP_SYNOPSIS_DECL("[--list] [name [argument ...]]");
 
 HELP_DESCRIPTION_DECL(
-    "The builtin builtin runs a shell builtin past a same-named function.");
+    "The builtin builtin runs the builtin even when a function has the same "
+    "name.");
 
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 FLAG(BUILTIN_LIST, Bool, '\0', "list", "List every builtin one per line.");
@@ -141,8 +142,6 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
     return 0;
   }
 
-  /* The flags are not parsed generically, since every argument after the name
-     belongs to the target builtin and passes through untouched. */
   let const &name = ec.args()[1];
   if (name == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
@@ -180,4 +179,4 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   return execute_builtin(steal(sub), cxt);
 }
 
-} /* namespace koshka */
+} // namespace koshka

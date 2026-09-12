@@ -1,0 +1,375 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements the evilfiles utility. It lists files held by visible
+ * processes and filters them by process, owner, command, and path.
+ */
+
+#include "../Cli.hpp"
+#include "../CliColors.hpp"
+#include "../Errors.hpp"
+#include "../Eval.hpp"
+#include "../Koshkit.hpp"
+#include "../Platform.hpp"
+#include "../StaticStringMap.hpp"
+#include "../Utils.hpp"
+
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[-t] [-p pid] [-u user] [-c command] [path ...]");
+
+HELP_DESCRIPTION_DECL(
+    "The evilfiles utility lists the files that running processes hold open.");
+
+FLAG(EVILFILES_TERSE, Bool, 't', "terse",
+     "Print only the process ids, one on each line.");
+FLAG(EVILFILES_PID, String, 'p', "pid", "List only this process id.");
+FLAG(EVILFILES_USER, String, 'u', "user",
+     "List only the processes of this owner.");
+FLAG(EVILFILES_COMMAND, String, 'c', "command",
+     "List only the processes whose name starts with this text.");
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
+REGISTER_KOSHKIT_UTIL_FLAGS(Evilfiles);
+
+namespace koshka::koshkit {
+
+namespace {
+
+struct open_file_row
+{
+  String command;
+  String pid;
+  String user;
+  String descriptor;
+  String type;
+  String device;
+  String size;
+  String node;
+  String name;
+};
+
+struct column_widths
+{
+  usize command{7};
+  usize pid{3};
+  usize user{4};
+  usize descriptor{2};
+  usize type{4};
+  usize device{6};
+  usize size{8};
+  usize node{4};
+};
+
+pure fn file_type_label(u32 mode) wontthrow -> StringView
+{
+  switch (os::file_type_letter(mode)) {
+  case 'd': return "DIR";
+  case 'l': return "LINK";
+  case 'c': return "CHR";
+  case 'b': return "BLK";
+  case 'p': return "FIFO";
+  case 's': return "unix";
+  default: break;
+  }
+
+  return "REG";
+}
+
+pure fn bracketed_type_label(StringView path) wontthrow -> StringView
+{
+  constexpr static_string_entry<StringView> ENTRIES[] = {
+      {SSK("[event]"),  "EVENT" },
+      {SSK("[kqueue]"), "KQUEUE"},
+      {SSK("[pipe]"),   "FIFO"  },
+      {SSK("[socket]"), "unix"  },
+  };
+  constexpr StaticStringMap TYPES{ENTRIES};
+  let const found = TYPES.find(path);
+  if (found.has_value()) return *found;
+
+  return "unknown";
+}
+
+fn device_label(const os::file_status &status, Allocator allocator) throws
+    -> String
+{
+  let const type_letter = os::file_type_letter(status.mode);
+  let const device_id = type_letter == 'c' || type_letter == 'b'
+                            ? status.special_device_id
+                            : status.device_id;
+
+  let label = String::from(os::device_major(device_id), allocator);
+  label += ",";
+  label += String::from(os::device_minor(device_id), allocator).view();
+  return label;
+}
+
+fn descriptor_label(const os::process_open_file &file,
+                    Allocator allocator) throws -> String
+{
+  switch (file.use) {
+  case os::process_file_use::Cwd: return String{allocator, "cwd"};
+  case os::process_file_use::Root: return String{allocator, "rtd"};
+  case os::process_file_use::Executable: return String{allocator, "txt"};
+  case os::process_file_use::Mapped: return String{allocator, "mem"};
+  case os::process_file_use::File: break;
+  }
+
+  if (file.descriptor_number < 0) return String{allocator, "unk"};
+
+  let label = String::from(static_cast<u64>(file.descriptor_number), allocator);
+  label += StringView{&file.access, 1};
+  return label;
+}
+
+fn widen(usize &width, const String &text) wontthrow -> void
+{
+  if (text.length() > width) width = text.length();
+}
+
+fn matches_filters(const os::process_entry &process, i64 wanted_pid,
+                   bool has_wanted_pid, Maybe<u32> wanted_owner) wontthrow
+    -> bool
+{
+  if (has_wanted_pid && process.pid != wanted_pid) return false;
+
+  if (wanted_owner.has_value() && process.owner_id != *wanted_owner) {
+    return false;
+  }
+
+  if (FLAG_EVILFILES_COMMAND.is_set() &&
+      !process.name.view().starts_with(FLAG_EVILFILES_COMMAND.value()))
+  {
+    return false;
+  }
+
+  return true;
+}
+
+fn matches_path_operands(StringView path,
+                         const ArrayList<String> &operands) wontthrow -> bool
+{
+  if (operands.is_empty()) return true;
+
+  for (let const &operand : operands) {
+    let const wanted = operand.view();
+    if (path == wanted) return true;
+
+    if (path.starts_with(wanted) && wanted.length > 0 &&
+        path.length > wanted.length && path[wanted.length] == '/')
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+}
+
+Evilfiles::Evilfiles() = default;
+
+pure fn Evilfiles::kind() const wontthrow -> Utility::Kind
+{
+  return Kind::Evilfiles;
+}
+
+fn Evilfiles::execute(
+    const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
+    const ArrayList<SourceLocation> &arg_locations) const throws -> i32
+{
+  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  defer { reset_flags(FLAG_LIST); };
+
+  KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
+
+  let const allocator = cxt.scratch_allocator();
+
+  if (!os::has_process_open_file_listing()) {
+    report_soft_koshkit_error(ec, cxt,
+                              "evilfiles: open file listing is unavailable",
+                              "this platform exposes no open file table");
+    return 1;
+  }
+
+  i64 wanted_pid = 0;
+  let const has_wanted_pid = FLAG_EVILFILES_PID.is_set();
+  if (has_wanted_pid) {
+    let const parsed = utils::parse_integer_in_base(FLAG_EVILFILES_PID.value(),
+                                                    int_base::decimal);
+    if (parsed.is_error()) {
+      report_soft_koshkit_error(
+          ec, cxt,
+          "evilfiles: invalid process id '" +
+              String{allocator, FLAG_EVILFILES_PID.value()} + "'",
+          "provide a decimal process id");
+      return 1;
+    }
+
+    wanted_pid = static_cast<i64>(parsed.value());
+  }
+
+  Maybe<u32> wanted_owner = None;
+  if (FLAG_EVILFILES_USER.is_set()) {
+    wanted_owner = os::username_to_uid(FLAG_EVILFILES_USER.value());
+    if (!wanted_owner.has_value()) {
+      let const parsed = utils::parse_integer_in_base(
+          FLAG_EVILFILES_USER.value(), int_base::decimal);
+      if (parsed.is_error()) {
+        report_soft_koshkit_error(
+            ec, cxt,
+            "evilfiles: no such user '" +
+                String{allocator, FLAG_EVILFILES_USER.value()} + "'",
+            "provide a user name or numeric uid");
+        return 1;
+      }
+
+      wanted_owner = static_cast<u32>(parsed.value());
+    }
+  }
+
+  let const processes = os::enumerate_processes();
+  if (processes.is_empty()) {
+    report_soft_koshkit_error(ec, cxt,
+                              "evilfiles: the process listing is unavailable",
+                              "this platform exposes no process table");
+    return 1;
+  }
+
+  ArrayList<open_file_row> rows{allocator};
+  column_widths widths{};
+  let terse_output = String{allocator};
+  bool did_match = false;
+
+  for (let const &process : processes) {
+    if (!matches_filters(process, wanted_pid, has_wanted_pid, wanted_owner)) {
+      continue;
+    }
+
+    let const files = os::list_process_open_files(process.pid, allocator);
+    if (files.is_empty()) continue;
+
+    let const owner = os::process_owner_name(static_cast<u32>(process.pid),
+                                             process.owner_id, allocator);
+    bool did_match_this_process = false;
+
+    for (let const &file : files) {
+      if (!matches_path_operands(file.path.view(), operands)) continue;
+
+      did_match = true;
+      did_match_this_process = true;
+      if (FLAG_EVILFILES_TERSE.is_enabled()) break;
+
+      os::file_status status{};
+      let const did_stat = os::stat_path_following(file.path.view(), status);
+
+      open_file_row row{
+          String{allocator, process.name.view()                                                         },
+          String::from(static_cast<u64>(process.pid), allocator),
+          owner.has_value() ? String{allocator, owner->view()                                                               }
+                            : String::from(process.owner_id, allocator),
+          descriptor_label(file, allocator),
+          String{allocator, did_stat ? file_type_label(status.mode)
+                                     : bracketed_type_label(file.path.view())},
+          did_stat ? device_label(status, allocator) : String{allocator, "-"                                                                         },
+          String::from(file.size != 0 || !did_stat ? file.size : status.size,
+                       allocator),
+          String::from(file.file_id != 0 || !did_stat ? file.file_id
+                                                      : status.file_id,
+                       allocator),
+          String{allocator, file.path.view()                                                            },
+      };
+
+      widen(widths.command, row.command);
+      widen(widths.pid, row.pid);
+      widen(widths.user, row.user);
+      widen(widths.descriptor, row.descriptor);
+      widen(widths.type, row.type);
+      widen(widths.device, row.device);
+      widen(widths.size, row.size);
+      widen(widths.node, row.node);
+      rows.push(steal(row));
+    }
+
+    if (FLAG_EVILFILES_TERSE.is_enabled() && did_match_this_process) {
+      terse_output +=
+          String::from(static_cast<u64>(process.pid), allocator).view();
+      terse_output += "\n";
+    }
+  }
+
+  if (FLAG_EVILFILES_TERSE.is_enabled()) {
+    ec.print_to_stdout(terse_output);
+    return did_match ? 0 : 1;
+  }
+
+  if (rows.is_empty()) return 1;
+
+  let const should_color = colors::stdout_wants_color();
+  let output = String{allocator};
+  append_report_text(output, "FILES", colors::ansi::BOLD_BLUE, should_color);
+  output += "\n  ";
+  append_report_column(output, "COMMAND", widths.command, false,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
+  append_report_column(output, "PID", widths.pid, true, colors::ansi::BOLD_CYAN,
+                       should_color);
+  output += "  ";
+  append_report_column(output, "USER", widths.user, false,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
+  append_report_column(output, "FD", widths.descriptor, true,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
+  append_report_column(output, "TYPE", widths.type, false,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
+  append_report_column(output, "DEVICE", widths.device, true,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
+  append_report_column(output, "SIZE/OFF", widths.size, true,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
+  append_report_column(output, "NODE", widths.node, true,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
+  append_report_text(output, "NAME", colors::ansi::BOLD_CYAN, should_color);
+  output += "\n";
+
+  for (let const &row : rows) {
+    output += "  ";
+    append_report_column(output, row.command.view(), widths.command, false,
+                         colors::ansi::BOLD_GREEN, should_color);
+    output += "  ";
+    append_report_column(output, row.pid.view(), widths.pid, true,
+                         colors::ansi::GREEN, should_color);
+    output += "  ";
+    append_report_column(output, row.user.view(), widths.user, false,
+                         colors::ansi::YELLOW, should_color);
+    output += "  ";
+    append_report_column(output, row.descriptor.view(), widths.descriptor, true,
+                         colors::ansi::CYAN, should_color);
+    output += "  ";
+    append_report_column(output, row.type.view(), widths.type, false,
+                         colors::ansi::BOLD_MAGENTA, should_color);
+    output += "  ";
+    append_report_column(output, row.device.view(), widths.device, true,
+                         colors::ansi::GREEN, should_color);
+    output += "  ";
+    append_report_column(output, row.size.view(), widths.size, true,
+                         colors::ansi::GREEN, should_color);
+    output += "  ";
+    append_report_column(output, row.node.view(), widths.node, true,
+                         colors::ansi::GREEN, should_color);
+    output += "  ";
+    output += row.name.view();
+    output += "\n";
+  }
+
+  ec.print_to_stdout(output);
+  return 0;
+}
+
+}

@@ -480,15 +480,277 @@ static fn match_magic_rules(const ArrayList<file_magic_rule> &rules,
   return {};
 }
 
+struct builtin_file_signature
+{
+  usize offset;
+  StringView bytes;
+  StringView description;
+};
+
+template <usize byte_count>
+consteval fn make_builtin_file_signature(usize offset,
+                                         const char (&bytes)[byte_count],
+                                         StringView description)
+    -> builtin_file_signature
+{
+  return {
+      offset, StringView{bytes, byte_count - 1},
+       description
+  };
+}
+
+static pure fn matches_builtin_file_signature(
+    StringView bytes, const builtin_file_signature &signature) wontthrow -> bool
+{
+  if (signature.offset > bytes.length ||
+      signature.bytes.length > bytes.length - signature.offset)
+    return false;
+
+  if (signature.bytes.is_empty()) return true;
+
+  let const candidate = bytes.data + signature.offset;
+  if (candidate[0] != signature.bytes[0]) return false;
+
+  return signature.bytes.length == 1 ||
+         byte_scan::are_bytes_equal(candidate + 1, signature.bytes.data + 1,
+                                    signature.bytes.length - 1);
+}
+
 static pure fn file_content_description(StringView bytes) wontthrow
     -> StringView
 {
   if (bytes.is_empty()) return "empty";
-  if (bytes.length >= 4 && static_cast<u8>(bytes[0]) == 0x7f &&
-      bytes.substring_of_length(1, 3) == "ELF")
-    return "ELF executable";
-  if (bytes.length >= 2 && bytes[0] == '#' && bytes[1] == '!')
-    return "script text executable";
+
+  if (bytes.length >= 0x40 && bytes.starts_with("MZ")) {
+    let const pe_offset =
+        static_cast<usize>(static_cast<u8>(bytes[0x3c])) |
+        static_cast<usize>(static_cast<u8>(bytes[0x3d])) << 8 |
+        static_cast<usize>(static_cast<u8>(bytes[0x3e])) << 16 |
+        static_cast<usize>(static_cast<u8>(bytes[0x3f])) << 24;
+    if (pe_offset <= bytes.length && 4 <= bytes.length - pe_offset &&
+        bytes.substring_of_length(pe_offset, 4) == StringView{"PE\0\0", 4})
+      return "PE executable";
+  }
+
+  if (bytes.length >= 8 &&
+      bytes.substring_of_length(0, 4) == StringView{"\xca\xfe\xba\xbe", 4})
+  {
+    let const major_version = static_cast<u16>(static_cast<u8>(bytes[6]) << 8) |
+                              static_cast<u8>(bytes[7]);
+    return major_version >= 45 ? StringView{"Java class"}
+                               : StringView{"Mach-O universal binary"};
+  }
+
+  if (bytes.length >= 12 && bytes.substring_of_length(0, 4) == "RIFF") {
+    let const kind = bytes.substring_of_length(8, 4);
+    if (kind == "WAVE") return "WAVE audio";
+    if (kind == "AVI ") return "AVI video";
+    if (kind == "WEBP") return "WebP image";
+    if (kind == "ACON") return "Windows animated cursor";
+  }
+
+  if (bytes.length >= 12 && bytes.substring_of_length(0, 4) == "FORM") {
+    let const kind = bytes.substring_of_length(8, 4);
+    if (kind == "AIFF" || kind == "AIFC") return "AIFF audio";
+  }
+
+  if (bytes.length >= 16 && bytes.substring_of_length(0, 8) == "AT&TFORM") {
+    let const kind = bytes.substring_of_length(12, 4);
+    if (kind == "DJVU" || kind == "DJVM" || kind == "DJVI" || kind == "THUM")
+      return "DjVu document";
+  }
+
+  if (bytes.length >= 12 && bytes.substring_of_length(4, 4) == "ftyp") {
+    let const brand = bytes.substring_of_length(8, 4);
+    if (brand == "avif" || brand == "avis") return "AVIF image";
+    if (brand == "heic" || brand == "heix" || brand == "hevc" ||
+        brand == "hevx" || brand == "mif1" || brand == "msf1")
+      return "HEIF image";
+  }
+
+  if (bytes.length >= 4 &&
+      bytes.substring_of_length(0, 4) == StringView{"\x1a\x45\xdf\xa3", 4})
+  {
+    let const header_length = bytes.length < 256 ? bytes.length : 256;
+    let const header = bytes.substring_of_length(4, header_length - 4);
+    if (header.find_substring("matroska").has_value()) return "Matroska video";
+    if (header.find_substring("webm").has_value()) return "WebM video";
+  }
+
+  if (bytes.length > 376 && bytes[0] == 'G' && bytes[188] == 'G' &&
+      bytes[376] == 'G')
+    return "MPEG transport stream";
+
+  constexpr builtin_file_signature SIGNATURES[] = {
+      make_builtin_file_signature(0, "\x89PNG\r\n\x1a\n", "PNG image"),
+      make_builtin_file_signature(0, "\xff\xd8\xff", "JPEG image"),
+      make_builtin_file_signature(0, "GIF87a", "GIF image"),
+      make_builtin_file_signature(0, "GIF89a", "GIF image"),
+      make_builtin_file_signature(0, "BM", "BMP image"),
+      make_builtin_file_signature(0, "II\x2a\0", "TIFF image"),
+      make_builtin_file_signature(0, "MM\0\x2a", "TIFF image"),
+      make_builtin_file_signature(0, "II\x2b\0", "BigTIFF image"),
+      make_builtin_file_signature(0, "MM\0\x2b", "BigTIFF image"),
+      make_builtin_file_signature(0, "\xff\x0a", "JPEG XL image"),
+      make_builtin_file_signature(0, "\xff\x4f\xff\x51", "JPEG 2000 image"),
+      make_builtin_file_signature(0, "\0\0\0\x0cJXL \r\n\x87\n",
+                                  "JPEG XL image"),
+      make_builtin_file_signature(0, "\0\0\0\x0cjP  \r\n\x87\n",
+                                  "JPEG 2000 image"),
+      make_builtin_file_signature(0, "\0\0\x01\0", "Windows icon"),
+      make_builtin_file_signature(0, "\0\0\x02\0", "Windows cursor"),
+      make_builtin_file_signature(0, "8BPS\0\x01", "Photoshop document"),
+      make_builtin_file_signature(0, "\x76\x2f\x31\x01", "OpenEXR image"),
+      make_builtin_file_signature(0, "#?RADIANCE", "Radiance HDR image"),
+      make_builtin_file_signature(0, "qoif", "QOI image"),
+      make_builtin_file_signature(0, "DDS ", "DDS image"),
+      make_builtin_file_signature(0, "\xabKTX 20\xbb\r\n\x1a\n", "KTX2 image"),
+      make_builtin_file_signature(0, "\xabKTX 11\xbb\r\n\x1a\n", "KTX image"),
+      make_builtin_file_signature(0, "PVR\x03", "PVR image"),
+      make_builtin_file_signature(0, "\x03RVP", "PVR image"),
+      make_builtin_file_signature(0, "\x13\xab\xa1\x5c", "ASTC image"),
+      make_builtin_file_signature(0, "BPG\xfb", "BPG image"),
+      make_builtin_file_signature(0, "FLIF", "FLIF image"),
+      make_builtin_file_signature(0, "gimp xcf ", "GIMP XCF image"),
+      make_builtin_file_signature(0, "farbfeld", "farbfeld image"),
+      make_builtin_file_signature(0, "\x59\xa6\x6a\x95", "Sun raster image"),
+      make_builtin_file_signature(0,
+                                  "\x7f"
+                                  "ELF",
+                                  "ELF executable"),
+      make_builtin_file_signature(0, "#!AMR-WB\n", "AMR-WB audio"),
+      make_builtin_file_signature(0, "#!AMR\n", "AMR audio"),
+      make_builtin_file_signature(0, "#!", "script text executable"),
+      make_builtin_file_signature(0, "MZ", "DOS executable"),
+      make_builtin_file_signature(0, "\xfe\xed\xfa\xce", "Mach-O executable"),
+      make_builtin_file_signature(0, "\xce\xfa\xed\xfe", "Mach-O executable"),
+      make_builtin_file_signature(0, "\xfe\xed\xfa\xcf", "Mach-O executable"),
+      make_builtin_file_signature(0, "\xcf\xfa\xed\xfe", "Mach-O executable"),
+      make_builtin_file_signature(0, "\xbe\xba\xfe\xca",
+                                  "Mach-O universal binary"),
+      make_builtin_file_signature(0, "\xca\xfe\xba\xbf",
+                                  "Mach-O universal binary"),
+      make_builtin_file_signature(0, "\xbf\xba\xfe\xca",
+                                  "Mach-O universal binary"),
+      make_builtin_file_signature(0, "\0asm", "WebAssembly module"),
+      make_builtin_file_signature(0, "BC\xc0\xde", "LLVM bitcode"),
+      make_builtin_file_signature(0, "!<arch>\n", "Unix archive"),
+      make_builtin_file_signature(0, "dex\n", "Dalvik executable"),
+      make_builtin_file_signature(0, "oat\n", "Android OAT file"),
+      make_builtin_file_signature(0, "vdex", "Android VDEX file"),
+      make_builtin_file_signature(0, "ANDROID!", "Android boot image"),
+      make_builtin_file_signature(0, "VNDRBOOT", "Android vendor boot image"),
+      make_builtin_file_signature(0, "\x27\x05\x19\x56", "U-Boot image"),
+      make_builtin_file_signature(
+          0, "L\0\0\0\x01\x14\x02\0\0\0\0\0\xc0\0\0\0\0\0\0F",
+          "Windows shortcut"),
+      make_builtin_file_signature(0, "MDMP", "Windows minidump"),
+      make_builtin_file_signature(0, "\xac\xed\0\x05", "Java serialization"),
+      make_builtin_file_signature(0, "\x1bLua", "Lua bytecode"),
+      make_builtin_file_signature(0, "PK\x03\x04", "ZIP archive"),
+      make_builtin_file_signature(0, "PK\x05\x06", "ZIP archive"),
+      make_builtin_file_signature(0, "PK\x07\x08", "ZIP archive"),
+      make_builtin_file_signature(0, "Rar!\x1a\x07", "RAR archive"),
+      make_builtin_file_signature(0, "7z\xbc\xaf\x27\x1c", "7-zip archive"),
+      make_builtin_file_signature(0, "\x1f\x8b", "gzip compressed data"),
+      make_builtin_file_signature(0, "BZh", "bzip2 compressed data"),
+      make_builtin_file_signature(0,
+                                  "\xfd"
+                                  "7zXZ\0",
+                                  "XZ compressed data"),
+      make_builtin_file_signature(0, "\x28\xb5\x2f\xfd",
+                                  "Zstandard compressed data"),
+      make_builtin_file_signature(0, "\x04\x22\x4d\x18", "LZ4 frame"),
+      make_builtin_file_signature(0, "LZIP", "lzip compressed data"),
+      make_builtin_file_signature(0, "\x1f\x9d", "Unix compressed data"),
+      make_builtin_file_signature(0, "MSCF", "Microsoft Cabinet archive"),
+      make_builtin_file_signature(0, "MSWIM\0\0\0", "Windows Imaging file"),
+      make_builtin_file_signature(0, "070701", "cpio archive"),
+      make_builtin_file_signature(0, "070702", "cpio archive"),
+      make_builtin_file_signature(0, "070707", "cpio archive"),
+      make_builtin_file_signature(257, "ustar", "tar archive"),
+      make_builtin_file_signature(0, "\xed\xab\xee\xdb", "RPM package"),
+      make_builtin_file_signature(0, "hsqs", "SquashFS filesystem"),
+      make_builtin_file_signature(0, "\x45\x3d\xcd\x28", "cramfs filesystem"),
+      make_builtin_file_signature(0, "xar!", "XAR archive"),
+      make_builtin_file_signature(0, "\x60\xea", "ARJ archive"),
+      make_builtin_file_signature(7, "**ACE**", "ACE archive"),
+      make_builtin_file_signature(2, "-lh", "LHA archive"),
+      make_builtin_file_signature(0, "bvx2", "LZFSE compressed data"),
+      make_builtin_file_signature(
+          0, "7kSt\xa0\x31\x83\xd3\x8c\xb2\x28\xb0\xd3zPQ", "ZPAQ archive"),
+      make_builtin_file_signature(0, "\xff\x06\0\0sNaPpY",
+                                  "Snappy framed data"),
+      make_builtin_file_signature(0, "%PDF-", "PDF document"),
+      make_builtin_file_signature(0, "%!PS", "PostScript document"),
+      make_builtin_file_signature(0, "{\\rtf", "RTF document"),
+      make_builtin_file_signature(0, "<!DOCTYPE html", "HTML document"),
+      make_builtin_file_signature(0, "<html", "HTML document"),
+      make_builtin_file_signature(0, "<?xml", "XML document"),
+      make_builtin_file_signature(0, "SQLite format 3\0", "SQLite database"),
+      make_builtin_file_signature(0, "\x37\x7f\x06\x82",
+                                  "SQLite write-ahead log"),
+      make_builtin_file_signature(0, "\x37\x7f\x06\x83",
+                                  "SQLite write-ahead log"),
+      make_builtin_file_signature(0, "\xd9\xd5\x05\xf9 \xa1\x63\xd7",
+                                  "SQLite rollback journal"),
+      make_builtin_file_signature(0, "PAR1", "Apache Parquet data"),
+      make_builtin_file_signature(0, "ORC", "Apache ORC data"),
+      make_builtin_file_signature(0, "Obj\x01", "Apache Avro object"),
+      make_builtin_file_signature(0, "ARROW1\0\0", "Apache Arrow file"),
+      make_builtin_file_signature(0, "\x89HDF\r\n\x1a\n", "HDF5 data"),
+      make_builtin_file_signature(0, "CDF\x01", "NetCDF data"),
+      make_builtin_file_signature(0, "CDF\x02", "NetCDF data"),
+      make_builtin_file_signature(0, "CDF\x05", "NetCDF data"),
+      make_builtin_file_signature(0, "SIMPLE  =", "FITS data"),
+      make_builtin_file_signature(0, "\xa1\xb2\xc3\xd4", "pcap capture"),
+      make_builtin_file_signature(0, "\xd4\xc3\xb2\xa1", "pcap capture"),
+      make_builtin_file_signature(0, "\xa1\xb2\x3c\x4d", "pcap capture"),
+      make_builtin_file_signature(0, "\x4d\x3c\xb2\xa1", "pcap capture"),
+      make_builtin_file_signature(0, "\x0a\x0d\x0d\x0a", "pcapng capture"),
+      make_builtin_file_signature(0, "REDIS", "Redis database"),
+      make_builtin_file_signature(0, "PGDMP", "PostgreSQL custom dump"),
+      make_builtin_file_signature(0, "PACK", "Git pack"),
+      make_builtin_file_signature(0, "DIRC", "Git index"),
+      make_builtin_file_signature(0, "MIDX", "Git multi-pack index"),
+      make_builtin_file_signature(0, "CGPH", "Git commit graph"),
+      make_builtin_file_signature(128, "DICM", "DICOM medical image"),
+      make_builtin_file_signature(0, "\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",
+                                  "OLE compound document"),
+      make_builtin_file_signature(0, "ITSF", "Compiled HTML help"),
+      make_builtin_file_signature(0, "fLaC", "FLAC audio"),
+      make_builtin_file_signature(0, "OggS", "Ogg data"),
+      make_builtin_file_signature(0, "ID3", "MP3 audio"),
+      make_builtin_file_signature(0, "MThd\0\0\0\x06", "MIDI audio"),
+      make_builtin_file_signature(0, ".snd", "Sun audio"),
+      make_builtin_file_signature(0, "MAC ", "Monkey's Audio"),
+      make_builtin_file_signature(0, "MPCK", "Musepack audio"),
+      make_builtin_file_signature(0, "wvpk", "WavPack audio"),
+      make_builtin_file_signature(0, "DSD ", "DSF audio"),
+      make_builtin_file_signature(0, "FRM8", "DSDIFF audio"),
+      make_builtin_file_signature(0, "Creative Voice File\x1a",
+                                  "Creative Voice audio"),
+      make_builtin_file_signature(0, "Extended Module: ", "FastTracker module"),
+      make_builtin_file_signature(0, "IMPM", "Impulse Tracker module"),
+      make_builtin_file_signature(44, "SCRM", "Scream Tracker module"),
+      make_builtin_file_signature(1080, "M.K.", "ProTracker module"),
+      make_builtin_file_signature(0, "FLV\x01", "Flash video"),
+      make_builtin_file_signature(0, "\0\0\x01\xba", "MPEG program stream"),
+      make_builtin_file_signature(
+          0, "\x30\x26\xb2\x75\x8e\x66\xcf\x11\xa6\xd9\0\xaa\0b\xce\x6c",
+          "ASF media"),
+      make_builtin_file_signature(0, ".RMF", "RealMedia file"),
+      make_builtin_file_signature(0, "FWS", "Flash file"),
+      make_builtin_file_signature(0, "CWS", "Flash file"),
+      make_builtin_file_signature(0, "ZWS", "Flash file"),
+  };
+  static_assert(sizeof(SIGNATURES) / sizeof(*SIGNATURES) >= 100);
+
+  for (let const &signature : SIGNATURES) {
+    if (matches_builtin_file_signature(bytes, signature)) {
+      return signature.description;
+    }
+  }
 
   static constexpr u32 TEXT_CONTROL_MASK =
       (1U << '\b') | (1U << '\t') | (1U << '\n') | (1U << '\f') | (1U << '\r');
@@ -503,6 +765,32 @@ static pure fn file_content_description(StringView bytes) wontthrow
   }
 
   return is_text ? StringView{"text"} : StringView{"data"};
+}
+
+fn describe_file_type(StringView path, const os::file_status &status,
+                      Allocator allocator) throws -> Maybe<String>
+{
+  switch (os::file_type_letter(status.mode)) {
+  case 'd': return String{allocator, "directory"};
+  case 'l': return String{allocator, "symbolic link"};
+  case 'p': return String{allocator, "fifo"};
+  case 's': return String{allocator, "socket"};
+  case 'b': return String{allocator, "block special file"};
+  case 'c': return String{allocator, "character special file"};
+  default: break;
+  }
+
+  let const descriptor =
+      os::open_file_descriptor(path, os::file_open_mode::Read);
+  if (!descriptor.has_value()) return None;
+  defer { os::close_fd(*descriptor); };
+
+  char buffer[8192];
+  let const read_count = os::read_fd(*descriptor, buffer, sizeof(buffer));
+  if (!read_count.has_value()) return None;
+
+  return String{allocator,
+                file_content_description(StringView{buffer, *read_count})};
 }
 
 File::File() = default;
@@ -562,12 +850,32 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
       !FLAG_FILE_NO_FOLLOW.is_enabled() ||
       FLAG_FILE_FOLLOW.position() > FLAG_FILE_NO_FOLLOW.position();
 
+  let operand_paths = ArrayList<Path>{allocator};
+  let file_statuses = ArrayList<os::file_status>{allocator};
+  let metadata_batch = os::Batch{allocator};
+  operand_paths.reserve(operands.count());
+  file_statuses.reserve(operands.count());
+  metadata_batch.reserve(operands.count());
+  for (let const &operand : operands) {
+    operand_paths.push(Path{operand.view()});
+    file_statuses.push({});
+  }
+  for (usize operand_position = 0; operand_position < operands.count();
+       operand_position++)
+  {
+    metadata_batch.add(os::BatchOperation::lstat(
+        operand_paths[operand_position], file_statuses[operand_position]));
+  }
+  let const metadata_results = metadata_batch.execute();
+
   for (usize operand_position = 0; operand_position < operands.count();
        operand_position++)
   {
     let const &operand = operands[operand_position];
-    os::file_status file_status{};
-    if (!os::stat_path(operand.view(), file_status)) {
+    let &file_status = file_statuses[operand_position];
+    if (metadata_results[operand_position].error_number != 0) {
+      os::set_last_system_error(
+          metadata_results[operand_position].error_number);
       report_soft_koshkit_util_error(
           ec, cxt, operand_locations[operand_position], args[0].view(),
           "cannot open '" + operand + "': " + os::last_system_error_message());
@@ -590,19 +898,22 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     let description = String{allocator};
-    switch (os::file_type_letter(file_status.mode)) {
-    case 'd': description += "directory"; break;
-    case 'l': description += "symbolic link"; break;
-    case 'p': description += "fifo"; break;
-    case 's': description += "socket"; break;
-    case 'b': description += "block special file"; break;
-    case 'c': description += "character special file"; break;
-    default: {
-      if (FLAG_FILE_REGULAR_ONLY.is_enabled()) {
-        description += "regular file";
-        break;
+    let const is_regular = os::file_type_letter(file_status.mode) == '-';
+    if (is_regular && FLAG_FILE_REGULAR_ONLY.is_enabled()) {
+      description += "regular file";
+    } else if (!is_regular || magic_rules.is_empty()) {
+      let const default_description =
+          describe_file_type(operand.view(), file_status, allocator);
+      if (!default_description.has_value()) {
+        report_soft_koshkit_util_error(
+            ec, cxt, operand_locations[operand_position], args[0].view(),
+            "cannot read '" + operand +
+                "': " + os::last_system_error_message());
+        status = 1;
+        continue;
       }
-
+      description += default_description->view();
+    } else {
       let const descriptor =
           os::open_file_descriptor(operand.view(), os::file_open_mode::Read);
       if (!descriptor.has_value()) {
@@ -615,35 +926,8 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
       }
       defer { os::close_fd(*descriptor); };
 
-      if (!magic_rules.is_empty()) {
-        let const contents = os::read_fd_to_string(*descriptor, allocator);
-        if (!contents.has_value()) {
-          report_soft_koshkit_util_error(
-              ec, cxt, operand_locations[operand_position], args[0].view(),
-              "cannot read '" + operand +
-                  "': " + os::last_system_error_message());
-          status = 1;
-          continue;
-        }
-        if (contents->is_empty()) {
-          description += "empty";
-          break;
-        }
-        let const magic_description =
-            match_magic_rules(magic_rules, contents->view(), allocator);
-        if (magic_description.has_value()) {
-          description += magic_description->view();
-        } else if (should_apply_default_tests) {
-          description += file_content_description(contents->view());
-        } else {
-          description += "data";
-        }
-        break;
-      }
-
-      char buffer[8192];
-      let const read_count = os::read_fd(*descriptor, buffer, sizeof(buffer));
-      if (!read_count.has_value()) {
+      let const contents = os::read_fd_to_string(*descriptor, allocator);
+      if (!contents.has_value()) {
         report_soft_koshkit_util_error(
             ec, cxt, operand_locations[operand_position], args[0].view(),
             "cannot read '" + operand +
@@ -651,9 +935,18 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
         status = 1;
         continue;
       }
-      description += file_content_description(StringView{buffer, *read_count});
-      break;
-    }
+      if (contents->is_empty()) {
+        description += "empty";
+      } else if (let const magic_description = match_magic_rules(
+                     magic_rules, contents->view(), allocator);
+                 magic_description.has_value())
+      {
+        description += magic_description->view();
+      } else if (should_apply_default_tests) {
+        description += file_content_description(contents->view());
+      } else {
+        description += "data";
+      }
     }
 
     ec.print_to_stdout(operand + ": " + description + "\n");

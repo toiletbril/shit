@@ -13,8 +13,10 @@
 
 #include "Builtin.hpp"
 #include "Cli.hpp"
+#include "CliColors.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
+#include "ProgramResolver.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
 
@@ -53,6 +55,40 @@ fn util_names() throws -> const ArrayList<String> &
     return collected;
   }();
   return names;
+}
+
+fn resolve_util_program(EvalContext &cxt, StringView name) throws -> Maybe<Path>
+{
+  let const matches = cxt.get_program_resolver().search(
+      name, ProgramResolver::SearchMode::First,
+      ProgramResolver::Requirement::Runnable,
+      ProgramResolver::CachePolicy::Bypass);
+  if (matches.is_empty()) return None;
+
+  return matches[0];
+}
+
+fn capture_util_program_output(const Path &program, ArrayList<String> arguments,
+                               u64 timeout_nanoseconds) throws -> Maybe<String>
+{
+  let command = ArrayList<String>{heap_allocator()};
+  command.reserve(arguments.count() + 1);
+  command.push(program.text().clone());
+  for (let &argument : arguments)
+    command.push(steal(argument));
+
+  return os::capture_program_output(command, timeout_nanoseconds);
+}
+
+fn capture_util_program_output(EvalContext &cxt, StringView name,
+                               ArrayList<String> arguments,
+                               u64 timeout_nanoseconds) throws -> Maybe<String>
+{
+  let const program = resolve_util_program(cxt, name);
+  if (!program.has_value()) return None;
+
+  return capture_util_program_output(*program, steal(arguments),
+                                     timeout_nanoseconds);
 }
 
 fn print_environment(const ExecContext &ec, EvalContext &cxt) throws -> void
@@ -234,15 +270,72 @@ fn print_util_help(const ExecContext &ec, StringView name, StringView synopsis,
   SynopsisList synopsis_lines{synopsis};
   help_text += make_synopsis(name, synopsis_lines);
   help_text += '\n';
-  help_text += make_flag_help(flags);
+  let const should_color = colors::stdout_wants_color();
+  help_text += make_flag_help(flags, should_color);
   help_text += '\n';
 
-  ec.print_to_stdout(help_text);
+  ec.print_to_stdout(format_cli_help(help_text.view(), should_color));
 }
 
 fn read_fd_to_string(os::descriptor fd) throws -> Maybe<String>
 {
   return os::read_fd_to_string(fd, heap_allocator());
+}
+
+fn copy_file_contents(StringView source, StringView destination,
+                      bool should_force) throws -> copy_file_result
+{
+  let const source_descriptor =
+      os::open_file_descriptor(source, os::file_open_mode::Read);
+  if (!source_descriptor.has_value()) return copy_file_result::SourceOpenFailed;
+  defer { unused(os::close_fd(*source_descriptor)); };
+
+  let destination_descriptor =
+      os::open_file_descriptor(destination, os::file_open_mode::Truncate);
+  if (!destination_descriptor.has_value() && should_force &&
+      os::remove_file(destination))
+  {
+    destination_descriptor =
+        os::open_file_descriptor(destination, os::file_open_mode::Truncate);
+  }
+  if (!destination_descriptor.has_value())
+    return copy_file_result::DestinationOpenFailed;
+  defer { unused(os::close_fd(*destination_descriptor)); };
+
+  char buffer[64 * 1024];
+  loop
+  {
+    let const read_count =
+        os::read_fd(*source_descriptor, buffer, sizeof(buffer));
+    if (!read_count.has_value()) return copy_file_result::ReadFailed;
+    if (*read_count == 0) return copy_file_result::Success;
+
+    usize written_count = 0;
+    while (written_count < *read_count) {
+      let const chunk =
+          os::write_fd(*destination_descriptor, buffer + written_count,
+                       *read_count - written_count);
+      if (!chunk.has_value() || *chunk == 0)
+        return copy_file_result::WriteFailed;
+      written_count += *chunk;
+    }
+  }
+}
+
+fn make_directories(const Path &directory, u32 mode) wontthrow -> bool
+{
+  let const text = directory.text().view();
+  let const root_length = os::path_root_length(text);
+  for (usize position = root_length; position <= text.length; position++) {
+    if (position < text.length && !os::is_directory_separator(text[position]))
+      continue;
+
+    let const prefix = text.substring_of_length(0, position);
+    if (prefix.is_empty() || Path{prefix}.is_directory()) continue;
+    if (!os::make_directory(prefix, mode)) return false;
+  }
+
+  return true;
 }
 
 fn confirm_koshkit_action(const ExecContext &ec, StringView prompt) throws
@@ -374,6 +467,127 @@ fn format_human_size(u64 bytes, Allocator allocator) throws -> String
   }
   out.push(units[unit - 1]);
   return out;
+}
+
+fn scaled_filesystem_blocks(u64 block_count, u64 block_size,
+                            u64 output_unit) wontthrow -> u64
+{
+  let const byte_count = static_cast<u128>(block_count) * block_size;
+  let const rounded_byte_count = byte_count + output_unit - 1;
+  let const high = static_cast<u64>(rounded_byte_count >> 64u);
+  if (high >= output_unit) return UINT64_MAX;
+
+  u64 remainder = 0;
+  return os::divide_u128_by_u64(high, static_cast<u64>(rounded_byte_count),
+                                output_unit, remainder);
+}
+
+fn filesystem_usage_percent(u64 used, u64 available) wontthrow -> u64
+{
+  let const capacity_base = static_cast<u128>(used) + available;
+  if (capacity_base == 0) return 0;
+
+  let const numerator = static_cast<u128>(used) * 100 + capacity_base - 1;
+  u64 remainder = 0;
+  return os::divide_u128_by_u64(static_cast<u64>(numerator >> 64u),
+                                static_cast<u64>(numerator),
+                                static_cast<u64>(capacity_base), remainder);
+}
+
+pure fn file_type_name(const os::file_status &status) wontthrow -> StringView
+{
+  switch (os::file_type_letter(status.mode)) {
+  case 'd': return "directory";
+  case 'l': return "symbolic link";
+  case 'c': return "character special file";
+  case 'b': return "block special file";
+  case 'p': return "fifo";
+  case 's': return "socket";
+  default: break;
+  }
+
+  return status.size == 0 ? "regular empty file" : "regular file";
+}
+
+fn format_file_timestamp(i64 seconds, u32 nanoseconds,
+                         Allocator allocator) throws -> String
+{
+  let text =
+      String{allocator,
+             utils::format_unix_timestamp(seconds, "%Y-%m-%d %H:%M:%S").view()};
+  text += ".";
+
+  let const digits = String::from(nanoseconds, allocator);
+  for (usize index = digits.length(); index < 9; index++)
+    text += "0";
+
+  text += digits.view();
+  text += " ";
+  text += utils::format_unix_timestamp(seconds, "%z").view();
+  return text;
+}
+
+fn get_init_system_name(Allocator allocator) throws -> String
+{
+  constexpr static_string_entry<StringView> INIT_COMMAND_ENTRIES[] = {
+      {SSK("systemd"),     "systemd"    },
+      {SSK("init"),        "sysvinit"   },
+      {SSK("openrc-init"), "openrc"     },
+      {SSK("runit"),       "runit"      },
+      {SSK("s6-svscan"),   "s6"         },
+      {SSK("dinit"),       "dinit"      },
+      {SSK("busybox"),     "busybox"    },
+      {SSK("launchd"),     "launchd"    },
+      {SSK("tini"),        "tini"       },
+      {SSK("docker-init"), "docker-init"},
+      {SSK("dumb-init"),   "dumb-init"  },
+      {SSK("bash"),        "shell"      },
+      {SSK("sh"),          "shell"      },
+  };
+  constexpr StaticStringMap INIT_COMMAND_NAMES{INIT_COMMAND_ENTRIES};
+
+  if (os::path_exists("/run/systemd/system")) {
+    return String{allocator, "systemd"};
+  }
+
+  if (os::path_exists("/run/openrc/softlevel")) {
+    return String{allocator, "openrc"};
+  }
+
+  if (os::path_exists("/run/s6/container_environment")) {
+    return String{allocator, "s6"};
+  }
+
+  if (os::path_exists("/run/runit")) return String{allocator, "runit"};
+
+  let const body = Path{"/proc/1/comm"}.read_entire_file();
+  if (body.has_value()) {
+    let command = body->view();
+    while (!command.is_empty() && (command[command.length - 1] == '\n' ||
+                                   command[command.length - 1] == '\r'))
+    {
+      command = command.substring_of_length(0, command.length - 1);
+    }
+
+    if (!command.is_empty()) {
+      let const named = INIT_COMMAND_NAMES.find(command);
+      if (named.has_value()) return String{allocator, *named};
+
+      return String{allocator, command};
+    }
+  }
+
+  let const processes = os::enumerate_processes();
+  for (let const &process : processes) {
+    if (process.pid != 1) continue;
+
+    let const named = INIT_COMMAND_NAMES.find(process.name.view());
+    if (named.has_value()) return String{allocator, *named};
+
+    return String{allocator, process.name.view()};
+  }
+
+  return String{allocator, "unknown"};
 }
 
 fn parse_koshkit_duration_seconds(StringView text, StringView utility_name,

@@ -231,6 +231,16 @@ public:
   }
 
   fn pop_back() wontthrow -> void;
+
+  fn truncate(usize kept_count) wontthrow -> void
+  {
+    ASSERT(kept_count <= m_length, "truncate past the end of the string");
+    if (kept_count == m_length) return;
+
+    m_length = kept_count;
+    m_data[m_length] = '\0';
+  }
+
   fn strip_trailing_newlines() wontthrow -> void;
 
   hot flatten fn append(char c) throws -> void { push(c); }

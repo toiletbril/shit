@@ -1,0 +1,313 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements the evilnet utility. It reports assigned IPv4 and IPv6
+ * interface addresses in deterministic content-derived columns.
+ */
+
+#include "../Cli.hpp"
+#include "../CliColors.hpp"
+#include "../Errors.hpp"
+#include "../Eval.hpp"
+#include "../Koshkit.hpp"
+#include "../Platform.hpp"
+#include "../Utils.hpp"
+
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[-a]");
+
+HELP_DESCRIPTION_DECL(
+    "The evilnet utility reports the addresses assigned to each interface.");
+
+FLAG(EVILNET_ALL, Bool, 'a', "all", "Include interface traffic and TCP data.");
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
+REGISTER_KOSHKIT_UTIL_FLAGS(Evilnet);
+
+namespace koshka::koshkit {
+
+namespace {
+
+pure fn family_name(os::network_address_family family) wontthrow -> StringView
+{
+  switch (family) {
+  case os::network_address_family::IPv4: return "IPv4";
+  case os::network_address_family::IPv6: return "IPv6";
+  }
+
+  unreachable("unknown network address family");
+}
+
+fn append_network_interface_report(String &output, bool should_color,
+                                   StringView indentation) throws -> usize
+{
+  let addresses = os::network_interface_addresses();
+  addresses.sort([](const os::network_interface_address &left,
+                    const os::network_interface_address &right) {
+    if (left.interface_name.view() != right.interface_name.view()) {
+      return left.interface_name.view() < right.interface_name.view();
+    }
+
+    if (left.family != right.family) return left.family < right.family;
+
+    return left.address.view() < right.address.view();
+  });
+
+  usize interface_width = 9;
+  for (let const &address : addresses) {
+    if (address.interface_name.length() > interface_width) {
+      interface_width = address.interface_name.length();
+    }
+  }
+
+  output += indentation;
+  append_report_column(output, "NAME", interface_width, false,
+                       colors::ansi::BOLD_CYAN, should_color);
+  output += "  ";
+  append_report_column(output, "FAMILY", 6, false, colors::ansi::BOLD_MAGENTA,
+                       should_color);
+  output += "  ";
+  append_report_text(output, "ADDRESS", {}, should_color);
+  output += "\n";
+
+  for (let const &address : addresses) {
+    output += indentation;
+    append_report_column(output, address.interface_name.view(), interface_width,
+                         false, colors::ansi::BOLD_GREEN, should_color);
+    output += "  ";
+    append_report_column(output, family_name(address.family), 6, false,
+                         colors::ansi::BOLD_MAGENTA, should_color);
+    output += "  ";
+    append_report_text(output, address.address.view(), {}, should_color);
+    output += "\n";
+  }
+
+  return addresses.count();
+}
+
+fn append_network_traffic_report(String &output, Allocator allocator,
+                                 bool should_color) throws -> usize
+{
+  let statistics = os::read_network_interface_statistics();
+  statistics.sort([](const os::network_interface_statistics_entry &left,
+                     const os::network_interface_statistics_entry &right) {
+    return left.interface_name < right.interface_name;
+  });
+
+  usize name_width = 4;
+  for (let const &entry : statistics) {
+    if (entry.interface_name.length() > name_width) {
+      name_width = entry.interface_name.length();
+    }
+  }
+
+  output += "\n";
+  append_report_text(output, "TRAFFIC", colors::ansi::BOLD_BLUE, should_color);
+  output += "\n  ";
+  append_report_column(output, "NAME", name_width, false,
+                       colors::ansi::BOLD_CYAN, should_color);
+  constexpr StringView HEADERS[] = {
+      "RX",        "TX",        "RX PACKETS", "TX PACKETS",
+      "RX ERRORS", "TX ERRORS", "RX DROPS",   "TX DROPS",
+      "RX CAP",    "TX CAP",    "TX QUEUE",   "TX LIMIT",
+  };
+  constexpr usize WIDTHS[] = {9, 9, 12, 12, 10, 10, 9, 9, 9, 9, 10, 10};
+  for (usize index = 0; index < countof(HEADERS); index++) {
+    output += "  ";
+    append_report_column(output, HEADERS[index], WIDTHS[index], true,
+                         colors::ansi::BOLD_CYAN, should_color);
+  }
+  output += "\n";
+
+  for (let const &entry : statistics) {
+    output += "  ";
+    append_report_column(output, entry.interface_name.view(), name_width, false,
+                         colors::ansi::BOLD_GREEN, should_color);
+    output += "  ";
+    append_report_column(
+        output,
+        entry.has_field(os::network_statistics_field::ReceiveBytes)
+            ? format_human_size(entry.receive_bytes, allocator).view()
+            : StringView{"-"},
+        9, true, colors::ansi::GREEN, should_color);
+    output += "  ";
+    append_report_column(
+        output,
+        entry.has_field(os::network_statistics_field::TransmitBytes)
+            ? format_human_size(entry.transmit_bytes, allocator).view()
+            : StringView{"-"},
+        9, true, colors::ansi::GREEN, should_color);
+    const u64 counters[] = {entry.receive_packet_count,
+                            entry.transmit_packet_count,
+                            entry.receive_error_count,
+                            entry.transmit_error_count,
+                            entry.receive_drop_count,
+                            entry.transmit_drop_count,
+                            entry.receive_link_bits_per_second / 8,
+                            entry.transmit_link_bits_per_second / 8,
+                            entry.transmit_queue_length,
+                            entry.transmit_queue_limit};
+    constexpr os::network_statistics_field FIELDS[] = {
+        os::network_statistics_field::ReceivePackets,
+        os::network_statistics_field::TransmitPackets,
+        os::network_statistics_field::ReceiveErrors,
+        os::network_statistics_field::TransmitErrors,
+        os::network_statistics_field::ReceiveDrops,
+        os::network_statistics_field::TransmitDrops,
+        os::network_statistics_field::ReceiveLinkSpeed,
+        os::network_statistics_field::TransmitLinkSpeed,
+        os::network_statistics_field::TransmitQueueLength,
+        os::network_statistics_field::TransmitQueueLimit,
+    };
+    for (usize index = 0; index < countof(counters); index++) {
+      output += "  ";
+      let value = String{allocator};
+      if (entry.has_field(FIELDS[index])) {
+        if (index == 6 || index == 7) {
+          value = format_human_size(counters[index], allocator);
+          value += "/s";
+        } else {
+          value = String::from(counters[index], allocator);
+        }
+      }
+      append_report_column(output,
+                           entry.has_field(FIELDS[index]) ? value.view()
+                                                          : StringView{"-"},
+                           WIDTHS[index + 2], true, {}, should_color);
+    }
+    output += "\n";
+  }
+
+  return statistics.count();
+}
+
+fn append_tcp_report(String &output, Allocator allocator,
+                     bool should_color) throws -> bool
+{
+  os::tcp_statistics statistics{};
+  if (!os::read_tcp_statistics(statistics)) return false;
+
+  output += "\n";
+  append_report_text(output, "TCP", colors::ansi::BOLD_BLUE, should_color);
+  output += "\n";
+  let body = String{allocator};
+  let const do_append_group =
+      [&](StringView title, const StringView *names, const u64 *values,
+          const os::tcp_statistics_field *fields, usize field_count) throws {
+        let value = String{allocator};
+        for (usize index = 0; index < field_count; index++) {
+          if (!statistics.has_field(fields[index])) continue;
+          if (!value.is_empty()) value += ", ";
+          value += names[index];
+          value += " ";
+          value += String::from(values[index], allocator).view();
+        }
+        if (value.is_empty()) return;
+        append_report_inline_field(body, title, value.view(),
+                                   colors::ansi::BOLD_CYAN, should_color);
+        body += "\n";
+      };
+  constexpr StringView OPEN_NAMES[] = {"active", "passive"};
+  const u64 open_values[] = {statistics.active_open_count,
+                             statistics.passive_open_count};
+  constexpr os::tcp_statistics_field OPEN_FIELDS[] = {
+      os::tcp_statistics_field::ActiveOpens,
+      os::tcp_statistics_field::PassiveOpens,
+  };
+  do_append_group("Opens", OPEN_NAMES, open_values, OPEN_FIELDS,
+                  countof(OPEN_NAMES));
+  constexpr StringView CONNECTION_NAMES[] = {"established", "failed",
+                                             "established resets"};
+  const u64 connection_values[] = {statistics.current_established_count,
+                                   statistics.attempt_failure_count,
+                                   statistics.established_reset_count};
+  constexpr os::tcp_statistics_field CONNECTION_FIELDS[] = {
+      os::tcp_statistics_field::CurrentEstablished,
+      os::tcp_statistics_field::AttemptFailures,
+      os::tcp_statistics_field::EstablishedResets,
+  };
+  do_append_group("Connections", CONNECTION_NAMES, connection_values,
+                  CONNECTION_FIELDS, countof(CONNECTION_NAMES));
+  constexpr StringView SEGMENT_NAMES[] = {"received", "sent", "retransmitted"};
+  const u64 segment_values[] = {statistics.received_segment_count,
+                                statistics.sent_segment_count,
+                                statistics.retransmitted_segment_count};
+  constexpr os::tcp_statistics_field SEGMENT_FIELDS[] = {
+      os::tcp_statistics_field::ReceivedSegments,
+      os::tcp_statistics_field::SentSegments,
+      os::tcp_statistics_field::RetransmittedSegments,
+  };
+  do_append_group("Segments", SEGMENT_NAMES, segment_values, SEGMENT_FIELDS,
+                  countof(SEGMENT_NAMES));
+  constexpr StringView FAILURE_NAMES[] = {
+      "input errors",         "sent resets",  "connection drops",
+      "receive memory drops", "listen drops", "retransmit timeouts"};
+  const u64 failure_values[] = {
+      statistics.input_error_count,     statistics.sent_reset_count,
+      statistics.connection_drop_count, statistics.receive_memory_drop_count,
+      statistics.listen_drop_count,     statistics.retransmit_timeout_count};
+  constexpr os::tcp_statistics_field FAILURE_FIELDS[] = {
+      os::tcp_statistics_field::InputErrors,
+      os::tcp_statistics_field::SentResets,
+      os::tcp_statistics_field::ConnectionDrops,
+      os::tcp_statistics_field::ReceiveMemoryDrops,
+      os::tcp_statistics_field::ListenDrops,
+      os::tcp_statistics_field::RetransmitTimeouts,
+  };
+  do_append_group("Failures", FAILURE_NAMES, failure_values, FAILURE_FIELDS,
+                  countof(FAILURE_NAMES));
+  append_report_body(output, body.view());
+  return true;
+}
+
+}
+
+Evilnet::Evilnet() = default;
+
+pure fn Evilnet::kind() const wontthrow -> Utility::Kind
+{
+  return Kind::Evilnet;
+}
+
+fn Evilnet::execute(const ExecContext &ec, EvalContext &cxt,
+                    const ArrayList<String> &args,
+                    const ArrayList<SourceLocation> &arg_locations) const throws
+    -> i32
+{
+  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  defer { reset_flags(FLAG_LIST); };
+
+  KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
+
+  if (!operands.is_empty()) {
+    report_soft_koshkit_error(ec, cxt, "evilnet: unexpected operand",
+                              "this utility accepts no operands");
+    return 1;
+  }
+
+  let const allocator = cxt.scratch_allocator();
+  let output = String{allocator};
+  let const should_color = colors::stdout_wants_color();
+  append_report_text(output, "INTERFACES", colors::ansi::BOLD_BLUE,
+                     should_color);
+  output += "\n";
+  let const address_count =
+      append_network_interface_report(output, should_color, "  ");
+  usize traffic_count = 0;
+  bool has_tcp_statistics = false;
+  if (FLAG_EVILNET_ALL.is_enabled()) {
+    traffic_count =
+        append_network_traffic_report(output, allocator, should_color);
+    has_tcp_statistics = append_tcp_report(output, allocator, should_color);
+  }
+
+  ec.print_to_stdout(output);
+  return address_count == 0 && (!FLAG_EVILNET_ALL.is_enabled() ||
+                                (traffic_count == 0 && !has_tcp_statistics))
+             ? 1
+             : 0;
+}
+
+}

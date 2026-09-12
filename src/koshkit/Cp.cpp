@@ -36,55 +36,32 @@ static fn copy_file(const ExecContext &ec, StringView source,
                     StringView destination, bool should_force, bool is_verbose,
                     Allocator allocator) throws -> void
 {
-  let const in_fd = os::open_file_descriptor(source, os::file_open_mode::Read);
-  if (!in_fd.has_value())
+  switch (copy_file_contents(source, destination, should_force)) {
+  case copy_file_result::SourceOpenFailed:
     throw Error{
         "cp: unable to open '" + String{allocator, source}
           +
         "': " + os::last_system_error_message()
     };
-  defer { os::close_fd(*in_fd); };
-
-  let out_fd =
-      os::open_file_descriptor(destination, os::file_open_mode::Truncate);
-  if (!out_fd.has_value() && should_force && os::remove_file(destination))
-    out_fd =
-        os::open_file_descriptor(destination, os::file_open_mode::Truncate);
-  if (!out_fd.has_value())
+  case copy_file_result::DestinationOpenFailed:
     throw Error{
         "cp: unable to create '" + String{allocator, destination}
           +
         "': " + os::last_system_error_message()
     };
-  defer { os::close_fd(*out_fd); };
-
-  char buffer[4096];
-  loop
-  {
-    let const read_count = os::read_fd(*in_fd, buffer, sizeof(buffer));
-    if (!read_count.has_value())
-      throw Error{
-          "cp: a read of '" + String{allocator, source}
-            +
-          "' failed: " + os::last_system_error_message()
-      };
-    if (*read_count == 0) break;
-    /* write_fd returns a single write's count that can fall short, so the
-       remaining bytes are written in the loop. */
-    usize written_count = 0;
-    while (written_count < *read_count) {
-      let const chunk = os::write_fd(*out_fd, buffer + written_count,
-                                     *read_count - written_count);
-      if (!chunk.has_value() || *chunk == 0) {
-        throw Error{
-            "cp: a write to '" + String{allocator, destination}
-              +
-            "' failed: " + os::last_system_error_message()
-        };
-      }
-
-      written_count += *chunk;
-    }
+  case copy_file_result::ReadFailed:
+    throw Error{
+        "cp: a read of '" + String{allocator, source}
+          +
+        "' failed: " + os::last_system_error_message()
+    };
+  case copy_file_result::WriteFailed:
+    throw Error{
+        "cp: a write to '" + String{allocator, destination}
+          +
+        "' failed: " + os::last_system_error_message()
+    };
+  case copy_file_result::Success: break;
   }
 
   if (is_verbose)

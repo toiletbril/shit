@@ -1,0 +1,519 @@
+/*
+ *    This file is a part of the Koshka shell, (c) toiletbril, 2026
+ *    See the top-level LICENSE file for the licensing information.
+ *
+ * This file implements goodcore. It captures a running process or accepts
+ * an existing core, collects its executable and mapped libraries, records host
+ * metadata, and creates a compressed debugging archive.
+ */
+
+#include "../Cli.hpp"
+#include "../CliColors.hpp"
+#include "../Errors.hpp"
+#include "../Eval.hpp"
+#include "../Koshkit.hpp"
+#include "../Path.hpp"
+#include "../Platform.hpp"
+#include "../ProgramResolver.hpp"
+#include "../Utils.hpp"
+
+FLAG_LIST_DECL();
+
+HELP_SYNOPSIS_DECL("[-q] [-b executable] [-o archive] [--no-compress] "
+                   "(-p pid | core)");
+
+HELP_DESCRIPTION_DECL(
+    "The goodcore utility captures or packages a core dump with its "
+    "executable, mapped libraries, and host metadata.");
+
+FLAG(GOODCORE_PID, String, 'p', "pid", "Capture this running process.");
+FLAG(GOODCORE_BINARY, String, 'b', "binary",
+     "Use this executable for an existing core dump.");
+FLAG(GOODCORE_OUTPUT, String, 'o', "output", "Write the archive to this path.");
+FLAG(GOODCORE_QUIET, Bool, 'q', "quiet", "Print only errors.");
+FLAG(GOODCORE_NO_COMPRESS, Bool, '\0', "no-compress",
+     "Create an uncompressed tar archive.");
+FLAG(HELP, Bool, '\0', "help", "Display help.");
+
+REGISTER_KOSHKIT_UTIL_FLAGS(Goodcore);
+
+namespace koshka::koshkit {
+
+namespace {
+
+fn run_tool(const Path &tool, ArrayList<String> arguments,
+            os::measured_output output) throws -> bool
+{
+  let command = ArrayList<String>{heap_allocator()};
+  command.reserve(arguments.count() + 1);
+  command.push(tool.text().clone());
+  for (let &argument : arguments)
+    command.push(steal(argument));
+
+  let const result = os::run_measured(command, output);
+  return result.has_value() && result->exit_status == 0;
+}
+
+fn write_text_file(StringView path, StringView text) throws -> bool
+{
+  let const descriptor =
+      os::open_file_descriptor(path, os::file_open_mode::Truncate);
+  if (!descriptor.has_value()) return false;
+  defer { unused(os::close_fd(*descriptor)); };
+
+  usize written_count = 0;
+  while (written_count < text.length) {
+    let const chunk = os::write_fd(*descriptor, text.data + written_count,
+                                   text.length - written_count);
+    if (!chunk.has_value() || *chunk == 0) return false;
+    written_count += *chunk;
+  }
+
+  return true;
+}
+
+pure fn stripped_root(StringView path) wontthrow -> StringView
+{
+  usize start_position = 0;
+  while (start_position < path.length &&
+         (path[start_position] == '/' || path[start_position] == '\\'))
+  {
+    start_position++;
+  }
+
+  return path.substring_of_length(start_position, path.length - start_position);
+}
+
+fn copy_into_root(const Path &stage, StringView source) throws -> bool
+{
+  if (!Path{source}.is_regular_file()) return false;
+
+  let const relative = stripped_root(source);
+  if (relative.is_empty()) return false;
+
+  let const destination =
+      PathBuilder{stage.text()}.append("root").append(relative).build();
+  if (!make_directories(destination.parent(), 0700)) return false;
+
+  return copy_file_contents(source, destination.text().view(), false) ==
+         copy_file_result::Success;
+}
+
+fn append_unique_path(ArrayList<String> &paths, StringView path,
+                      Allocator allocator) throws -> void
+{
+  if (path.is_empty() || path[0] != '/') return;
+  for (let const &existing : paths) {
+    if (existing.view() == path) return;
+  }
+
+  if (Path{path}.is_regular_file()) paths.push(String{allocator, path});
+}
+
+fn collect_paths_from_output(StringView output, ArrayList<String> &paths,
+                             Allocator allocator) throws -> void
+{
+  for (let view : utils::split_lines(output, allocator, false)) {
+    view = view.trim_blanks();
+    let const start = view.find_character('/');
+    if (!start.has_value()) continue;
+
+    usize end_position = *start;
+    while (end_position < view.length && view[end_position] != ' ' &&
+           view[end_position] != '\t' && view[end_position] != ')' &&
+           view[end_position] != '(')
+    {
+      end_position++;
+    }
+
+    append_unique_path(paths,
+                       view.substring_of_length(*start, end_position - *start),
+                       allocator);
+  }
+}
+
+fn infer_binary(EvalContext &cxt, StringView core, Allocator allocator) throws
+    -> Maybe<String>
+{
+  let const file = resolve_util_program(cxt, "file");
+  if (!file.has_value()) return None;
+
+  let arguments = ArrayList<String>{heap_allocator()};
+  arguments.push(String{core});
+  let const output =
+      capture_util_program_output(*file, steal(arguments), 30'000'000'000);
+  if (!output.has_value()) return None;
+
+  constexpr StringView markers[] = {"execfn: '", "from '"};
+  for (let const marker : markers) {
+    let const marker_position = output->view().find_substring(marker);
+    if (!marker_position.has_value()) continue;
+
+    let const start_position = *marker_position + marker.length;
+    let const remainder = output->view().substring_of_length(
+        start_position, output->length() - start_position);
+    let const end_position = remainder.find_character('\'');
+    if (!end_position.has_value()) continue;
+
+    let const candidate = remainder.substring_of_length(0, *end_position);
+    if (Path{candidate}.is_regular_file()) return String{allocator, candidate};
+
+    let const matches = cxt.get_program_resolver().search(
+        Path{candidate}.filename(), ProgramResolver::SearchMode::First,
+        ProgramResolver::Requirement::Runnable,
+        ProgramResolver::CachePolicy::Bypass);
+    if (!matches.is_empty()) return matches[0].text().clone();
+  }
+
+  return None;
+}
+
+fn collect_core_libraries(EvalContext &cxt, StringView core, StringView binary,
+                          ArrayList<String> &paths, Allocator allocator) throws
+    -> void
+{
+  if (let const gdb = resolve_util_program(cxt, "gdb")) {
+    let arguments = ArrayList<String>{heap_allocator()};
+    arguments.push(String{"--batch"});
+    arguments.push(String{"--nx"});
+    arguments.push(String{"--eval-command=info sharedlibrary"});
+    arguments.push(String{"-c"});
+    arguments.push(String{core});
+    arguments.push(String{binary});
+    if (let const output =
+            capture_util_program_output(*gdb, steal(arguments), 30'000'000'000))
+      collect_paths_from_output(output->view(), paths, allocator);
+  }
+
+  if (let const dependency_tool = resolve_util_program(
+#if defined __APPLE__
+          cxt, "otool"
+#else
+          cxt, "ldd"
+#endif
+          ))
+  {
+    let arguments = ArrayList<String>{heap_allocator()};
+#if defined __APPLE__
+    arguments.push(String{"-L"});
+#endif
+    arguments.push(String{binary});
+    if (let const output = capture_util_program_output(
+            *dependency_tool, steal(arguments), 30'000'000'000))
+      collect_paths_from_output(output->view(), paths, allocator);
+  }
+}
+
+fn remove_stage(const Path &stage) throws -> void
+{
+  unused(remove_path(stage.text().view(), removal_mode::Recursive));
+}
+
+}
+
+Goodcore::Goodcore() = default;
+
+pure fn Goodcore::kind() const wontthrow -> Utility::Kind
+{
+  return Kind::Goodcore;
+}
+
+fn Goodcore::execute(
+    const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
+    const ArrayList<SourceLocation> &arg_locations) const throws -> i32
+{
+  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  defer { reset_flags(FLAG_LIST); };
+
+  KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
+
+  let const allocator = cxt.scratch_allocator();
+  let const has_pid = FLAG_GOODCORE_PID.is_set();
+  if (!has_pid && operands.is_empty()) {
+    return report_usage_error(ec, cxt, args[0].view());
+  }
+
+  if (has_pid == !operands.is_empty() || operands.count() > 1) {
+    report_soft_koshkit_error(ec, cxt, "goodcore: invalid input",
+                              "pass exactly one running pid or one core file");
+    return 2;
+  }
+
+  if (has_pid && FLAG_GOODCORE_BINARY.is_set()) {
+    report_soft_koshkit_error(
+        ec, cxt, "goodcore: invalid input",
+        "--binary applies only when packaging an existing core file");
+    return 2;
+  }
+
+  i64 process_id = 0;
+  if (has_pid) {
+    let const parsed = utils::parse_integer_in_base(FLAG_GOODCORE_PID.value(),
+                                                    int_base::decimal);
+    if (parsed.is_error() || parsed.value() <= 0) {
+      report_soft_koshkit_error(ec, cxt, "goodcore: invalid process id",
+                                "the process id must be a positive integer");
+      return 1;
+    }
+    process_id = parsed.value();
+  }
+
+  let binary = Maybe<String>{};
+  let paths = ArrayList<String>{allocator};
+  if (has_pid) {
+    for (let const &file : os::list_process_open_files(process_id, allocator)) {
+      if (file.use == os::process_file_use::Executable) {
+        binary = file.path.clone();
+      }
+      if (file.use == os::process_file_use::Executable ||
+          file.use == os::process_file_use::Mapped)
+      {
+        append_unique_path(paths, file.path.view(), allocator);
+      }
+    }
+  } else if (FLAG_GOODCORE_BINARY.is_set()) {
+    binary = Path{FLAG_GOODCORE_BINARY.value()}.to_absolute().text().clone();
+  } else {
+    binary = infer_binary(cxt, operands[0].view(), allocator);
+  }
+
+  if (!binary.has_value() || !Path{binary->view()}.is_regular_file()) {
+    report_soft_koshkit_error(ec, cxt, "goodcore: executable not found",
+                              "pass its path with --binary");
+    return 1;
+  }
+
+  let const stage_directory =
+      os::make_temp_directory(Path::temp_directory(), "goodcore");
+  if (!stage_directory.has_value()) {
+    report_soft_koshkit_error(ec, cxt,
+                              "goodcore: cannot create staging directory",
+                              os::last_system_error_message());
+    return 1;
+  }
+  let const stage = *stage_directory;
+  defer { remove_stage(stage); };
+
+  let const dump_directory = PathBuilder{stage.text()}.append("dump").build();
+  if (!os::make_directory(dump_directory.text().view(), 0700)) {
+    report_soft_koshkit_error(ec, cxt, "goodcore: cannot create dump directory",
+                              os::last_system_error_message());
+    return 1;
+  }
+
+  let core = PathBuilder{dump_directory.text()}.append("core").build();
+  if (has_pid) {
+#if defined __APPLE__
+    let const debugger = resolve_util_program(cxt, "lldb");
+    let capture_arguments = ArrayList<String>{heap_allocator()};
+    capture_arguments.push(String{"--batch"});
+    capture_arguments.push(String{"-p"});
+    capture_arguments.push(String::from(process_id, heap_allocator()));
+    capture_arguments.push(String{"-o"});
+    capture_arguments.push(String{"process save-core "} + core.text());
+    capture_arguments.push(String{"-o"});
+    capture_arguments.push(String{"process detach"});
+#elif defined __linux__
+    let const debugger = resolve_util_program(cxt, "gcore");
+    let capture_arguments = ArrayList<String>{heap_allocator()};
+    capture_arguments.push(String{"-o"});
+    capture_arguments.push(core.text().clone());
+    capture_arguments.push(String::from(process_id, heap_allocator()));
+#else
+    let const debugger = Maybe<Path>{};
+    let capture_arguments = ArrayList<String>{heap_allocator()};
+#endif
+    if (!debugger.has_value() || !run_tool(*debugger, steal(capture_arguments),
+                                           os::measured_output::Inherit))
+    {
+      report_soft_koshkit_error(
+          ec, cxt, "goodcore: capture failed",
+          "install the platform debugger and check process permissions");
+      return 1;
+    }
+#if defined __linux__
+    let const captured_core =
+        Path{core.text() + "." + String::from(process_id, allocator)};
+    if (!os::rename_path(captured_core.text().view(), core.text().view())) {
+      report_soft_koshkit_error(ec, cxt, "goodcore: capture failed",
+                                "the debugger produced no usable core file");
+      return 1;
+    }
+#endif
+  } else {
+    let const source = Path{operands[0].view()}.to_absolute();
+    if (!source.is_regular_file()) {
+      report_soft_koshkit_error(ec, cxt, "goodcore: core file not found",
+                                "the operand must name a regular file");
+      return 1;
+    }
+
+    if (copy_file_contents(source.text().view(), core.text().view(), false) !=
+        copy_file_result::Success)
+    {
+      report_soft_koshkit_error(ec, cxt, "goodcore: cannot copy core file",
+                                os::last_system_error_message());
+      return 1;
+    }
+  }
+
+  os::file_status core_status{};
+  if (!os::stat_path_following(core.text().view(), core_status) ||
+      core_status.size == 0)
+  {
+    report_soft_koshkit_error(ec, cxt, "goodcore: capture failed",
+                              "the core file is missing or empty");
+    return 1;
+  }
+
+  collect_core_libraries(cxt, core.text().view(), binary->view(), paths,
+                         allocator);
+
+  append_unique_path(paths, binary->view(), allocator);
+  usize copied_path_count = 0;
+  for (let const &path : paths) {
+    if (!copy_into_root(stage, path.view())) {
+      report_soft_koshkit_error(ec, cxt, "goodcore: cannot copy required file",
+                                path.view());
+      return 1;
+    }
+    copied_path_count++;
+  }
+
+  let metadata = String{allocator};
+  metadata += "Core: ";
+  metadata += "dump/core";
+  metadata += "\nExecutable: ";
+  metadata += binary->view();
+  metadata += "\nCollected files: ";
+  metadata += String::from(copied_path_count, allocator).view();
+  metadata += "\n";
+  if (let const uname = resolve_util_program(cxt, "uname")) {
+    let uname_arguments = ArrayList<String>{heap_allocator()};
+    uname_arguments.push(String{"-a"});
+    if (let const output = capture_util_program_output(
+            *uname, steal(uname_arguments), 30'000'000'000))
+    {
+      metadata += "Host: ";
+      metadata += output->view();
+      if (metadata.is_empty() || metadata[metadata.length() - 1] != '\n') {
+        metadata += "\n";
+      }
+    }
+  }
+  let const metadata_path =
+      PathBuilder{stage.text()}.append("INFO.txt").build();
+  if (!write_text_file(metadata_path.text().view(), metadata.view())) {
+    report_soft_koshkit_error(ec, cxt, "goodcore: cannot write metadata",
+                              os::last_system_error_message());
+    return 1;
+  }
+
+  let const zstd = FLAG_GOODCORE_NO_COMPRESS.is_enabled()
+                       ? Maybe<Path>{None}
+                       : resolve_util_program(cxt, "zstd");
+  let output =
+      FLAG_GOODCORE_OUTPUT.is_set()
+          ? Path{FLAG_GOODCORE_OUTPUT.value()}.to_absolute()
+          : Path{String{"goodcore-"} + core.filename() +
+                 (FLAG_GOODCORE_NO_COMPRESS.is_enabled() ? StringView{".tar"}
+                  : zstd.has_value() ? StringView{".tar.zst"}
+                                     : StringView{".tar.gz"})}
+                .to_absolute();
+  if (output.is_same_file_as(Path{binary->view()}) ||
+      (!has_pid && output.is_same_file_as(Path{operands[0].view()})))
+  {
+    report_soft_koshkit_error(ec, cxt, "goodcore: unsafe output path",
+                              "the archive cannot replace an input file");
+    return 1;
+  }
+
+  let const tar = resolve_util_program(cxt, "tar");
+  if (!tar.has_value()) {
+    report_soft_koshkit_error(ec, cxt, "goodcore: tar is unavailable",
+                              "install tar or place it on PATH");
+    return 1;
+  }
+
+  let const temporary_output =
+      os::write_to_named_temp_file(output.parent(), ".goodcore", StringView{});
+  if (!temporary_output.has_value()) {
+    report_soft_koshkit_error(ec, cxt,
+                              "goodcore: cannot create temporary archive",
+                              os::last_system_error_message());
+    return 1;
+  }
+  defer { unused(os::remove_file(temporary_output->text().view())); };
+
+  let archive_arguments = ArrayList<String>{heap_allocator()};
+  archive_arguments.push(String{"-cf"});
+  archive_arguments.push(temporary_output->text().clone());
+  archive_arguments.push(String{"-C"});
+  archive_arguments.push(stage.text().clone());
+  archive_arguments.push(String{"."});
+  bool did_archive = false;
+  if (FLAG_GOODCORE_NO_COMPRESS.is_enabled()) {
+    did_archive =
+        run_tool(*tar, steal(archive_arguments), os::measured_output::Suppress);
+  } else if (zstd.has_value()) {
+    let const temporary_tar = os::write_to_named_temp_file(
+        output.parent(), ".goodcore-tar", StringView{});
+    if (!temporary_tar.has_value()) {
+      report_soft_koshkit_error(ec, cxt,
+                                "goodcore: cannot create temporary archive",
+                                os::last_system_error_message());
+      return 1;
+    }
+    defer { unused(os::remove_file(temporary_tar->text().view())); };
+
+    archive_arguments[1] = temporary_tar->text().clone();
+    did_archive =
+        run_tool(*tar, steal(archive_arguments), os::measured_output::Suppress);
+    if (did_archive) {
+      let compression_arguments = ArrayList<String>{heap_allocator()};
+      compression_arguments.push(String{"-q"});
+      compression_arguments.push(String{"-f"});
+      compression_arguments.push(temporary_tar->text().clone());
+      compression_arguments.push(String{"-o"});
+      compression_arguments.push(temporary_output->text().clone());
+      did_archive = run_tool(*zstd, steal(compression_arguments),
+                             os::measured_output::Suppress);
+    }
+  } else {
+    archive_arguments[0] = String{"-czf"};
+    did_archive =
+        run_tool(*tar, steal(archive_arguments), os::measured_output::Suppress);
+  }
+
+  if (!did_archive) {
+    report_soft_koshkit_error(ec, cxt, "goodcore: archive creation failed",
+                              "the selected archiver returned a failure");
+    return 1;
+  }
+
+  if (!os::rename_path(temporary_output->text().view(), output.text().view())) {
+    report_soft_koshkit_error(ec, cxt, "goodcore: cannot publish archive",
+                              os::last_system_error_message());
+    return 1;
+  }
+
+  if (!FLAG_GOODCORE_QUIET.is_enabled()) {
+    let result = String{allocator};
+    let const should_color = colors::stdout_wants_color();
+    append_report_text(result, "GOODCORE", colors::ansi::BOLD_BLUE,
+                       should_color);
+    result += "\n";
+    append_report_field(result, "Archive", output.text().view(),
+                        colors::ansi::GREEN, should_color);
+    append_report_field(result, "Executable", binary->view(),
+                        colors::ansi::GREEN, should_color);
+    append_report_field(result, "Files",
+                        String::from(copied_path_count, allocator).view(),
+                        colors::ansi::GREEN, should_color);
+    ec.print_to_stdout(result);
+  }
+
+  return 0;
+}
+
+}

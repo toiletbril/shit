@@ -126,6 +126,8 @@ fn expand_leading_tilde_path(StringView name) throws -> Maybe<String>;
    own non-control quoting. */
 fn append_ansi_c_quote_if_needed(String &out, StringView arg) throws -> bool;
 
+fn append_shell_quoted(String &out, StringView arg) throws -> void;
+
 fn decode_ansi_c_escapes(String &out, StringView body) throws -> void;
 
 fn set_foreground_program_title(const ArrayList<String> &arguments,
@@ -228,6 +230,8 @@ fn uint_to_text_into(u64 value, char *buffer, usize buffer_size) wontthrow
     -> StringView;
 
 fn format_minutes_seconds(double seconds) throws -> String;
+fn format_duration_nanoseconds(u64 nanoseconds, Allocator allocator) throws
+    -> String;
 
 enum class time_report_layout : u8
 {
