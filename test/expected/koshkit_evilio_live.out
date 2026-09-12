@@ -1,3 +1,7 @@
 status=130
 shape=matched
 scope=only-process-io
+disk-status=130
+disk-shape=matched
+disk-scope=only-disk-io
+disk-margin=unindented
