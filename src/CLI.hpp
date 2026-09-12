@@ -45,6 +45,7 @@
 
 namespace koshka {
 
+class ExecContext;
 class Flag;
 
 class SynopsisList
@@ -344,6 +345,8 @@ fn append_report_body(String &output, StringView body,
                       StringView indentation = "  ") throws -> void;
 fn format_cli_help(StringView text, bool should_color) throws -> String;
 fn format_cli_help(StringView text) throws -> String;
+fn enter_alternate_screen(const ExecContext &ec) wontthrow -> bool;
+fn leave_alternate_screen(const ExecContext &ec) wontthrow -> void;
 
 fn show_message(StringView err) throws -> void;
 

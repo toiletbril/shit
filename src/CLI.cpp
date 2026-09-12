@@ -13,6 +13,7 @@
 #include "Common.hpp"
 #include "Debug.hpp"
 #include "Errors.hpp"
+#include "Eval.hpp"
 #include "Platform.hpp"
 #include "Trace.hpp"
 #include "Utils.hpp"
@@ -1235,6 +1236,25 @@ fn format_cli_help(StringView text, bool should_color) throws -> String
 fn format_cli_help(StringView text) throws -> String
 {
   return format_cli_help(text, colors::stdout_wants_color());
+}
+
+static fn write_alternate_screen_sequence(const ExecContext &ec,
+                                          StringView sequence) wontthrow -> bool
+{
+  let descriptor = KOSH_STDOUT;
+  if (ec.out_fd.has_value()) descriptor = *ec.out_fd;
+
+  return os::write_all(descriptor, sequence.data, sequence.length);
+}
+
+fn enter_alternate_screen(const ExecContext &ec) wontthrow -> bool
+{
+  return write_alternate_screen_sequence(ec, "\x1b[?1049h");
+}
+
+fn leave_alternate_screen(const ExecContext &ec) wontthrow -> void
+{
+  unused(write_alternate_screen_sequence(ec, "\x1b[?1049l"));
 }
 
 cold fn make_flag_help(const FlagList &flags, bool should_color) throws

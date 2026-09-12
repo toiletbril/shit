@@ -148,6 +148,13 @@ fn Watch::execute(const ExecContext &ec, EvalContext &cxt,
   cxt.set_terminal_exec_allowed(false);
   defer { cxt.set_terminal_exec_allowed(saved_terminal_exec); };
 
+  bool is_alternate_screen_active = false;
+  if (is_terminal) is_alternate_screen_active = enter_alternate_screen(ec);
+  defer
+  {
+    if (is_alternate_screen_active) leave_alternate_screen(ec);
+  };
+
   loop
   {
     u32 column_count = FALLBACK_COLUMN_COUNT;
