@@ -41,18 +41,18 @@ struct BatchOperation
   static fn stat(const Path &&path, file_status &status) wontthrow
       -> BatchOperation = delete;
 
+  const Path *path{nullptr};
+  const char *input_buffer{nullptr};
+  char *output_buffer{nullptr};
+  file_status *status{nullptr};
+  u64 request_id{0};
+  u64 byte_offset{0};
+  usize byte_count{0};
+  descriptor fd{KOSH_INVALID_FD};
+  Kind syscall_id{Kind::Read};
+
 private:
   BatchOperation() = default;
-
-  Kind m_kind{Kind::Read};
-  descriptor m_descriptor{KOSH_INVALID_FD};
-  const char *m_input_buffer{nullptr};
-  char *m_output_buffer{nullptr};
-  usize m_byte_count{0};
-  u64 m_byte_offset{0};
-  const Path *m_path{nullptr};
-  file_status *m_status{nullptr};
-
   friend class Batch;
 };
 
@@ -67,19 +67,7 @@ namespace batch_internal {
 
 using batched_syscall_id = BatchOperation::Kind;
 using batched_syscall_result = BatchResult;
-
-struct batched_syscall
-{
-  const Path *path{nullptr};
-  const char *input_buffer{nullptr};
-  char *output_buffer{nullptr};
-  file_status *status{nullptr};
-  u64 request_id{0};
-  u64 byte_offset{0};
-  usize byte_count{0};
-  descriptor fd{KOSH_INVALID_FD};
-  batched_syscall_id syscall_id{batched_syscall_id::Read};
-};
+using batched_syscall = BatchOperation;
 
 fn execute_batch_operations(const batched_syscall *operations,
                             usize operation_count,
@@ -101,7 +89,7 @@ public:
   pure fn count() const wontthrow -> usize;
 
 private:
-  ArrayList<batch_internal::batched_syscall> m_operations;
+  ArrayList<BatchOperation> m_operations;
 };
 
 } /* namespace koshka::os */

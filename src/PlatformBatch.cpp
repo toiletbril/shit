@@ -15,11 +15,11 @@ fn BatchOperation::read(descriptor fd, char *buffer, usize byte_count,
                         u64 byte_offset) wontthrow -> BatchOperation
 {
   BatchOperation operation;
-  operation.m_kind = Kind::Read;
-  operation.m_descriptor = fd;
-  operation.m_output_buffer = buffer;
-  operation.m_byte_count = byte_count;
-  operation.m_byte_offset = byte_offset;
+  operation.syscall_id = Kind::Read;
+  operation.fd = fd;
+  operation.output_buffer = buffer;
+  operation.byte_count = byte_count;
+  operation.byte_offset = byte_offset;
   return operation;
 }
 
@@ -27,11 +27,11 @@ fn BatchOperation::write(descriptor fd, const char *buffer, usize byte_count,
                          u64 byte_offset) wontthrow -> BatchOperation
 {
   BatchOperation operation;
-  operation.m_kind = Kind::Write;
-  operation.m_descriptor = fd;
-  operation.m_input_buffer = buffer;
-  operation.m_byte_count = byte_count;
-  operation.m_byte_offset = byte_offset;
+  operation.syscall_id = Kind::Write;
+  operation.fd = fd;
+  operation.input_buffer = buffer;
+  operation.byte_count = byte_count;
+  operation.byte_offset = byte_offset;
   return operation;
 }
 
@@ -39,9 +39,9 @@ fn BatchOperation::lstat(const Path &path, file_status &status) wontthrow
     -> BatchOperation
 {
   BatchOperation operation;
-  operation.m_kind = Kind::Lstat;
-  operation.m_path = &path;
-  operation.m_status = &status;
+  operation.syscall_id = Kind::Lstat;
+  operation.path = &path;
+  operation.status = &status;
   return operation;
 }
 
@@ -49,9 +49,9 @@ fn BatchOperation::stat(const Path &path, file_status &status) wontthrow
     -> BatchOperation
 {
   BatchOperation operation;
-  operation.m_kind = Kind::Stat;
-  operation.m_path = &path;
-  operation.m_status = &status;
+  operation.syscall_id = Kind::Stat;
+  operation.path = &path;
+  operation.status = &status;
   return operation;
 }
 
@@ -64,17 +64,8 @@ fn Batch::reserve(usize operation_count) throws -> void
 
 fn Batch::add(BatchOperation operation) throws -> void
 {
-  batch_internal::batched_syscall record{};
-  record.path = operation.m_path;
-  record.input_buffer = operation.m_input_buffer;
-  record.output_buffer = operation.m_output_buffer;
-  record.status = operation.m_status;
-  record.request_id = m_operations.count();
-  record.byte_offset = operation.m_byte_offset;
-  record.byte_count = operation.m_byte_count;
-  record.fd = operation.m_descriptor;
-  record.syscall_id = operation.m_kind;
-  m_operations.push(record);
+  operation.request_id = m_operations.count();
+  m_operations.push(steal(operation));
 }
 
 fn Batch::clear() wontthrow -> void { m_operations.clear(); }
