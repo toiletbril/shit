@@ -186,8 +186,7 @@ fn EvilFiles::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let const operands = PARSE_KOSHKIT_ARGS(args, arg_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -206,9 +205,9 @@ fn EvilFiles::execute(
     let const parsed = utils::parse_integer_in_base(FLAG_EVILFILES_PID.value(),
                                                     int_base::decimal);
     if (parsed.is_error()) {
-      report_soft_koshkit_error(
-          ec, cxt,
-          "evilfiles: invalid process id '" +
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_EVILFILES_PID.value_location(),
+          "invalid process id '" +
               String{allocator, FLAG_EVILFILES_PID.value()} + "'",
           "provide a decimal process id");
       return 1;
@@ -224,10 +223,10 @@ fn EvilFiles::execute(
       let const parsed = utils::parse_integer_in_base(
           FLAG_EVILFILES_USER.value(), int_base::decimal);
       if (parsed.is_error()) {
-        report_soft_koshkit_error(
-            ec, cxt,
-            "evilfiles: no such user '" +
-                String{allocator, FLAG_EVILFILES_USER.value()} + "'",
+        KOSHKIT_REPORT_ERROR_AT(
+            FLAG_EVILFILES_USER.value_location(),
+            "no such user '" + String{allocator, FLAG_EVILFILES_USER.value()} +
+                "'",
             "provide a user name or numeric uid");
         return 1;
       }

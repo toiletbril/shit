@@ -206,8 +206,9 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -242,9 +243,9 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize index = 0; index < operands.count(); index++) {
     if (operand_results[index].error_number != 0) {
       os::set_last_system_error(operand_results[index].error_number);
-      report_soft_koshkit_error(ec, cxt,
-                                "goodfsw: cannot watch '" + operands[index] +
-                                    "': " + os::last_system_error_message());
+      KOSHKIT_REPORT_ERROR_AT(operand_locations[index],
+                              "cannot watch '" + operands[index] +
+                                  "': " + os::last_system_error_message());
       return 1;
     }
   }

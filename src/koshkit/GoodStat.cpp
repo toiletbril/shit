@@ -161,8 +161,9 @@ fn GoodStat::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -174,9 +175,9 @@ fn GoodStat::execute(
   if (FLAG_GOODSTAT_COLOR.is_set()) {
     let const mode = parse_cli_color_mode(FLAG_GOODSTAT_COLOR.value());
     if (!mode.has_value()) {
-      report_soft_koshkit_error(
-          ec, cxt,
-          "goodstat: invalid color mode '" +
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_GOODSTAT_COLOR.value_location(),
+          "invalid color mode '" +
               String{cxt.scratch_allocator(), FLAG_GOODSTAT_COLOR.value()} +
               "'",
           "the value is always, auto, or never");
@@ -214,9 +215,9 @@ fn GoodStat::execute(
     let const &operand = operands[index];
     if (results[index].error_number != 0) {
       os::set_last_system_error(results[index].error_number);
-      report_soft_koshkit_error(ec, cxt,
-                                "goodstat: cannot stat '" + operand +
-                                    "': " + os::last_system_error_message());
+      KOSHKIT_REPORT_ERROR_AT(operand_locations[index],
+                              "cannot stat '" + operand +
+                                  "': " + os::last_system_error_message());
       status = 1;
       continue;
     }

@@ -283,8 +283,9 @@ fn EvilDisk::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -292,8 +293,9 @@ fn EvilDisk::execute(
   if (FLAG_EVILDISK_COLOR.is_set()) {
     let const parsed = parse_cli_color_mode(FLAG_EVILDISK_COLOR.value());
     if (!parsed.has_value()) {
-      report_soft_koshkit_error(ec, cxt, "evildisk: invalid color mode",
-                                "use always, auto, or never");
+      KOSHKIT_REPORT_ERROR_AT(FLAG_EVILDISK_COLOR.value_location(),
+                              "invalid color mode",
+                              "use always, auto, or never");
       return 1;
     }
     color_mode = *parsed;
@@ -321,12 +323,18 @@ fn EvilDisk::execute(
   let rows = ArrayList<disk_row>{allocator};
   rows.reserve(filesystems.count());
   i32 status = 0;
-  for (let const &mounted : filesystems) {
+  for (usize filesystem_index = 0; filesystem_index < filesystems.count();
+       filesystem_index++)
+  {
+    let const &mounted = filesystems[filesystem_index];
     os::filesystem_status filesystem{};
     if (!os::stat_filesystem(mounted.target.view(), filesystem)) {
-      report_soft_koshkit_error(ec, cxt,
-                                "evildisk: cannot read '" + mounted.target +
-                                    "': " + os::last_system_error_message());
+      let const location = operands.is_empty()
+                               ? ec.source_location()
+                               : operand_locations[filesystem_index];
+      KOSHKIT_REPORT_ERROR_AT(location,
+                              "cannot read '" + mounted.target +
+                                  "': " + os::last_system_error_message());
       status = 1;
       continue;
     }

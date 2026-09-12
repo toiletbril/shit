@@ -58,15 +58,16 @@ cold fn Basename::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
   if (operands.count() > 2) {
-    report_soft_koshkit_error(
-        ec, cxt, "basename: extra operand '" + operands[2] + "'",
+    KOSHKIT_REPORT_ERROR_AT(
+        operand_locations[2], "extra operand '" + operands[2] + "'",
         "basename takes a path and an optional suffix, e.g. `basename a.c .c`");
     return 1;
   }

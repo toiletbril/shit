@@ -136,3 +136,27 @@ echo "=== evilio later all location ==="
 
 echo "=== evilio live mode location ==="
 "$BIN" -c 'koshkit evilio --all --live' 2>&1
+
+echo "=== basename extra operand location ==="
+"$BIN" -c 'koshkit basename path suffix extra' 2>&1
+
+echo "=== evildisk color value location ==="
+"$BIN" -c 'koshkit evildisk --color invalid' 2>&1
+
+echo "=== evildisk path location ==="
+"$BIN" -c 'koshkit evildisk KOSH_MISSING_FILESYSTEM' 2>&1 >/dev/null
+
+echo "=== evilfiles process value location ==="
+"$BIN" -c 'koshkit evilfiles --pid invalid' 2>&1
+
+echo "=== evilfiles user value location ==="
+"$BIN" -c 'koshkit evilfiles --user KOSH_MISSING_USER' 2>&1
+
+echo "=== goodfsw path location ==="
+"$BIN" -c 'koshkit goodfsw KOSH_MISSING_PATH' 2>&1
+
+echo "=== goodstat color value location ==="
+"$BIN" -c 'koshkit goodstat --color invalid LICENSE' 2>&1
+
+echo "=== goodstat path location ==="
+"$BIN" -c 'koshkit goodstat KOSH_MISSING_PATH' 2>&1

@@ -209,3 +209,40 @@ note: use --all without --cumulative or --live.
      1 |  koshkit evilio --all --live
        |                       ^~~~~~
 note: use --all without --cumulative or --live.
+=== basename extra operand location ===
+1:30: error: basename: extra operand 'extra'.
+     1 |  koshkit basename path suffix extra
+       |                               ^~~~~
+note: basename takes a path and an optional suffix, e.g. `basename a.c .c`.
+=== evildisk color value location ===
+1:26: error: evildisk: invalid color mode.
+     1 |  koshkit evildisk --color invalid
+       |                           ^~~~~~~
+note: use always, auto, or never.
+=== evildisk path location ===
+1:18: error: evildisk: cannot read 'KOSH_MISSING_FILESYSTEM': No such file or directory.
+     1 |  koshkit evildisk KOSH_MISSING_FILESYSTEM
+       |                   ^~~~~~~~~~~~~~~~~~~~~~~
+=== evilfiles process value location ===
+1:25: error: evilfiles: invalid process id 'invalid'.
+     1 |  koshkit evilfiles --pid invalid
+       |                          ^~~~~~~
+note: provide a decimal process id.
+=== evilfiles user value location ===
+1:26: error: evilfiles: no such user 'KOSH_MISSING_USER'.
+     1 |  koshkit evilfiles --user KOSH_MISSING_USER
+       |                           ^~~~~~~~~~~~~~~~~
+note: provide a user name or numeric uid.
+=== goodfsw path location ===
+1:17: error: goodfsw: cannot watch 'KOSH_MISSING_PATH': No such file or directory.
+     1 |  koshkit goodfsw KOSH_MISSING_PATH
+       |                  ^~~~~~~~~~~~~~~~~
+=== goodstat color value location ===
+1:26: error: goodstat: invalid color mode 'invalid'.
+     1 |  koshkit goodstat --color invalid LICENSE
+       |                           ^~~~~~~
+note: the value is always, auto, or never.
+=== goodstat path location ===
+1:18: error: goodstat: cannot stat 'KOSH_MISSING_PATH': No such file or directory.
+     1 |  koshkit goodstat KOSH_MISSING_PATH
+       |                   ^~~~~~~~~~~~~~~~~
