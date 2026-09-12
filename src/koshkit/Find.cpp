@@ -95,14 +95,20 @@ static fn find_entry_matches(char type_letter, StringView filename, usize depth,
 static fn find_walk(const ExecContext &ec, EvalContext &cxt, const Path &path,
                     StringView display, usize depth,
                     const find_options &options, String &output,
-                    i32 &exit_status, Allocator allocator) throws -> void
+                    i32 &exit_status, Allocator allocator,
+                    const os::file_status *known_status = nullptr) throws
+    -> void
 {
   /* The stat reads the symlink, not its target, and a failed stat yields the
      marker '\0' that matches no -type filter and is not descended. */
-  os::file_status status{};
-  let const type_letter = os::stat_path(path.text().view(), status)
-                              ? os::file_type_letter(status.mode)
-                              : '\0';
+  os::file_status queried_status{};
+  if (known_status == nullptr &&
+      os::stat_path(path.text().view(), queried_status))
+  {
+    known_status = &queried_status;
+  }
+  let const type_letter =
+      known_status != nullptr ? os::file_type_letter(known_status->mode) : '\0';
 
   if (find_entry_matches(type_letter, path.filename(), depth, options)) {
     output += display;
@@ -115,8 +121,8 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt, const Path &path,
     return;
   }
 
-  Maybe<ArrayList<String>> names = Path::read_directory(path);
-  if (!names.has_value()) {
+  let children = os::list_directory_status(path.text().view(), allocator);
+  if (!children.has_value()) {
     if (!path.is_readable()) {
       report_soft_koshkit_error(ec, cxt,
                                 "find: '" + String{allocator, display} +
@@ -126,19 +132,24 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt, const Path &path,
 
     return;
   }
-  names->sort();
+  children->sort([](const os::directory_status_entry &left,
+                    const os::directory_status_entry &right) {
+    return left.child.name.view() < right.child.name.view();
+  });
 
-  for (let const &child_name : *names) {
+  for (let const &child_entry : *children) {
     if (os::INTERRUPT_REQUESTED) return;
 
     String child_display{allocator, display};
     if (!child_display.is_empty() && child_display.back() != '/') {
       child_display += '/';
     }
-    child_display += child_name.view();
+    child_display += child_entry.child.name.view();
     let const child_path = Path{child_display.view()};
+    let const child_status =
+        child_entry.has_status ? &child_entry.status : nullptr;
     find_walk(ec, cxt, child_path, child_display.view(), depth + 1, options,
-              output, exit_status, allocator);
+              output, exit_status, allocator, child_status);
   }
 }
 

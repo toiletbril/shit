@@ -33,26 +33,43 @@ namespace koshka {
 
 namespace koshkit {
 
-/* A symlink is counted as its own size and not followed, so a cycle cannot
-   run forever. */
 static fn total_size(const Path &path, Path &failed_path,
-                     String &failure_message) throws -> Maybe<u64>
+                     String &failure_message,
+                     const os::file_status *known_status = nullptr) throws
+    -> Maybe<u64>
 {
-  if (path.is_directory() && !path.is_symbolic_link()) {
-    u64 total_bytes = 0;
-    Maybe<ArrayList<String>> names = Path::read_directory(path);
-    if (!names.has_value()) {
+  os::file_status queried_status{};
+  if (known_status == nullptr) {
+    if (!os::stat_path(path.text().view(), queried_status)) {
       failure_message = os::last_system_error_message();
       failed_path = path.clone();
       return None;
     }
 
-    for (let const &name : *names) {
+    known_status = &queried_status;
+  }
+
+  let const type_letter = os::file_type_letter(known_status->mode);
+  if (type_letter == 'd') {
+    u64 total_bytes = 0;
+    let const children =
+        os::list_directory_status(path.text().view(), heap_allocator());
+    if (!children.has_value()) {
+      failure_message = os::last_system_error_message();
+      failed_path = path.clone();
+      return None;
+    }
+
+    for (let const &child_entry : *children) {
       if (os::INTERRUPT_REQUESTED) return None;
 
-      let const child =
-          PathBuilder{path.text().view()}.append(name.view()).build();
-      let const child_size = total_size(child, failed_path, failure_message);
+      let const child = PathBuilder{path.text().view()}
+                            .append(child_entry.child.name.view())
+                            .build();
+      let const child_status =
+          child_entry.has_status ? &child_entry.status : nullptr;
+      let const child_size =
+          total_size(child, failed_path, failure_message, child_status);
       if (!child_size.has_value()) return None;
       if (*child_size > UINT64_MAX - total_bytes) {
         failure_message = "the total size is too large";
@@ -65,12 +82,17 @@ static fn total_size(const Path &path, Path &failed_path,
     return total_bytes;
   }
 
-  let const size = path.file_size();
-  if (!size.has_value()) {
-    failure_message = os::last_system_error_message();
-    failed_path = path.clone();
-  }
-  return size;
+  return known_status->size;
+}
+
+fn append_size_line(String &output, u64 size, StringView path,
+                    Allocator allocator) throws -> void
+{
+  output += FLAG_DU_HUMAN.is_enabled() ? format_human_size(size, allocator)
+                                       : String::from(size, allocator);
+  output += '\t';
+  output += path;
+  output += '\n';
 }
 
 Du::Du() = default;
@@ -87,23 +109,38 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
-  ArrayList<StringView> targets{cxt.scratch_allocator()};
-  if (operands.is_empty())
-    targets.push(StringView{"."});
-  else
+  let const allocator = cxt.scratch_allocator();
+  ArrayList<String> targets{allocator};
+  if (operands.is_empty()) {
+    let names = Path::read_directory(Path{"."});
+    if (!names.has_value()) {
+      report_soft_koshkit_error(
+          ec, cxt, "du: cannot read '.': " + os::last_system_error_message());
+      return 1;
+    }
+    names->sort();
+    targets.reserve(names->count());
+    for (let const &name : *names)
+      targets.push(String{allocator, name.view()});
+  } else {
+    targets.reserve(operands.count());
     for (let const &operand : operands)
-      targets.push(operand.view());
+      targets.push(String{allocator, operand.view()});
+  }
 
-  let output = String{cxt.scratch_allocator()};
+  let output = String{allocator};
   i32 status = 0;
+  u64 current_directory_total = 0;
+  bool is_current_directory_total_valid = true;
   for (let const &target : targets) {
-    let const path = Path{target};
+    let const path = Path{target.view()};
     if (!path.exists()) {
       report_soft_koshkit_error(ec, cxt,
                                 "du: cannot access '" +
-                                    String{cxt.scratch_allocator(), target} +
+                                    String{allocator, target.view()} +
                                     "': no such file or directory");
       status = 1;
+      is_current_directory_total_valid = false;
       continue;
     }
     let failed_path = Path{};
@@ -115,14 +152,23 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
                                 "du: cannot read '" + failed_path.text() +
                                     "': " + failure_message);
       status = 1;
+      is_current_directory_total_valid = false;
       continue;
     }
-    output += FLAG_DU_HUMAN.is_enabled()
-                  ? format_human_size(*total, cxt.scratch_allocator())
-                  : String::from(*total, cxt.scratch_allocator());
-    output += '\t';
-    output += target;
-    output += '\n';
+    append_size_line(output, *total, target.view(), allocator);
+
+    if (operands.is_empty()) {
+      if (*total > UINT64_MAX - current_directory_total) {
+        is_current_directory_total_valid = false;
+        status = 1;
+      } else {
+        current_directory_total += *total;
+      }
+    }
+  }
+
+  if (operands.is_empty() && is_current_directory_total_valid) {
+    append_size_line(output, current_directory_total, ".", allocator);
   }
 
   ec.print_to_stdout(output);
