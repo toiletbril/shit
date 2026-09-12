@@ -87,5 +87,27 @@ echo "status=$?"
 echo "--- tee then read back ---"
 "$BIN" -c 'koshkit seq 2 | koshkit tee tee.txt'
 "$BIN" -c 'koshkit cat tee.txt'
+echo "--- tee copies to multiple files and appends ---"
+printf 'old\n' > tee-first.txt
+printf 'one\ntwo\n' | "$BIN" -c \
+  'koshkit tee -a tee-first.txt tee-second.txt'
+echo "first:"
+"$BIN" -c 'koshkit cat tee-first.txt'
+echo "second:"
+"$BIN" -c 'koshkit cat tee-second.txt'
+echo "--- empty tee input truncates outputs ---"
+printf 'old\n' > tee-empty.txt
+printf '' | "$BIN" -c 'koshkit tee tee-empty.txt'
+"$BIN" -c 'koshkit wc -c < tee-empty.txt'
+echo "--- tee copies more than one chunk ---"
+"$BIN" -c \
+  'koshkit seq 20000 | koshkit tee tee-large-1.txt tee-large-2.txt tee-large-3.txt tee-large-4.txt tee-large-5.txt tee-large-6.txt tee-large-7.txt tee-large-8.txt | koshkit wc -l'
+"$BIN" -c 'koshkit cmp tee-large-1.txt tee-large-8.txt'
+echo "same=$?"
+echo "--- tee keeps working outputs after an open failure ---"
+mkdir tee-directory
+printf 'kept\n' | "$BIN" -c \
+  'koshkit tee tee-working.txt tee-directory 2>/dev/null; printf "status=%s\n" "$?"'
+"$BIN" -c 'koshkit cat tee-working.txt'
 echo "--- seq with step ---"
 "$BIN" -c 'koshkit seq 2 2 8'

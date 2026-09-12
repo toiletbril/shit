@@ -48,6 +48,10 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
                                                 : os::file_open_mode::Truncate;
   let output_descriptors = ArrayList<os::descriptor>{cxt.scratch_allocator()};
   let output_names = ArrayList<StringView>{cxt.scratch_allocator()};
+  let written_byte_counts = ArrayList<usize>{cxt.scratch_allocator()};
+  let output_positions = ArrayList<usize>{cxt.scratch_allocator()};
+  let batch = os::Batch{cxt.scratch_allocator()};
+  let batch_results = ArrayList<os::batch_result>{cxt.scratch_allocator()};
   i32 status = 0;
   for (const String &operand : operands) {
     let const fd = os::open_file_descriptor(operand.view(), mode);
@@ -60,6 +64,10 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
     output_descriptors.push(*fd);
     output_names.push(operand.view());
   }
+  written_byte_counts.reserve(output_descriptors.count());
+  output_positions.reserve(output_descriptors.count());
+  batch.reserve(output_descriptors.count());
+  batch_results.reserve(output_descriptors.count());
   defer
   {
     for (let const descriptor : output_descriptors)
@@ -80,21 +88,61 @@ fn Tee::execute(const ExecContext &ec, EvalContext &cxt,
     if (*read_size == 0) break;
 
     ec.print_to_stdout(StringView{buffer, *read_size});
-    usize output_index = output_descriptors.count();
-    while (output_index > 0) {
-      output_index--;
-      if (os::write_all(output_descriptors[output_index], buffer, *read_size))
-        continue;
+    written_byte_counts.clear();
+    for (usize index = 0; index < output_descriptors.count(); index++)
+      written_byte_counts.push(0);
 
-      report_soft_koshkit_error(
-          ec, cxt,
-          "tee: " +
-              String{cxt.scratch_allocator(), output_names[output_index]} +
-              ": " + os::last_system_error_message());
-      os::close_fd(output_descriptors[output_index]);
-      output_descriptors.remove(output_index);
-      output_names.remove(output_index);
-      status = 1;
+    loop
+    {
+      batch.clear();
+      output_positions.clear();
+      usize output_index = output_descriptors.count();
+      while (output_index > 0) {
+        output_index--;
+        let const written_byte_count = written_byte_counts[output_index];
+        if (written_byte_count == *read_size) continue;
+
+        batch.add(os::batch_operation::write_current(
+            output_descriptors[output_index], buffer + written_byte_count,
+            *read_size - written_byte_count));
+        output_positions.push(output_index);
+      }
+      if (batch.count() == 0) break;
+
+      batch.execute(batch_results);
+      for (usize result_index = 0; result_index < batch_results.count();
+           result_index++)
+      {
+        let const output_position = output_positions[result_index];
+        let const &result = batch_results[result_index];
+        let const remaining_byte_count =
+            *read_size - written_byte_counts[output_position];
+        if (result.error_number == 0 && result.transferred_byte_count > 0 &&
+            result.transferred_byte_count <= remaining_byte_count)
+        {
+          written_byte_counts[output_position] += result.transferred_byte_count;
+          continue;
+        }
+
+        let reason = String{cxt.scratch_allocator()};
+        if (result.error_number != 0) {
+          os::set_last_system_error(result.error_number);
+          reason = os::last_system_error_message();
+        } else {
+          reason = "write made no progress";
+        }
+        report_soft_koshkit_error(
+            ec, cxt,
+            "tee: " +
+                String{cxt.scratch_allocator(), output_names[output_position]} +
+                ": " + reason);
+        os::close_fd(output_descriptors[output_position]);
+        output_descriptors.remove(output_position);
+        output_names.remove(output_position);
+        written_byte_counts.remove(output_position);
+        status = 1;
+      }
+      if (os::INTERRUPT_REQUESTED) return 130;
     }
   }
 

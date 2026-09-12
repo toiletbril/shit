@@ -116,6 +116,25 @@ status=0
 2
 1
 2
+--- tee copies to multiple files and appends ---
+one
+two
+first:
+old
+one
+two
+second:
+one
+two
+--- empty tee input truncates outputs ---
+0
+--- tee copies more than one chunk ---
+20000
+same=0
+--- tee keeps working outputs after an open failure ---
+kept
+status=1
+kept
 --- seq with step ---
 2
 4
