@@ -140,6 +140,9 @@ echo "=== evilio live mode location ==="
 echo "=== basename extra operand location ==="
 "$BIN" -c 'koshkit basename path suffix extra' 2>&1
 
+echo "=== bc register ranges ==="
+"$BIN" -c "printf 'ibase=1\nobase=17\nscale=-1\n' | koshkit bc" 2>&1
+
 echo "=== cal extra operand location ==="
 "$BIN" -c 'koshkit cal 1 2024 extra' 2>&1
 

@@ -214,6 +214,19 @@ note: use --all without --cumulative or --live.
      1 |  koshkit basename path suffix extra
        |                               ^~~~~
 note: basename takes a path and an optional suffix, e.g. `basename a.c .c`.
+=== bc register ranges ===
+1:42: error: bc: invalid ibase.
+     1 |  printf 'ibase=1\nobase=17\nscale=-1\n' | koshkit bc
+       |                                           ^~~~~~~~~~
+note: ibase must evaluate to an integer from 2 through 16.
+1:42: error: bc: invalid obase.
+     1 |  printf 'ibase=1\nobase=17\nscale=-1\n' | koshkit bc
+       |                                           ^~~~~~~~~~
+note: obase must evaluate to an integer from 2 through 16.
+1:42: error: bc: invalid scale.
+     1 |  printf 'ibase=1\nobase=17\nscale=-1\n' | koshkit bc
+       |                                           ^~~~~~~~~~
+note: scale must evaluate to an integer from 0 through 100000.
 === cal extra operand location ===
 1:20: error: cal: extra operand 'extra'.
      1 |  koshkit cal 1 2024 extra

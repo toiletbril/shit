@@ -899,7 +899,9 @@ static fn bc_execute_simple(StringView statement, bool should_print,
     let const parsed = bc_parse_register(*value, runtime.input_base,
                                          runtime.output_base, cxt, allocator);
     if (!parsed.has_value() || *parsed < 2 || *parsed > 16) {
-      report_soft_koshkit_error(ec, cxt, "bc: invalid ibase");
+      report_soft_koshkit_error(
+          ec, cxt, "bc: invalid ibase",
+          "ibase must evaluate to an integer from 2 through 16");
       runtime.status = 1;
     } else {
       runtime.input_base = *parsed;
@@ -912,7 +914,9 @@ static fn bc_execute_simple(StringView statement, bool should_print,
     let const parsed = bc_parse_register(*value, runtime.input_base,
                                          runtime.output_base, cxt, allocator);
     if (!parsed.has_value() || *parsed < 2 || *parsed > 16) {
-      report_soft_koshkit_error(ec, cxt, "bc: invalid obase");
+      report_soft_koshkit_error(
+          ec, cxt, "bc: invalid obase",
+          "obase must evaluate to an integer from 2 through 16");
       runtime.status = 1;
     } else {
       runtime.output_base = *parsed;
@@ -925,7 +929,9 @@ static fn bc_execute_simple(StringView statement, bool should_print,
     let const parsed = bc_parse_register(*value, runtime.input_base,
                                          runtime.output_base, cxt, allocator);
     if (!parsed.has_value() || *parsed > 100000) {
-      report_soft_koshkit_error(ec, cxt, "bc: invalid scale");
+      report_soft_koshkit_error(
+          ec, cxt, "bc: invalid scale",
+          "scale must evaluate to an integer from 0 through 100000");
       runtime.status = 1;
     } else {
       runtime.scale = *parsed;
