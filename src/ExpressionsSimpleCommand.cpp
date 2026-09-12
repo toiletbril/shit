@@ -400,6 +400,7 @@ pure fn SimpleCommand::assignments_source_end_position() const wontthrow
 pure fn SimpleCommand::full_source_end_position() const wontthrow -> usize
 {
   let const words_end_position = source_end_position();
+
   return m_full_source_end_position > words_end_position
              ? m_full_source_end_position
              : words_end_position;
@@ -480,8 +481,9 @@ fn bind_nonstandard_fd(ArrayList<nonstandard_descriptor> &nonstandard,
   for (let &existing : nonstandard) {
     if (existing.target_fd != binding.target_fd) continue;
 
-    if (existing.file_fd != KOSH_INVALID_FD && !existing.is_file_borrowed)
+    if (existing.file_fd != KOSH_INVALID_FD && !existing.is_file_borrowed) {
       os::close_fd(existing.file_fd);
+    }
     existing = binding;
 
     return;
@@ -761,7 +763,8 @@ static fn read_fd_allocation_value(EvalContext &cxt,
 fn internal::allocate_redirection_descriptor(
     const Redirection &redir, const resolved_redirection &resolved,
     EvalContext &cxt, const SourceLocation &location,
-    bool *open_or_stage_failed) throws -> i32
+    bool *open_or_stage_failed, const Maybe<String> *known_current_value) throws
+    -> i32
 {
   if (redir.fd_allocation_name_token == nullptr) return redir.fd;
 
@@ -776,11 +779,17 @@ fn internal::allocate_redirection_descriptor(
   if (resolved.kind == redirection_outcome::Duplicate &&
       resolved.dup_from_fd == Redirection::DUP_FD_CLOSE)
   {
-    let const current_value = read_fd_allocation_value(cxt, *target);
-    if (current_value.has_value()) {
-      let const parsed = current_value->view().to<i64>();
-      if (!parsed.is_error() && parsed.value() >= 0)
+    let const read_value = known_current_value != nullptr
+                               ? Maybe<String>{}
+                               : read_fd_allocation_value(cxt, *target);
+    let const *current_value =
+        known_current_value != nullptr ? known_current_value : &read_value;
+
+    if (current_value->has_value()) {
+      let const parsed = (*current_value)->view().to<i64>();
+      if (!parsed.is_error() && parsed.value() >= 0) {
         return static_cast<i32>(parsed.value());
+      }
     }
 
     if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
@@ -1629,8 +1638,9 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
     if (was_nonstandard_handed_off) return;
 
     for (let const &binding : nonstandard) {
-      if (binding.file_fd != KOSH_INVALID_FD && !binding.is_file_borrowed)
+      if (binding.file_fd != KOSH_INVALID_FD && !binding.is_file_borrowed) {
         os::close_fd(binding.file_fd);
+      }
     }
   };
 
@@ -1665,6 +1675,9 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
                                       /*open_or_stage_failed=*/nullptr,
                                       /*should_allow_fd_memoization=*/true);
 
+    let previous = Maybe<String>{};
+    let const *known_previous = static_cast<const Maybe<String> *>(nullptr);
+
     if (redir.fd_allocation_name_token != nullptr) {
       let const &allocation_word =
           static_cast<const tokens::WordToken *>(redir.fd_allocation_name_token)
@@ -1672,16 +1685,18 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
       let const allocation_target = allocation_word.get_fd_allocation_target();
       ASSERT(allocation_target.has_value());
 
-      let previous = read_fd_allocation_value(cxt, *allocation_target);
-      let record = stage_fd_allocation_restore{
-          *allocation_target,
-          previous.has_value() ? steal(*previous) : String{heap_allocator()},
-          previous.has_value()};
+      previous = read_fd_allocation_value(cxt, *allocation_target);
+      known_previous = &previous;
+      let record = stage_fd_allocation_restore{*allocation_target,
+                                               previous.has_value()
+                                                   ? String{previous->view()}
+                                                   : String{heap_allocator()},
+                                               previous.has_value()};
       allocation_restores.push(steal(record));
     }
 
-    let const target_fd =
-        allocate_redirection_descriptor(redir, r, cxt, source_location());
+    let const target_fd = allocate_redirection_descriptor(
+        redir, r, cxt, source_location(), nullptr, known_previous);
 
     switch (r.kind) {
     case redirection_outcome::Heredoc:

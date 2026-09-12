@@ -38,31 +38,46 @@ fn Caller::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   ASSERT(!args.is_empty());
 
+  let const has_frame_operand = args.count() > 1;
+  let const source_count = cxt.bash_source_frame_count();
+
+  if (source_count == 0) return 1;
+
   usize frame_index = 0;
-  if (args.count() > 1) {
+
+  if (has_frame_operand) {
     let const parsed = args[1].to<i64>();
     if (parsed.is_error()) {
-      throw make_error_for_arg(
-          ec, 1, StringView{"'"} + args[1] + "' is not a whole number",
+      report_soft_builtin_error(
+          ec, cxt, operand_locations[1],
+          StringView{"'"} + args[1] + "' is not a whole number",
           "The frame index must be a whole number such as `caller 0`");
+
+      return 2;
     }
-    if (parsed.value() < 0) {
-      throw make_error_for_arg(
-          ec, 1, StringView{"'"} + args[1] + "' is a negative frame number",
-          "The frame index must not be negative");
-    }
+
+    if (parsed.value() < 0) return 1;
+
     frame_index = static_cast<usize>(parsed.value());
+
+    if (frame_index + 1 >= cxt.funcname_frame_count()) return 1;
   }
 
-  if (frame_index >= cxt.funcname_frame_count()) return 1;
-
-  let const line = cxt.funcname_line_at(frame_index);
-  let const source = cxt.funcname_source_at(frame_index);
-
   let out = String{cxt.scratch_allocator()};
-  out += String::from(line, cxt.scratch_allocator());
+  out +=
+      String::from(cxt.funcname_line_at(frame_index), cxt.scratch_allocator());
   out += ' ';
-  out.append(source);
+
+  if (has_frame_operand) {
+    out.append(cxt.funcname_frame_at(frame_index + 1));
+    out += ' ';
+    out.append(cxt.bash_source_frame_at(frame_index + 1));
+  } else if (source_count > 1) {
+    out.append(cxt.bash_source_frame_at(1));
+  } else {
+    out.append(StringView{"NULL"});
+  }
+
   out += '\n';
   ec.print_to_stdout(out);
 

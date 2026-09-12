@@ -510,7 +510,7 @@ pure fn piece_begins_redirection(const ArrayList<format_piece> &pieces,
 
 struct format_layout
 {
-  usize indent_step{2};
+  usize indent_step_spaces{2};
   bool is_bash_declaration{false};
 };
 
@@ -611,16 +611,20 @@ public:
 
   fn finish_line() throws -> void
   {
-    if (!m_output.is_empty() && m_output[m_output.count() - 1] != '\n')
+    if (!m_output.is_empty() && m_output[m_output.count() - 1] != '\n') {
       m_output.push('\n');
+    }
+
     m_line_has_text = false;
     m_column = 0;
   }
 
   fn finish_padded_line() throws -> void
   {
-    if (!m_output.is_empty() && m_output[m_output.count() - 1] != '\n')
+    if (!m_output.is_empty() && m_output[m_output.count() - 1] != '\n') {
       m_output.append(" \n");
+    }
+
     m_line_has_text = false;
     m_column = 0;
   }
@@ -902,7 +906,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
   let writer = FormatWriter{};
   writer.set_indent(initial_indent);
   writer.set_wrapping(!layout.is_bash_declaration);
-  let const indent_step = layout.indent_step;
+  let const indent_step_spaces = layout.indent_step_spaces;
   let const is_bash = layout.is_bash_declaration;
   bool has_pending_statement_end = false;
   bool should_pad_pending_line = false;
@@ -1106,8 +1110,10 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
   for (usize index = 0; index < pieces.count(); index++) {
     let const &piece = pieces[index];
     let const text = piece.text;
-    if (is_bash && piece.kind != format_piece_kind::Newline)
+    if (is_bash && piece.kind != format_piece_kind::Newline) {
       do_flush_statement_end(index);
+    }
+
     if (piece.kind == format_piece_kind::Raw) {
       if (!is_bash) {
         writer.append_raw(text);
@@ -1164,8 +1170,10 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         has_pending_structural_separator = false;
       }
       writer.append_comment(text, piece.is_at_line_start);
-      if (piece.source_position == 0 && text.starts_with("#!"))
+      if (piece.source_position == 0 && text.starts_with("#!")) {
         writer.ensure_blank_line();
+      }
+
       continue;
     }
     if (piece.kind == format_piece_kind::Newline) {
@@ -1280,8 +1288,11 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       if ((keyword_flags & formatter_keyword_closes) != 0) {
         do_finish_command();
         writer.finish_line();
-        if (is_case_body_esac && indent >= indent_step) indent -= indent_step;
-        if (indent >= indent_step) indent -= indent_step;
+        if (is_case_body_esac && indent >= indent_step_spaces) {
+          indent -= indent_step_spaces;
+        }
+
+        if (indent >= indent_step_spaces) indent -= indent_step_spaces;
         writer.set_indent(indent);
       }
       if ((keyword_flags & formatter_keyword_vertical) != 0 || is_case_in) {
@@ -1303,8 +1314,9 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
             (keyword_flags & formatter_keyword_indents) == 0;
         if (is_compound_terminator) has_completed_structural_statement = true;
         if (is_bash) {
-          if (rendered_text == "done" && !loop_do_join_states.is_empty())
+          if (rendered_text == "done" && !loop_do_join_states.is_empty()) {
             loop_do_join_states.pop_back();
+          }
           if (rendered_text == "fi" && !pending_fi_counts.is_empty()) {
             let const extra_count = pending_fi_counts.back();
             pending_fi_counts.pop_back();
@@ -1312,7 +1324,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
             for (usize repeat = 0; repeat < extra_count; repeat++) {
               writer.append_attached(";");
               writer.finish_line();
-              if (indent >= indent_step) indent -= indent_step;
+              if (indent >= indent_step_spaces) indent -= indent_step_spaces;
               writer.set_indent(indent);
               writer.append_token("fi");
             }
@@ -1331,8 +1343,9 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
           writer.finish_line();
         }
 
-        if ((keyword_flags & formatter_keyword_indents) != 0 || is_case_in)
-          indent += indent_step;
+        if ((keyword_flags & formatter_keyword_indents) != 0 || is_case_in) {
+          indent += indent_step_spaces;
+        }
         writer.set_indent(indent);
         is_expecting_case_in = false;
         if (is_case_in) case_pattern_states.push(true);
@@ -1346,7 +1359,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         if (is_bash) {
           writer.append_token("else");
           writer.finish_line();
-          indent += indent_step;
+          indent += indent_step_spaces;
           writer.set_indent(indent);
           if (!pending_fi_counts.is_empty()) pending_fi_counts.back()++;
           writer.append_token("if");
@@ -1360,12 +1373,13 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       if ((keyword_flags & formatter_keyword_case) != 0)
         is_expecting_case_in = true;
       if (is_bash && is_reserved_position) {
-        if (rendered_text == "while" || rendered_text == "until")
+        if (rendered_text == "while" || rendered_text == "until") {
           loop_do_join_states.push(true);
-        else if (rendered_text == "for" || rendered_text == "select")
+        } else if (rendered_text == "for" || rendered_text == "select") {
           loop_do_join_states.push(false);
-        else if (rendered_text == "if")
+        } else if (rendered_text == "if") {
           pending_fi_counts.push(0);
+        }
       }
       let should_rewrite_test =
           is_command_start && !is_case_pattern && rendered_text == "test" &&
@@ -1390,8 +1404,9 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
           is_redirection_operator(pieces[index + 1].text) &&
           piece.source_position + piece.text.count() ==
               pieces[index + 1].source_position;
-      if (is_test_command && !has_closed_test && is_redirection_descriptor)
+      if (is_test_command && !has_closed_test && is_redirection_descriptor) {
         do_close_test();
+      }
 
       if (should_attach_case_pattern) {
         writer.append_attached(rendered_text);
@@ -1424,7 +1439,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       } else if (!is_followed_by_inline_comment) {
         writer.finish_line();
       }
-      indent += indent_step;
+      indent += indent_step_spaces;
       writer.set_indent(indent);
       do_finish_command();
       continue;
@@ -1449,7 +1464,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         continue;
       }
       if (!is_followed_by_inline_comment) writer.finish_line();
-      indent += indent_step;
+      indent += indent_step_spaces;
       subshell_depth++;
       writer.set_indent(indent);
       do_finish_command();
@@ -1458,7 +1473,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       do_begin_statement(false, true);
       do_finish_command();
       writer.finish_line();
-      if (indent >= indent_step) indent -= indent_step;
+      if (indent >= indent_step_spaces) indent -= indent_step_spaces;
       writer.set_indent(indent);
       writer.append_token(text);
       has_completed_structural_statement = true;
@@ -1478,7 +1493,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       has_completed_structural_statement = false;
       do_finish_command();
       writer.finish_line();
-      if (indent >= indent_step) indent -= indent_step;
+      if (indent >= indent_step_spaces) indent -= indent_step_spaces;
       writer.set_indent(indent);
       writer.append_token(text);
       if (!is_followed_by_inline_comment) writer.finish_line();
@@ -1533,7 +1548,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       if (is_case_pattern) {
         writer.append_attached(text);
         if (!is_followed_by_inline_comment) writer.finish_line();
-        indent += indent_step;
+        indent += indent_step_spaces;
         writer.set_indent(indent);
         case_pattern_states.back() = false;
         should_attach_case_pattern = false;
@@ -1549,7 +1564,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
           continue;
         }
         writer.finish_line();
-        if (indent >= indent_step) indent -= indent_step;
+        if (indent >= indent_step_spaces) indent -= indent_step_spaces;
         subshell_depth--;
         writer.set_indent(indent);
         writer.append_token(text);
@@ -1573,8 +1588,9 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         conditional_depth == 0 && is_redirection_operator(text);
     if (is_test_command && !has_closed_test && is_redirection) do_close_test();
 
-    if (is_redirection && (text == "<<" || text == "<<-"))
+    if (is_redirection && (text == "<<" || text == "<<-")) {
       should_attach_heredoc_delimiter = true;
+    }
 
     if (is_redirection) {
       if (is_command_start && !has_classified_current_statement) {
@@ -1949,8 +1965,9 @@ static fn test_operand_without_x_prefix(StringView operand) throws
     return String{operand.substring(1)};
   }
 
-  if (operand[0] == 'x' && is_plain_test_literal(operand.substring(1)))
+  if (operand[0] == 'x' && is_plain_test_literal(operand.substring(1))) {
     return String{operand.substring(1)};
+  }
 
   return None;
 }

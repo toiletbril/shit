@@ -250,10 +250,11 @@ fn EvalContext::sorted_readonly_function_names() const throws
 {
   let out = ArrayList<String>{heap_allocator()};
   out.reserve(m_readonly_functions.count());
-  m_functions.for_each([&](StringView name, const FunctionBodyHandle &) {
-    if (m_readonly_functions.contains(name)) out.push_managed(name);
+  m_readonly_functions.for_each([&](StringView name) {
+    if (find_function(name) != nullptr) out.push_managed(name);
   });
   out.sort();
+
   return out;
 }
 
@@ -300,8 +301,6 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
 fn EvalContext::cached_trap_body(StringView condition, StringView action) throws
     -> FunctionBodyHandle
 {
-  if (action.find_character('\r').has_value()) return FunctionBodyHandle{};
-
   if (let const *cached = m_trap_bodies.find(condition); cached != nullptr) {
     let const *cached_source = cached->get_source();
     if (cached->get_body() != nullptr && cached_source != nullptr &&
@@ -310,6 +309,8 @@ fn EvalContext::cached_trap_body(StringView condition, StringView action) throws
       return *cached;
     }
   }
+
+  if (action.find_character('\r').has_value()) return FunctionBodyHandle{};
 
   LOG(Debug, "parsing the '%.*s' trap action of %zu bytes for reuse",
       static_cast<int>(condition.length), condition.data, action.length);
@@ -729,6 +730,16 @@ fn EvalContext::run_pending_traps() throws -> void
           child_body.has_value() ? &child_body : nullptr;
 
       u32 fired_count = 0;
+      defer
+      {
+        if (fired_count > m_pending_child_trap_count)
+          m_pending_child_trap_count = 0;
+        else
+          m_pending_child_trap_count -= fired_count;
+
+        os::clear_reaped_child_arrival();
+      };
+
       for (; fired_count < fire_count; fired_count++) {
         if (has_pending_control_flow()) break;
 
@@ -736,13 +747,6 @@ fn EvalContext::run_pending_traps() throws -> void
         run_source(action.view(), "the CHLD trap", return_handling::Reject,
                    m_current_location, None, false, nullptr, cached_child_body);
       }
-
-      if (fired_count > m_pending_child_trap_count)
-        m_pending_child_trap_count = 0;
-      else
-        m_pending_child_trap_count -= fired_count;
-
-      os::clear_reaped_child_arrival();
     }
   }
 

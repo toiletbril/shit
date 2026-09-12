@@ -202,8 +202,9 @@ hot fn decode_shell_word(StringView word, Allocator allocator,
       decode_ansi_c_escapes(ansi_text, body);
 
       let const construct_end = is_terminated ? body_end + 1 : body_end;
-      if (should_map_source && !has_escape)
+      if (should_map_source && !has_escape) {
         decoded.raw_positions.back() = body_start;
+      }
 
       for (usize index = 0; index < ansi_text.length(); index++) {
         let const decoded_byte = ansi_text[index];
@@ -719,13 +720,17 @@ fn split_lines(StringView text, Allocator allocator,
   while (position < text.length) {
     let const line_start = position;
     let line = text.next_line(position);
-    if (should_keep_newlines && position > line_start + line.length)
+    if (should_keep_newlines && position > line_start + line.length) {
       line = text.substring_of_length(line_start, line.length + 1);
+    }
     lines.push(line);
   }
+
   if (!should_keep_newlines &&
       (text.is_empty() || text[text.length - 1] == '\n'))
+  {
     lines.push(text.substring(text.length));
+  }
 
   return lines;
 }

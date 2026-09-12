@@ -407,6 +407,16 @@ changes update this file.
   mode to every counter or diagnostic hook the fixture requires.
 - Rebuild the required mode. Verify platform, mode, and revision when relevant.
   Compile release after changing assertion-only locals.
+- The no editor configuration keeps its own object directory and links the same
+  debug path. Rebuild the ordinary configuration before the next fixture run.
+- Run a container suite without an allocated terminal. A terminal moves a
+  fixture onto its terminal branch and hides the result continuous integration
+  reports. A container exec also starts with SIGQUIT ignored, and the startup
+  ignore listing reports it.
+- A bounded golden fixture runs in a new session without a controlling
+  terminal. Job control is unavailable there. A helper that must keep the
+  default interrupt disposition runs in the foreground and publishes its own
+  process id.
 - Force-sign a relinked macOS binary and prove it runs one command before a
   suite is started. An invalid signature kills every invocation with signal 9.
 - Run owners sharing result or artifact paths sequentially. Rebuild the required

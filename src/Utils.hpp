@@ -183,6 +183,9 @@ pure alwaysinline fn hex_digit_value(char byte) wontthrow -> Maybe<u8>
 }
 
 pure fn token_has_uppercase(StringView token) wontthrow -> bool;
+pure fn smart_case_prefix_matches(StringView candidate, StringView prefix,
+                                  bool is_prefix_case_sensitive) wontthrow
+    -> bool;
 pure fn smart_case_prefix_matches(StringView candidate,
                                   StringView prefix) wontthrow -> bool;
 

@@ -339,23 +339,6 @@ collect_command_names(StringView token, command_match_mode match_mode,
       utils::token_has_uppercase(normalized_path_token.view());
   let seen = BorrowedStringSet{};
 
-  let const do_prefix_matches = [](StringView candidate, StringView prefix,
-                                   bool is_prefix_case_sensitive) -> bool {
-    if (candidate.starts_with(prefix)) return true;
-    if (is_prefix_case_sensitive || candidate.length < prefix.length) {
-      return false;
-    }
-
-    for (usize position = 0; position < prefix.length; position++)
-      if (utils::ascii_to_lower(candidate[position]) !=
-          utils::ascii_to_lower(prefix[position]))
-      {
-        return false;
-      }
-
-    return true;
-  };
-
   let const do_add = [&](StringView name) throws {
     collector.note_source_candidate();
     let const tier = command_name_match(name, token, token_is_glob,
@@ -382,8 +365,12 @@ collect_command_names(StringView token, command_match_mode match_mode,
   if (context.koshkit_utilities_are_reachable()) {
     for (const String &util_name : koshkit::util_names()) {
       if (!token_is_glob && !collector.allows_fuzzy_fallback() &&
-          !do_prefix_matches(util_name.view(), token, is_case_sensitive))
+          !utils::smart_case_prefix_matches(util_name.view(), token,
+                                            is_case_sensitive))
+      {
         continue;
+      }
+
       do_add(util_name.view());
     }
   }
@@ -405,8 +392,9 @@ collect_command_names(StringView token, command_match_mode match_mode,
       (!token.is_empty() || collector.allows_fuzzy_fallback()))
   {
     for (let const &path_name : path_names)
-      if (do_prefix_matches(path_name.view(), normalized_path_token.view(),
-                            path_is_case_sensitive))
+      if (utils::smart_case_prefix_matches(path_name.view(),
+                                           normalized_path_token.view(),
+                                           path_is_case_sensitive))
         do_add_path(path_name.view());
   }
 
@@ -531,8 +519,9 @@ static fn check_filesystem_entry(const filesystem_listing &listing,
   let const is_directory =
       utils::directory_entry_kind(listing.directory, entry) ==
       Path::entry_kind::Directory;
-  if (filter == filesystem_entry_filter::DirectoriesOnly && !is_directory)
+  if (filter == filesystem_entry_filter::DirectoriesOnly && !is_directory) {
     return None;
+  }
   if (filter == filesystem_entry_filter::RunnableOrDirectories &&
       !is_directory && !entry_is_executable(listing.directory, name))
   {
@@ -572,8 +561,9 @@ static fn build_filesystem_candidate(
   }
 
   if (preserve_directory_spelling) {
-    if (!inside_quote && path_candidate_needs_quoting(entry_name.view()))
+    if (!inside_quote && path_candidate_needs_quoting(entry_name.view())) {
       entry_name = escape_path_candidate(entry_name.view());
+    }
 
     return String{completion_allocator(), raw_directory_part} + entry_name;
   }
@@ -1071,7 +1061,9 @@ fn complete(StringView line, usize cursor, EvalContext &context,
   if (token_is_variable(open_quote_content_token) && is_leading_variable_active)
   {
     candidates = complete_variable(open_quote_content_token, context);
-    if (has_open_quote) token_start += decoded_token.open_quote_content_start;
+    if (has_open_quote) {
+      token_start += decoded_token.open_quote_content_start;
+    }
   } else if (token_is_tilde_user_prefix(stage_token) &&
              is_leading_tilde_active && !is_posix_completion)
   {

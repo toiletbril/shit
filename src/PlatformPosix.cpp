@@ -1083,8 +1083,10 @@ fn apply_terminal_settings(descriptor terminal,
     if (let const selected_character = TERMINAL_CONTROL_CHARACTERS.find(name);
         selected_character.has_value())
     {
-      if (is_disabled || ++index == settings.count())
+      if (is_disabled || ++index == settings.count()) {
         return {terminal_settings_apply_kind::InvalidSetting, index - 1};
+      }
+
       cc_t value = 0;
       if (!parse_terminal_character(settings[index].view(), value))
         return {terminal_settings_apply_kind::InvalidSetting, index};
@@ -1095,10 +1097,14 @@ fn apply_terminal_settings(descriptor terminal,
     let const selected_setting = TERMINAL_SETTINGS.find(name);
     if (!selected_setting.has_value()) {
       let const speed = terminal_speed_value(name);
-      if (speed == static_cast<speed_t>(~speed_t{0}) || is_disabled)
+      if (speed == static_cast<speed_t>(~speed_t{0}) || is_disabled) {
         return {terminal_settings_apply_kind::InvalidSetting, index};
-      if (cfsetispeed(&state, speed) != 0 || cfsetospeed(&state, speed) != 0)
+      }
+
+      if (cfsetispeed(&state, speed) != 0 || cfsetospeed(&state, speed) != 0) {
         return {terminal_settings_apply_kind::InvalidSetting, index};
+      }
+
       continue;
     }
 
@@ -1161,15 +1167,21 @@ fn apply_terminal_settings(descriptor terminal,
       continue;
     case terminal_setting_kind::Rows:
     case terminal_setting_kind::Columns: {
-      if (++index == settings.count() || !has_window)
+      if (++index == settings.count() || !has_window) {
         return {terminal_settings_apply_kind::InvalidSetting, index - 1};
+      }
+
       let const parsed = utils::parse_decimal_u64(settings[index].view());
-      if (parsed.is_error() || parsed.value() > UINT16_MAX)
+      if (parsed.is_error() || parsed.value() > UINT16_MAX) {
         return {terminal_settings_apply_kind::InvalidSetting, index};
-      if (*selected_setting == terminal_setting_kind::Rows)
+      }
+
+      if (*selected_setting == terminal_setting_kind::Rows) {
         window.ws_row = static_cast<u16>(parsed.value());
-      else
+      } else {
         window.ws_col = static_cast<u16>(parsed.value());
+      }
+
       continue;
     }
     case terminal_setting_kind::Minimum:
@@ -1177,8 +1189,10 @@ fn apply_terminal_settings(descriptor terminal,
       if (++index == settings.count())
         return {terminal_settings_apply_kind::InvalidSetting, index - 1};
       let const parsed = utils::parse_decimal_u64(settings[index].view());
-      if (parsed.is_error() || parsed.value() > UCHAR_MAX)
+      if (parsed.is_error() || parsed.value() > UCHAR_MAX) {
         return {terminal_settings_apply_kind::InvalidSetting, index};
+      }
+
       state.c_cc[*selected_setting == terminal_setting_kind::Minimum ? VMIN
                                                                      : VTIME] =
           static_cast<cc_t>(parsed.value());
@@ -1186,10 +1200,14 @@ fn apply_terminal_settings(descriptor terminal,
     }
     }
   }
+
   if (tcsetattr(terminal, TCSADRAIN, &state) != 0)
     return {terminal_settings_apply_kind::SystemError, 0};
-  if (has_window && ioctl(terminal, TIOCSWINSZ, &window) != 0)
+
+  if (has_window && ioctl(terminal, TIOCSWINSZ, &window) != 0) {
     return {terminal_settings_apply_kind::SystemError, 0};
+  }
+
   return {terminal_settings_apply_kind::Success, 0};
 }
 
@@ -1390,7 +1408,10 @@ static fn capture_entry_ignored_signals() wontthrow -> void
   }
 }
 
-fn entry_ignored_signals() wontthrow -> u64 { return ENTRY_IGNORED_SIGNALS; }
+fn get_entry_ignored_signals() wontthrow -> u64
+{
+  return ENTRY_IGNORED_SIGNALS;
+}
 
 fn set_default_signal_handlers(signal_profile profile) throws -> void
 {
@@ -1543,9 +1564,11 @@ static fn lookup_id_by_name(StringView database_path, StringView wanted_name,
   for (let const &line : utils::split_lines(contents->view())) {
     if (passwd_field(line, 0) != wanted_name) continue;
     let const id = passwd_field(line, id_field_index).to<i64>();
-    if (!id.is_error() && id.value() >= 0 && id.value() <= UINT32_MAX)
+    if (!id.is_error() && id.value() >= 0 && id.value() <= UINT32_MAX) {
       return static_cast<u32>(id.value());
+    }
   }
+
   return koshka::None;
 }
 

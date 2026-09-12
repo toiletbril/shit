@@ -119,7 +119,7 @@ enum class bash_special_array_id : u8
   Count,
 };
 
-/* The dynamic names an unset can take the reader away from. */
+/* An unset can take the reader away from each of these dynamic names. */
 enum class dynamic_reader_id : u8
 {
   Seconds,
@@ -419,7 +419,7 @@ public:
   fn restore_temporary_shell_variable(
       StringView name, const Maybe<String> &previous_value) throws -> void;
   fn begin_confined_variable_writes() wontthrow -> usize;
-  fn rollback_confined_variable_writes(usize mark) throws -> void;
+  fn rollback_confined_variable_writes(usize mark) wontthrow -> void;
   fn get_program_resolver() wontthrow -> ProgramResolver &
   {
     return m_program_resolver;
@@ -1039,6 +1039,9 @@ public:
     Kind kind{Kind::Main};
     usize storage_index{0};
   };
+  mustuse fn merged_frame_at(usize index, usize total,
+                             Maybe<usize> script_source_index) const wontthrow
+      -> MergedFrame;
   mustuse fn merged_frame_at(usize index) const wontthrow -> MergedFrame;
   mustuse fn script_source_frame_index() const wontthrow -> Maybe<usize>;
   /* The FUNCNAME frame list bash exposes, the function calls innermost first,
@@ -1047,11 +1050,11 @@ public:
   mustuse fn funcname_frame_at(usize index) const wontthrow -> StringView;
   /* A frame past the function calls reports zero. */
   mustuse fn funcname_line_at(usize index) const throws -> usize;
-  /* A frame past the source stack reports an empty path. */
-  mustuse fn funcname_source_at(usize index) const wontthrow -> StringView;
   /* The BASH_SOURCE frame list, the innermost sourced file first and the script
      name at the bottom. A frame past the stack reports an empty path. */
   mustuse fn bash_source_frame_at(usize index) const wontthrow -> StringView;
+  mustuse fn bash_source_frame_count(
+      Maybe<usize> script_source_index) const wontthrow -> usize;
   mustuse fn bash_source_frame_count() const wontthrow -> usize;
 
   enum class DynamicArray : u8
@@ -1088,7 +1091,8 @@ public:
                             SourceLocation call_site,
                             bool is_only_root_source) throws -> void;
   fn pop_root_source_frame() wontthrow -> void;
-  pure fn retained_source_generation() const wontthrow -> u64;
+  pure fn get_retained_source_generation() const wontthrow -> u64;
+  pure fn scan_source_generation(const String *source) const wontthrow -> u64;
   pure fn source_generation_for(const String *source) const wontthrow -> u64;
   pure fn borrowed_frame_source(const source_frame &frame) const wontthrow
       -> const String *;
@@ -2117,6 +2121,11 @@ protected:
   ArrayList<environment_undo_entry> m_environment_undo_log{heap_allocator()};
   ArrayList<environment_undo_entry> m_confined_write_log{heap_allocator()};
   usize m_confined_write_depth{0};
+  /* The dynamic state a stage can write without leaving an undo entry, saved
+     when the outermost confined window opens. */
+  i64 m_confined_seconds_base{0};
+  u64 m_confined_random_state{0};
+  bool m_was_confined_ignoreeof_enabled{false};
   /* The names currently in the process environment, kept in step with every
      environment write. An assignment tests membership in O(1). A key is the
      ASCII lowercase form of the name where the environment ignores case. */
@@ -2174,6 +2183,7 @@ protected:
      leaves m_current_source or a control_flow::source dangling. */
   ArrayList<String *> m_retained_sources{heap_allocator()};
   u64 m_retained_source_generation{0};
+  u64 m_current_source_generation{EXTERNAL_SOURCE_GENERATION};
 
   /* The mood and the diagnostic and strictness toggles, grouped as one runtime
      state so a scope that swaps them saves and restores the whole set with one
@@ -2183,7 +2193,8 @@ protected:
   u8 m_init_moods_sourcing{0};
   u8 m_initialized_moods{0};
   u8 m_disabled_bash_special_arrays{0};
-  /* One bit per dynamic_reader_id whose reader an unset has taken away. */
+  /* Each bit names a dynamic_reader_id whose reader an unset has taken
+     away. */
   u8 m_unset_dynamic_readers{0};
   bool m_was_mood_set_explicitly{false};
   u64 m_mood_mutation_revision{0};
@@ -2191,12 +2202,12 @@ protected:
   u64 m_diagnostics_mutation_revision{0};
   u64 m_annoying_diagnostics_mutation_revision{0};
   shell_option_mutations m_shell_option_mutations{};
-  /* One bit per suppressible_warning value. */
+  /* Each bit names a suppressible_warning value. */
   u32 m_suppressed_warnings{0};
   /* The nesting of mimicked scripts, bounded so a script that mimics another
      cannot recurse without limit. */
   usize m_mimicry_depth{0};
-  /* The base $SECONDS counts from. */
+  /* This is the base $SECONDS counts from. */
   i64 m_shell_start_time{0};
   /* The offset an assignment to SECONDS puts on the elapsed count. */
   i64 m_seconds_base{0};

@@ -49,7 +49,7 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
   set_field_separators(m_field_separators.view());
 
   m_shell_start_time = static_cast<i64>(std::time(nullptr));
-  m_startup_ignored_signals = os::entry_ignored_signals();
+  m_startup_ignored_signals = os::get_entry_ignored_signals();
 
   os::for_each_environment_name(this, [](opaque *context, StringView name) {
     static_cast<EvalContext *>(context)->mark_exported(name);
@@ -168,20 +168,37 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
   LOG(All, "assigning variable '%.*s' to a value of %zu bytes",
       static_cast<int>(name.length), name.data, value.length);
   let const first_byte = name.is_empty() ? '\0' : name[0];
-  if (first_byte == 'I' && name == "IFS") set_field_separators(value);
-  if (write_dynamic_variable(name, value)) return;
+  let is_field_separator_name = false;
+  let is_ignoreeof_name = false;
+  let is_path_name = false;
 
-  if (utils::environment_name_is_path(name))
-    m_program_resolver.assign_path(String{value});
-  if (first_byte == 'I' && name == "IGNOREEOF")
-    m_runtime.set_option(shell_option_id::Ignoreeof, true);
+  switch (first_byte) {
+  case 'I':
+    is_field_separator_name = name == "IFS";
+    is_ignoreeof_name = name == "IGNOREEOF";
+    break;
+  case 'P':
+  case 'p': is_path_name = utils::environment_name_is_path(name); break;
+  default: break;
+  }
+
   if (m_confined_write_depth > 0) [[unlikely]] {
     let const *previous = lookup_shell_variable(name);
     let saved = Maybe<String>{};
     if (previous != nullptr) saved = String{previous->view()};
+
     m_confined_write_log.push(
         environment_undo_entry{String{name}, steal(saved)});
   }
+
+  if (is_field_separator_name) set_field_separators(value);
+  if (write_dynamic_variable(name, value)) return;
+
+  if (is_path_name) m_program_resolver.assign_path(String{value});
+  if (is_ignoreeof_name) {
+    m_runtime.set_option(shell_option_id::Ignoreeof, true);
+  }
+
   m_shell_variables.set(name, value);
   if (is_exported(name)) {
     if (m_subshell_depth > 0)
@@ -204,11 +221,19 @@ fn EvalContext::begin_confined_variable_writes() wontthrow -> usize
 {
   LOG(Debug, "confining variable writes above mark %zu",
       m_confined_write_log.count());
+
+  if (m_confined_write_depth == 0) {
+    m_confined_seconds_base = m_seconds_base;
+    m_confined_random_state = m_random_state;
+    m_was_confined_ignoreeof_enabled =
+        m_runtime.option_is_enabled(shell_option_id::Ignoreeof);
+  }
+
   m_confined_write_depth++;
   return m_confined_write_log.count();
 }
 
-fn EvalContext::rollback_confined_variable_writes(usize mark) throws -> void
+fn EvalContext::rollback_confined_variable_writes(usize mark) wontthrow -> void
 {
   ASSERT(m_confined_write_depth > 0);
   m_confined_write_depth--;
@@ -216,23 +241,35 @@ fn EvalContext::rollback_confined_variable_writes(usize mark) throws -> void
       m_confined_write_log.count() - mark);
 
   while (m_confined_write_log.count() > mark) {
-    let const &entry = m_confined_write_log.back();
-    let const name = entry.name.view();
-    restore_temporary_shell_variable(name, entry.previous_value);
-    let const restored = entry.previous_value.has_value()
-                             ? entry.previous_value->view()
-                             : StringView{};
+    try {
+      let const &entry = m_confined_write_log.back();
+      let const name = entry.name.view();
+      restore_temporary_shell_variable(name, entry.previous_value);
+      let const restored = entry.previous_value.has_value()
+                               ? entry.previous_value->view()
+                               : StringView{};
 
-    if (name == "IFS") set_field_separators(restored);
-    if (utils::environment_name_is_path(name))
-      m_program_resolver.assign_path(String{restored});
-    if (is_exported(name)) {
-      if (entry.previous_value.has_value())
-        os::set_environment_variable(name, restored);
-      else
-        os::unset_environment_variable(name);
+      if (name == "IFS") set_field_separators(restored);
+      if (utils::environment_name_is_path(name))
+        m_program_resolver.assign_path(String{restored});
+      if (is_exported(name)) {
+        if (entry.previous_value.has_value())
+          os::set_environment_variable(name, restored);
+        else
+          os::unset_environment_variable(name);
+      }
+    } catch (...) {
+      LOG(Info, "a confined variable write could not be rewound");
     }
+
     m_confined_write_log.pop_back();
+  }
+
+  if (m_confined_write_depth == 0) {
+    m_seconds_base = m_confined_seconds_base;
+    m_random_state = m_confined_random_state;
+    m_runtime.set_option(shell_option_id::Ignoreeof,
+                         m_was_confined_ignoreeof_enabled);
   }
 }
 
@@ -264,8 +301,9 @@ fn EvalContext::guard_restricted_path(StringView path,
                                       restricted_path_use use) const throws
     -> void
 {
-  if (!restricted_enforcement_active() || !os::has_directory_separator(path))
+  if (!restricted_enforcement_active() || !os::has_directory_separator(path)) {
     return;
+  }
 
   switch (use) {
   case restricted_path_use::Command:
@@ -829,8 +867,9 @@ static fn store_exported_name(StringMap<Value> &names, StringView key,
        name and places a new one. */
     let const previous_count = names.count();
     let &display_name = names.get_or_create(key, String{heap_allocator()});
-    if (names.count() != previous_count && key != spelling)
+    if (names.count() != previous_count && key != spelling) {
       display_name.append(spelling);
+    }
   }
 }
 
@@ -1020,10 +1059,11 @@ fn EvalContext::append_current_bash_argument_frame() const throws -> void
       m_bash_argument_frame_context->has_flag(BashArgumentFrameFlag::IsSource);
   let const has_source_arguments = m_bash_argument_frame_context->has_flag(
       BashArgumentFrameFlag::HasSourceArguments);
-  if (is_source_frame && !has_source_arguments)
+  if (is_source_frame && !has_source_arguments) {
     append_bash_argument_frame(m_bash_argument_frame_context->source_path);
-  else
+  } else {
     append_bash_argument_frame(m_positional_params);
+  }
 }
 
 fn EvalContext::enter_bash_function_argument_frame(
@@ -1170,18 +1210,18 @@ pure fn EvalContext::script_source_frame_index() const wontthrow -> Maybe<usize>
   return None;
 }
 
-pure fn EvalContext::merged_frame_at(usize index) const wontthrow -> MergedFrame
+pure fn EvalContext::merged_frame_at(
+    usize index, usize total, Maybe<usize> script_source_index) const wontthrow
+    -> MergedFrame
 {
-  let const total = bash_source_frame_count();
   if (index >= total) return MergedFrame{MergedFrame::Kind::Main, 0};
 
   let const target = total - 1 - index;
-  let const script_source_index = script_source_frame_index();
-  usize emitted = 0;
+  usize emitted_count = 0;
 
   if (m_is_script_run && !script_source_index.has_value()) {
     if (target == 0) return MergedFrame{MergedFrame::Kind::Main, 0};
-    emitted = 1;
+    emitted_count = 1;
   }
 
   let const function_count = m_function_call_names.count();
@@ -1203,7 +1243,7 @@ pure fn EvalContext::merged_frame_at(usize index) const wontthrow -> MergedFrame
     if (has_source &&
         m_source_frames[source_index].function_call_depth <= function_index)
     {
-      if (emitted == target) {
+      if (emitted_count == target) {
         if (script_source_index.has_value() &&
             *script_source_index == source_index)
         {
@@ -1213,19 +1253,27 @@ pure fn EvalContext::merged_frame_at(usize index) const wontthrow -> MergedFrame
         return MergedFrame{MergedFrame::Kind::Source, source_index};
       }
 
-      emitted++;
+      emitted_count++;
       source_index++;
       continue;
     }
 
-    if (emitted == target)
+    if (emitted_count == target)
       return MergedFrame{MergedFrame::Kind::Function, function_index};
 
-    emitted++;
+    emitted_count++;
     function_index++;
   }
 
   return MergedFrame{MergedFrame::Kind::Main, 0};
+}
+
+pure fn EvalContext::merged_frame_at(usize index) const wontthrow -> MergedFrame
+{
+  let const script_source_index = script_source_frame_index();
+
+  return merged_frame_at(index, bash_source_frame_count(script_source_index),
+                         script_source_index);
 }
 
 fn EvalContext::funcname_frame_count() const wontthrow -> usize
@@ -1284,36 +1332,14 @@ fn EvalContext::funcname_line_at(usize index) const throws -> usize
   return 0;
 }
 
-pure fn EvalContext::funcname_source_at(usize index) const wontthrow
-    -> StringView
-{
-  if (!m_source_frames.is_empty()) {
-    let const source_index = m_source_frames.count() - 1;
-    if (index <= source_index)
-      return m_source_frames[source_index - index].source_path.view();
-  }
-  if (index < m_function_call_names.count()) {
-    let const call_count = m_function_call_names.count();
-    let const storage_index = call_count - 1 - index;
-    let const *info =
-        m_function_call_storages[storage_index].get_definition_info();
-    if (info != nullptr) {
-      if (let const name = source_name_at(info->source_name_index);
-          name.has_value())
-      {
-        return *name;
-      }
-    }
-  }
-  return StringView{};
-}
-
 pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
     -> StringView
 {
-  if (index >= bash_source_frame_count()) return StringView{};
+  let const script_source_index = script_source_frame_index();
+  let const total = bash_source_frame_count(script_source_index);
+  if (index >= total) return StringView{};
 
-  let const frame = merged_frame_at(index);
+  let const frame = merged_frame_at(index, total, script_source_index);
   switch (frame.kind) {
   case MergedFrame::Kind::Function: {
     let const *info =
@@ -1336,7 +1362,8 @@ pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
   return m_shell_name.view();
 }
 
-pure fn EvalContext::bash_source_frame_count() const wontthrow -> usize
+pure fn EvalContext::bash_source_frame_count(
+    Maybe<usize> script_source_index) const wontthrow -> usize
 {
   usize frame_count = m_function_call_names.count();
 
@@ -1344,10 +1371,14 @@ pure fn EvalContext::bash_source_frame_count() const wontthrow -> usize
     if (!m_source_frames[i].source_path.is_empty()) frame_count++;
   }
 
-  if (m_is_script_run && !script_source_frame_index().has_value())
-    frame_count++;
+  if (m_is_script_run && !script_source_index.has_value()) frame_count++;
 
   return frame_count;
+}
+
+pure fn EvalContext::bash_source_frame_count() const wontthrow -> usize
+{
+  return bash_source_frame_count(script_source_frame_index());
 }
 
 fn EvalContext::dynamic_array_element_count(DynamicArray which) const throws
@@ -1569,8 +1600,9 @@ fn ExecContext::close_fds() throws -> void
   }
 
   for (let const &binding : nonstandard_fds) {
-    if (binding.file_fd != KOSH_INVALID_FD && !binding.is_file_borrowed)
+    if (binding.file_fd != KOSH_INVALID_FD && !binding.is_file_borrowed) {
       os::close_fd(binding.file_fd);
+    }
   }
   nonstandard_fds.clear();
 }

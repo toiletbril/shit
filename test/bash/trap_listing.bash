@@ -182,6 +182,36 @@ esac
 echo "kill-list-agrees=$([ "$(kill -l)" = "$signal_table" ] && echo yes || echo no)"
 echo after-signal-list=$?
 
+# The real-time names are generated from the range the system reports, so the
+# counts are taken out of the same listing and a system without the range
+# agrees at zero. The install round trip runs only where the range exists, and
+# each listing is filtered to the one name it installs.
+echo realtime-signals
+rt_min_count=0
+rt_max_count=0
+rt_min_offset_count=0
+rt_max_offset_count=0
+for field in $signal_table; do
+  case $field in
+    SIGRTMIN) rt_min_count=$((rt_min_count + 1)) ;;
+    SIGRTMAX) rt_max_count=$((rt_max_count + 1)) ;;
+    SIGRTMIN+*) rt_min_offset_count=$((rt_min_offset_count + 1)) ;;
+    SIGRTMAX-*) rt_max_offset_count=$((rt_max_offset_count + 1)) ;;
+  esac
+done
+echo "rt-min=$rt_min_count rt-max=$rt_max_count"
+echo "rt-min-offsets=$rt_min_offset_count"
+echo "rt-max-offsets=$rt_max_offset_count"
+if [ "$rt_min_count" = 1 ]; then
+  ( trap 'echo R' RTMIN+1; trap -p RTMIN+1 )
+  echo "rt-min-install=$?"
+  ( trap 'echo X' SIGRTMAX-1; trap -p SIGRTMAX-1 )
+  echo "rt-max-install=$?"
+else
+  echo rt-range-absent
+fi
+echo after-realtime-signals=$?
+
 # A condition name is folded to upper case, a SIG prefix on input is dropped,
 # and a number names the condition it belongs to.
 echo lower-case-condition

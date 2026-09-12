@@ -34,36 +34,37 @@ hot inline fn load_word(const char *bytes) wontthrow -> u64
 }
 
 hot inline fn are_bytes_equal(const char *left, const char *right,
-                              usize count) wontthrow -> bool
+                              usize byte_count) wontthrow -> bool
 {
-  if (count <= 8) {
+  if (byte_count <= 8) {
     u64 left_word = 0;
     u64 right_word = 0;
-    __builtin_memcpy(&left_word, left, count);
-    __builtin_memcpy(&right_word, right, count);
+    __builtin_memcpy(&left_word, left, byte_count);
+    __builtin_memcpy(&right_word, right, byte_count);
     return left_word == right_word;
   }
 
-  if (count <= 16) {
+  if (byte_count <= 16) {
     return load_word(left) == load_word(right) &&
-           load_word(left + count - 8) == load_word(right + count - 8);
+           load_word(left + byte_count - 8) ==
+               load_word(right + byte_count - 8);
   }
 
-  return __builtin_memcmp(left, right, count) == 0;
+  return __builtin_memcmp(left, right, byte_count) == 0;
 }
 
-hot inline fn find_byte(const char *bytes, usize count,
+hot inline fn find_byte(const char *bytes, usize byte_count,
                         unsigned char wanted) wontthrow -> const char *
 {
-  if (count >= LIBRARY_SCAN_CROSSOVER) {
-    return static_cast<const char *>(std::memchr(bytes, wanted, count));
+  if (byte_count >= LIBRARY_SCAN_CROSSOVER) {
+    return static_cast<const char *>(std::memchr(bytes, wanted, byte_count));
   }
 
   usize position = 0;
 
 #if defined __BYTE_ORDER__ && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
   let const broadcast = LOW_BITS * wanted;
-  while (position + 8 <= count) {
+  while (position + 8 <= byte_count) {
     let const word = load_word(bytes + position) ^ broadcast;
     let const marks = (word - LOW_BITS) & ~word & HIGH_BITS;
     if (marks != 0) {
@@ -75,7 +76,7 @@ hot inline fn find_byte(const char *bytes, usize count,
   }
 #endif
 
-  while (position < count) {
+  while (position < byte_count) {
     if (bytes[position] == static_cast<char>(wanted)) return bytes + position;
     position++;
   }

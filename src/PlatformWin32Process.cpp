@@ -433,7 +433,9 @@ fn process_group_of(process p) throws -> process
 fn close_process_reference(process p) wontthrow -> void
 {
   if (p == nullptr || p == INVALID_HANDLE_VALUE || process_is_pid_reference(p))
+  {
     return;
+  }
 
   if (process_is_group_reference(p)) p = process_from_group_reference(p);
   CloseHandle(p);
@@ -534,16 +536,19 @@ static fn create_process_utf8(StringView application_path,
   let wide_application = application_path.is_empty()
                              ? Maybe<ArrayList<wchar_t>>{}
                              : utf8_to_wide(application_path, heap_allocator());
-  if (!application_path.is_empty() && !wide_application.has_value())
+  if (!application_path.is_empty() && !wide_application.has_value()) {
     return false;
+  }
+
   let wide_command_line = utf8_to_wide(command_line, heap_allocator());
   if (!wide_command_line.has_value()) return false;
   let wide_working_directory =
       working_directory.is_empty()
           ? Maybe<ArrayList<wchar_t>>{}
           : utf8_to_wide(working_directory, heap_allocator());
-  if (!working_directory.is_empty() && !wide_working_directory.has_value())
+  if (!working_directory.is_empty() && !wide_working_directory.has_value()) {
     return false;
+  }
 
   scan_inherited_shell_fds();
   let unique_handles = ArrayList<HANDLE>{heap_allocator()};
@@ -606,8 +611,9 @@ static fn create_process_utf8(StringView application_path,
           (handle == nullptr || handle == INVALID_HANDLE_VALUE) ? 0 : 1;
     };
     let const do_read_inherited_fd = [&](i32 shell_fd) wontthrow -> HANDLE {
-      if (shell_fd < 0 || shell_fd >= inherited_fd_count)
+      if (shell_fd < 0 || shell_fd >= inherited_fd_count) {
         return INVALID_HANDLE_VALUE;
+      }
 
       intptr_t handle_value = 0;
       __builtin_memcpy(&handle_value, handles + sizeof(handle_value) * shell_fd,
@@ -1762,8 +1768,9 @@ cold fn last_system_error_message() throws -> String
 {
   LPWSTR errno_text{};
   let const win_errno = GetLastError();
-  if (win_errno == ERROR_FILE_NOT_FOUND || win_errno == ERROR_PATH_NOT_FOUND)
+  if (win_errno == ERROR_FILE_NOT_FOUND || win_errno == ERROR_PATH_NOT_FOUND) {
     return String{"No such file or directory"};
+  }
 
   let const ret = FormatMessageW(
       FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
@@ -1877,7 +1884,7 @@ fn set_trap_ignore(i32 signal_number) -> void
   signal(signal_number, SIG_IGN);
 }
 
-fn entry_ignored_signals() wontthrow -> u64 { return 0; }
+fn get_entry_ignored_signals() wontthrow -> u64 { return 0; }
 
 fn clear_trap_handler(i32 signal_number) -> void
 {

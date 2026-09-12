@@ -49,6 +49,7 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (FLAG_READONLY_FUNCTION.is_enabled()) {
     if (args.count() == 1) {
       let out = String{cxt.scratch_allocator()};
+
       for (let const &name : cxt.sorted_readonly_function_names()) {
         if (const String *source = cxt.find_function_source(name.view());
             source != nullptr && !source->is_empty())
@@ -61,11 +62,14 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         out.append(name.view());
         out += "\n";
       }
+
       ec.print_to_stdout(out);
+
       return 0;
     }
 
     let has_function_error = false;
+
     for (usize i = 1; i < args.count(); i++) {
       let const name = args[i].view();
       if (cxt.find_function(name) == nullptr) {
@@ -88,6 +92,7 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (args.count() == 1 && !ec.has_stripped_array_operands) {
     let const is_declare_form = cxt.is_bash_compatible();
     let out = String{cxt.scratch_allocator()};
+
     for (let const &name : cxt.readonly_names()) {
       out += is_declare_form ? "declare -r " : "readonly ";
       out += name;
@@ -109,11 +114,14 @@ fn Readonly::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       }
       out += "\n";
     }
+
     ec.print_to_stdout(out);
+
     return 0;
   }
 
   let has_error = false;
+
   for (usize i = 1; i < args.count(); i++) {
     let const &arg = args[i];
     let const parts = NameValueArg::from(arg);

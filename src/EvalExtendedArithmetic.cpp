@@ -402,6 +402,56 @@ fn twos_complement_limbs(const ArithmeticValue &value, usize width,
   return result;
 }
 
+pure fn did_unsigned_multiply_overflow(u128 left, u128 right,
+                                       u128 *product) wontthrow -> bool
+{
+  let const left_low = static_cast<u64>(left);
+  let const left_high = static_cast<u64>(left >> 64);
+  let const right_low = static_cast<u64>(right);
+  let const right_high = static_cast<u64>(right >> 64);
+
+  if (left_high != 0 && right_high != 0) return true;
+
+  let const low_product = static_cast<u128>(left_low) * right_low;
+  let const cross_product = static_cast<u128>(left_high) * right_low +
+                            static_cast<u128>(left_low) * right_high;
+
+  if (cross_product > static_cast<u128>(~u64{0})) return true;
+
+  let const result = low_product + (cross_product << 64);
+  if (result < low_product) return true;
+
+  *product = result;
+
+  return false;
+}
+
+pure fn did_signed_multiply_overflow(i128 left, i128 right,
+                                     i128 *product) wontthrow -> bool
+{
+  let const left_magnitude =
+      left < 0 ? ~static_cast<u128>(left) + 1 : static_cast<u128>(left);
+  let const right_magnitude =
+      right < 0 ? ~static_cast<u128>(right) + 1 : static_cast<u128>(right);
+  let const is_negative_product = (left < 0) != (right < 0);
+
+  u128 magnitude;
+  if (did_unsigned_multiply_overflow(left_magnitude, right_magnitude,
+                                     &magnitude))
+  {
+    return true;
+  }
+
+  let const highest_magnitude =
+      (u128{1} << 127) - (is_negative_product ? u128{0} : u128{1});
+  if (magnitude > highest_magnitude) return true;
+
+  *product =
+      static_cast<i128>(is_negative_product ? ~magnitude + 1 : magnitude);
+
+  return false;
+}
+
 } // namespace
 
 ArithmeticValue::ArithmeticValue(i64 value) wontthrow
@@ -891,9 +941,11 @@ fn ArithmeticValue::multiply(const ArithmeticValue &left,
     return from_magnitude(NULL, 0, false, decimal_scale, arena);
   if (!left.is_promoted() && !right.is_promoted()) {
     i128 result;
-    if (!__builtin_mul_overflow(left.inline_value(), right.inline_value(),
-                                &result))
+    if (!did_signed_multiply_overflow(left.inline_value(), right.inline_value(),
+                                      &result))
+    {
       return from_signed_128(result, arena);
+    }
   }
 
   let const left_magnitude = left.copy_magnitude(allocator);

@@ -461,8 +461,9 @@ fn EvalContext::run_source(StringView source, StringView origin,
     cached_body = nullptr;
   }
 
-  let normalized_source = String{source};
+  let normalized_source = String{heap_allocator()};
   if (cached_body == nullptr) {
+    normalized_source = String{source};
     normalized_source.normalize_crlf_line_endings();
     source = normalized_source.view();
   } else {
@@ -690,23 +691,34 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
   reset_runtime_diagnostic_highlight_cache();
 
   m_current_source = nullptr;
+  m_current_source_generation = EXTERNAL_SOURCE_GENERATION;
   m_current_origin.clear();
   m_retained_source_generation++;
 }
 
-pure fn EvalContext::retained_source_generation() const wontthrow -> u64
+pure fn EvalContext::get_retained_source_generation() const wontthrow -> u64
 {
   return m_retained_source_generation;
 }
 
-pure fn EvalContext::source_generation_for(const String *source) const wontthrow
-    -> u64
+pure fn
+EvalContext::scan_source_generation(const String *source) const wontthrow -> u64
 {
+  if (source == nullptr) return EXTERNAL_SOURCE_GENERATION;
+
   for (let const *retained : m_retained_sources) {
     if (retained == source) return m_retained_source_generation;
   }
 
   return EXTERNAL_SOURCE_GENERATION;
+}
+
+pure fn EvalContext::source_generation_for(const String *source) const wontthrow
+    -> u64
+{
+  if (source == m_current_source) return m_current_source_generation;
+
+  return scan_source_generation(source);
 }
 
 pure fn EvalContext::borrowed_frame_source(

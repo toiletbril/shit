@@ -341,7 +341,8 @@ fn check_test_operand_lints(AnalysisContext &actx,
   /* Obsolescent or redundant test forms. -a or -o joining two conditions is
      SC2166, warned only past the first operand and not after a !. A negated -z
      or -n is SC2236 and SC2237. */
-  /* The literal of the previous word, empty for a non-word predecessor. */
+  /* This holds the literal of the previous word. It is empty when the
+     predecessor is not a word. */
   let previous_literal = String{heap_allocator()};
   if (args.count() > 1 && args[0]->kind() == Token::Kind::Word) {
     previous_literal = static_cast<const tokens::WordToken *>(args[0])

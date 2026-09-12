@@ -412,7 +412,7 @@ fn open_file_descriptor(StringView path, file_open_mode mode) throws
   {
     const int fd = ::open(path_string.c_str(), flags, 0666);
     /* An open of a named pipe blocks until its peer arrives. A Ctrl-C returns
-       to the caller, any other interrupting signal retries the open. */
+       to the caller. Any other interrupting signal retries the open. */
     if (fd < 0 && errno == EINTR) {
       if (INTERRUPT_REQUESTED) return koshka::None;
       continue;

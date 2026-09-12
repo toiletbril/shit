@@ -2,7 +2,7 @@ plain=absent
 stage=absent
 out=out-1,out-2,out-3,
 err=err-1,err-2,err-3,
-bound=40
+bound=40 lines=40
 reopen=a,b,c,d,
 truncate=3,
 done

@@ -1,3 +1,4 @@
+unset KOSH_FLAGS
 dir=$(mktemp -d)
 trap '[ -n "$dir" ] && /bin/rm -rf "$dir"' EXIT
 
@@ -51,6 +52,8 @@ content_script="$dir/content.kosh"
 
 # The cache holds sixteen descriptors. A loop that appends to more files than
 # that keeps working, because a target past the limit is reopened every round.
+# Every file is counted and so is every line, because a lost descriptor would
+# leave a file empty while its name still exists.
 bound_script="$dir/bound.kosh"
 {
   printf 'cd "$1" || exit 1\n'
@@ -60,8 +63,12 @@ bound_script="$dir/bound.kosh"
   printf '  echo body >> "bound-$n.log" | cat\n'
   printf 'done\n'
   printf 'count=0\n'
-  printf 'for f in bound-*.log; do count=$((count+1)); done\n'
-  printf 'printf "bound=%%s\\n" "$count"\n'
+  printf 'line_count=0\n'
+  printf 'for f in bound-*.log; do\n'
+  printf '  count=$((count+1))\n'
+  printf '  while read -r line; do line_count=$((line_count+1)); done < "$f"\n'
+  printf 'done\n'
+  printf 'printf "bound=%%s lines=%%s\\n" "$count" "$line_count"\n'
 } > "$bound_script"
 "$BIN" --mood bash "$bound_script" "$dir"
 

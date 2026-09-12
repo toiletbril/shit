@@ -55,11 +55,13 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
       if (do_was_interrupted()) {
         cxt.forget_done_jobs();
+
         return status;
       }
     }
 
     cxt.forget_done_jobs();
+
     return 0;
   }
 
@@ -107,11 +109,13 @@ fn Wait::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     if (do_was_interrupted()) {
       cxt.forget_done_jobs();
+
       return status;
     }
   }
 
   cxt.forget_done_jobs();
+
   return status;
 }
 

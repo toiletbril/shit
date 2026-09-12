@@ -1069,7 +1069,7 @@ fn set_trap_ignore(i32 signal_number) throws -> void;
 
 constexpr i32 ENTRY_IGNORED_SIGNAL_LIMIT = 64;
 
-fn entry_ignored_signals() wontthrow -> u64;
+fn get_entry_ignored_signals() wontthrow -> u64;
 
 /* Restore a signal's default disposition when its trap is removed. SIGINT
    returns to the shell's interrupt handler, every other signal to SIG_DFL. A

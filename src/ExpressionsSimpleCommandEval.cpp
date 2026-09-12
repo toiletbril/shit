@@ -207,8 +207,9 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
   defer { cxt.cleanup_process_substitutions(substitution_mark); };
   expand_command_aliases(cxt, program_args, program_arg_locations);
 
-  if (!is_async() && !cxt.is_in_pipeline_stage())
+  if (!is_async() && !cxt.is_in_pipeline_stage()) {
     utils::set_foreground_program_title(program_args, cxt);
+  }
 
   if (!program_args.is_empty())
     cxt.guard_restricted_path(program_args[0].view(),
@@ -693,9 +694,10 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
               previous_shell_value =
                   String{cxt.scratch_allocator(), stored->view()};
             }
-            if (name == "IGNOREEOF" && !previous_ignoreeof_state.has_value())
+            if (name == "IGNOREEOF" && !previous_ignoreeof_state.has_value()) {
               previous_ignoreeof_state =
                   cxt.shell_option_state(shell_option_id::Ignoreeof);
+            }
             cxt.set_shell_variable(name, expanded_value.view());
           }
           saved_env.push(saved_env_var{

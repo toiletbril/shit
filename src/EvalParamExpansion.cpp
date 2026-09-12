@@ -743,8 +743,9 @@ hot fn EvalContext::apply_parameter_expansion(
           name, rest, do_source_location_for(rest, rest_location));
     }
     case '@':
-      if (rest.length >= 2 && mood() != mimic_mood::Posix)
+      if (rest.length >= 2 && mood() != mimic_mood::Posix) {
         return apply_parameter_transform(name, rest[1]);
+      }
 
       break;
     default: break;
@@ -838,9 +839,11 @@ fn EvalContext::get_variable_value_checked(StringView name) const throws
     -> Maybe<String>
 {
   let current = get_variable_value(name);
-  if (error_unset() && !current.has_value())
+  if (error_unset() && !current.has_value()) {
     throw_script_fatal("Unable to expand '" + name +
                        "' because the parameter is not set");
+  }
+
   return current;
 }
 
@@ -1003,8 +1006,9 @@ fn EvalContext::pattern_replace_value(
   /* An empty unanchored pattern matches nothing in bash, so the value is
      returned unchanged. The anchored forms still splice at the start or the
      end. */
-  if (pattern.is_empty() && !is_anchored_at_start && !is_anchored_at_end)
+  if (pattern.is_empty() && !is_anchored_at_start && !is_anchored_at_end) {
     return String{scratch_allocator(), value};
+  }
 
   let out = String{scratch_allocator()};
   let const is_extglob_enabled = extglob_enabled();
@@ -1238,8 +1242,9 @@ fn EvalContext::apply_value_modifier(
   if (modifier.is_empty()) return String{scratch_allocator(), value};
   let const op = modifier[0];
   if (op == '/') return pattern_replace_value(value, modifier, source_location);
-  if (op == '^' || op == ',')
+  if (op == '^' || op == ',') {
     return apply_case_modification_to_value(value, modifier, source_location);
+  }
   if (op == '#' || op == '%') {
     let const is_doubled = modifier.length > 1 && modifier[1] == op;
     let const pattern_word = modifier.substring(is_doubled ? 2 : 1);

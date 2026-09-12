@@ -315,11 +315,13 @@ pure fn token_has_uppercase(StringView token) wontthrow -> bool
   return false;
 }
 
-pure fn smart_case_prefix_matches(StringView candidate,
-                                  StringView prefix) wontthrow -> bool
+pure fn smart_case_prefix_matches(StringView candidate, StringView prefix,
+                                  bool is_prefix_case_sensitive) wontthrow
+    -> bool
 {
   if (candidate.starts_with(prefix)) return true;
-  if (token_has_uppercase(prefix) || candidate.length < prefix.length) {
+
+  if (is_prefix_case_sensitive || candidate.length < prefix.length) {
     return false;
   }
 
@@ -328,6 +330,15 @@ pure fn smart_case_prefix_matches(StringView candidate,
       return false;
 
   return true;
+}
+
+pure fn smart_case_prefix_matches(StringView candidate,
+                                  StringView prefix) wontthrow -> bool
+{
+  if (candidate.starts_with(prefix)) return true;
+
+  return smart_case_prefix_matches(candidate, prefix,
+                                   token_has_uppercase(prefix));
 }
 
 hot flatten fn glob_matches(StringView glob, StringView str,

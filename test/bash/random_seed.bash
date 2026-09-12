@@ -54,6 +54,30 @@ declare -p RANDOM | /usr/bin/sed 's/=.*//'
 export -n RANDOM
 echo declared-form-done
 
+# Moving the name into the environment does not take the generator away from
+# it. Three draws are compared, because two equal draws are an ordinary result
+# of a generator that is still running.
+echo exported-value
+export RANDOM=7
+first_draw=$RANDOM
+second_draw=$RANDOM
+third_draw=$RANDOM
+if [ "$first_draw" = "$second_draw" ] && [ "$second_draw" = "$third_draw" ]; then
+  echo exported=frozen
+else
+  echo exported=keeps-drawing
+fi
+export -n RANDOM
+fourth_draw=$RANDOM
+fifth_draw=$RANDOM
+sixth_draw=$RANDOM
+if [ "$fourth_draw" = "$fifth_draw" ] && [ "$fifth_draw" = "$sixth_draw" ]; then
+  echo unexported=frozen
+else
+  echo unexported=keeps-drawing
+fi
+echo exported-value-done
+
 echo local-shadow
 draw_inside() {
   local RANDOM=9

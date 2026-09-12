@@ -165,6 +165,8 @@ WINDOWS_SKIPPED_CLI_NAMES := \
 	cli_spawn_failure_location \
 	cli_stopped_job_survives_poll \
 	cli_suspend_behavior \
+	cli_trap_during_blocking_builtin \
+	cli_trap_startup_ignored \
 	cli_wait_on_stopped_job
 
 $(WINDOWS_SKIPPED_CLI_NAMES):

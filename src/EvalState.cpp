@@ -223,6 +223,7 @@ fn EvalContext::set_current_source(const String *source,
 {
   reset_runtime_diagnostic_highlight_cache();
   m_current_source = source;
+  m_current_source_generation = scan_source_generation(source);
   m_current_origin = steal(origin);
 }
 

@@ -89,17 +89,7 @@ static fn command_word_prefixes_any(StringView word,
   let const is_case_sensitive = utils::token_has_uppercase(word);
 
   let const do_has_prefix = [&](StringView name) -> bool {
-    if (name.starts_with(word)) return true;
-    if (is_case_sensitive || name.length < word.length) return false;
-
-    for (usize position = 0; position < word.length; position++)
-      if (utils::ascii_to_lower(name[position]) !=
-          utils::ascii_to_lower(word[position]))
-      {
-        return false;
-      }
-
-    return true;
+    return utils::smart_case_prefix_matches(name, word, is_case_sensitive);
   };
 
   for (let const &builtin_name : builtin_names())
@@ -163,9 +153,9 @@ static pure fn is_highlight_function_name_char(char c) wontthrow -> bool
 }
 
 /* The shell looks a command word up in the function table before it treats the
-   word as a path, so a name such as ble/util/put is a call and not a file. A
-   brace pair holding `..` is a range expansion and an unpaired brace is a
-   fragment, so neither one belongs to a name. */
+   word as a path. A name such as ble/util/put is a call. A brace pair holding
+   `..` is a range expansion. An unpaired brace is a fragment. Neither one
+   belongs to a name. */
 pure fn internal::word_is_function_name(StringView word) wontthrow -> bool
 {
   if (word.is_empty() || !is_highlight_name_start(word[0])) return false;

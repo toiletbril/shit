@@ -32,13 +32,13 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Od);
 
 namespace koshka::koshkit {
 
-static fn append_od_padded(String &output, u64 value, usize width,
+static fn append_od_padded(String &output, u64 value, usize width_columns,
                            int_base base) throws -> void
 {
   let const digits =
       String::from_in_base(value, false, base, output.allocator());
-  if (digits.length() < width)
-    output.append_repeated('0', width - digits.length());
+  if (digits.length() < width_columns)
+    output.append_repeated('0', width_columns - digits.length());
 
   output += digits.view();
 }
@@ -88,8 +88,8 @@ static fn od_base(char radix) wontthrow -> int_base
 struct od_format
 {
   int_base base;
-  usize unit_size;
-  usize width;
+  usize unit_size_bytes;
+  usize width_columns;
   bool is_character;
 };
 
@@ -157,8 +157,9 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
     if (is_decimal) offset = offset.substring_of_length(0, offset.length - 1);
     let const parsed = utils::parse_integer_in_base_u64(
         offset, is_decimal ? int_base::decimal : int_base::octal);
-    if (parsed.is_error() || parsed.value() > UINT64_MAX / multiplier)
+    if (parsed.is_error() || parsed.value() > UINT64_MAX / multiplier) {
       throw Error{"od: invalid legacy offset"};
+    }
     skip_count = parsed.value() * multiplier;
     operand_count--;
   }
@@ -203,21 +204,22 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     let const radix = format.is_empty() ? 'o' : format[0];
-    usize unit_size = 2;
-    if (format.length > 1 && format[1] >= '1' && format[1] <= '8')
-      unit_size = static_cast<usize>(format[1] - '0');
+    usize unit_size_bytes = 2;
+    if (format.length > 1 && format[1] >= '1' && format[1] <= '8') {
+      unit_size_bytes = static_cast<usize>(format[1] - '0');
+    }
 
     int_base base = int_base::decimal;
-    usize width = unit_size * 3;
+    usize width_columns = unit_size_bytes * 3;
     switch (radix) {
     case 'x':
       base = int_base::hex;
-      width = unit_size * 2;
+      width_columns = unit_size_bytes * 2;
       break;
 
     case 'o':
       base = int_base::octal;
-      width = (unit_size * 8 + 2) / 3;
+      width_columns = (unit_size_bytes * 8 + 2) / 3;
       break;
 
     case 'd':
@@ -227,10 +229,13 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
       throw Error{"od: unsupported output type '" + String{format} + "'"};
     }
 
-    if (unit_size != 1 && unit_size != 2 && unit_size != 4 && unit_size != 8)
+    if (unit_size_bytes != 1 && unit_size_bytes != 2 && unit_size_bytes != 4 &&
+        unit_size_bytes != 8)
+    {
       throw Error{"od: unsupported integer width"};
+    }
 
-    formats.push(od_format{base, unit_size, width, false});
+    formats.push(od_format{base, unit_size_bytes, width_columns, false});
   }
 
   let const address_base = od_base(address_radix);
@@ -268,12 +273,13 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
         }
       } else {
         for (usize position = 0; position < row_length;
-             position += format.unit_size)
+             position += format.unit_size_bytes)
         {
           u64 value = 0;
-          let const current_size = row_length - position < format.unit_size
-                                       ? row_length - position
-                                       : format.unit_size;
+          let const current_size =
+              row_length - position < format.unit_size_bytes
+                  ? row_length - position
+                  : format.unit_size_bytes;
 
           for (usize byte_index = 0; byte_index < current_size; byte_index++)
             value |= static_cast<u64>(static_cast<u8>(
@@ -281,7 +287,7 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
                      << (byte_index * 8);
 
           output += ' ';
-          append_od_padded(output, value, format.width, format.base);
+          append_od_padded(output, value, format.width_columns, format.base);
         }
       }
 

@@ -160,8 +160,9 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
           for (usize position = *first_delimiter; position <= line.length;
                position++)
           {
-            if (position != line.length && line[position] != delimiter)
+            if (position != line.length && line[position] != delimiter) {
               continue;
+            }
 
             if (text_position_is_selected(field_number, *ranges)) {
               if (has_output_field) output += delimiter;

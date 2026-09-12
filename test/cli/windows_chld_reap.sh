@@ -55,6 +55,12 @@ else
   echo term-rejected
 fi
 wait "$victim" 2> /dev/null
+term_status=$?
+if [ "$term_status" -ne 0 ]; then
+  echo term-ended-child
+else
+  echo "term-left-child status=$term_status"
+fi
 "$1" --no-traces -c "sleep 30" &
 victim=$!
 kill -KILL "$victim" 2> /dev/null
@@ -64,5 +70,11 @@ else
   echo kill-rejected
 fi
 wait "$victim" 2> /dev/null
+kill_status=$?
+if [ "$kill_status" -ne 0 ]; then
+  echo kill-ended-child
+else
+  echo "kill-left-child status=$kill_status"
+fi
 echo both-signals-checked' shell "$BIN"
 echo "rc=$?"

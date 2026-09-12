@@ -13,6 +13,8 @@ hand-raise-follows-the-platform
 rc=0
 == KILL and TERM reach a child on both platforms:
 term-accepted
+term-ended-child
 kill-accepted
+kill-ended-child
 both-signals-checked
 rc=0
