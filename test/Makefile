@@ -8,6 +8,8 @@ endif
 
 DIFF_FLAGS := -u
 MODE ?= dbg
+ARCH ?= $(shell uname -m)
+NO_TOILETLINE ?= 0
 IS_NONDEBUG_BUILD := $(if $(filter rel prof cov cosmo,$(MODE)),1,0)
 export IS_NONDEBUG_BUILD
 ifeq ($(OS), Windows_NT)
@@ -103,8 +105,12 @@ clean:
 	@rm -rf $(FAILED_LIST).d
 	@rm -rf "$(CURDIR)/.test-work"
 
-test: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
+test: batch_contract_test $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh all
+
+batch_contract_test:
+	@$(MAKE) -C ../src MODE='$(MODE)' TARGET='$(TARGET)' ARCH='$(ARCH)' \
+		NO_TOILETLINE='$(NO_TOILETLINE)' batch_contract_test
 
 verify_koshkit_diff: $(BIN)
 	@if test ! -x '$(BIN)'; then \
@@ -287,6 +293,6 @@ bench: $(BIN) $(WINDOWS_DIFF_BOOTSTRAP)
 		BASH_SPEEDUP_REQUIRED='$(BASH_SPEEDUP_REQUIRED)' \
 		$(SHELL) run-bench-test.sh
 
-.PHONY: test clean verify_koshkit_diff kosh_tests refill compatdiff dashdiff \
-		bashdiff mimicrydiff bench build_tests completion_tests diagnostic_tty_test \
-		cli_tests highlight_tests
+.PHONY: test clean batch_contract_test verify_koshkit_diff kosh_tests refill \
+		compatdiff dashdiff bashdiff mimicrydiff bench build_tests completion_tests \
+		diagnostic_tty_test cli_tests highlight_tests
