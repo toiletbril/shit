@@ -7,7 +7,7 @@ BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
 directory=$(mktemp -d)
 trap '[ -n "$directory" ] && /bin/rm -rf "$directory"' EXIT
 mkfifo "$directory/read" "$directory/write" "$directory/exec" "$directory/kept" \
-  "$directory/wc" "$directory/cksum" "$directory/grep"
+  "$directory/wc" "$directory/cksum" "$directory/grep" "$directory/diff"
 printf 'first\n' > "$directory/first"
 
 echo "== an untrapped interrupt ends a blocking read open:"
@@ -81,6 +81,27 @@ if [ "$grep_output_is_ready" = yes ]; then
 else
   echo "grep-first=missing"
 fi
+
+echo "== diff stops after a first error before opening a later pipe:"
+"$BIN" --no-traces -c 'directory=$1
+cd "$directory" || exit 1
+koshkit diff missing diff
+echo "diff-status=$?"' shell "$directory" 2>&1 &
+diff_pid=$!
+diff_did_timeout=no
+diff_poll_count=0
+while [ "$diff_poll_count" -lt 500 ]; do
+  if ! kill -0 "$diff_pid" 2>/dev/null; then break; fi
+  /bin/sleep 0.01
+  diff_poll_count=$((diff_poll_count + 1))
+done
+if kill -0 "$diff_pid" 2>/dev/null; then
+  diff_did_timeout=yes
+  kill -TERM "$diff_pid" 2>/dev/null || :
+fi
+wait "$diff_pid" 2>/dev/null
+echo "rc=$?"
+echo "timeout=$diff_did_timeout"
 
 echo "== an ignored interrupt leaves the open blocked until its peer arrives:"
 "$BIN" --no-traces --mood bash -c 'fifo=$1

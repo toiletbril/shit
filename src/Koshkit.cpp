@@ -613,7 +613,7 @@ fn SourceBatchReader::read_next_internal(ArrayList<Chunk> &chunks,
 
 fn SourceBatchReader::read_next(ArrayList<Chunk> &chunks) throws -> ReadResult
 {
-  return read_next_internal(chunks, false, false);
+  return read_next_internal(chunks, false, true);
 }
 
 fn SourceBatchReader::read_next_ordered(ArrayList<Chunk> &chunks) throws

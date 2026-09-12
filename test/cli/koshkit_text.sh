@@ -48,6 +48,17 @@ echo "--- cut reads later files after a missing operand ---"
 "$BIN" -c \
   'koshkit cut -c 1-5 cat-first.txt missing.txt cat-last.txt; printf "status=%s\n" "$?"' \
   2>&1
+"$BIN" -c 'koshkit seq 19999; printf "20001\n"' > diff-right.txt
+echo "--- diff reads two multi-chunk files ---"
+"$BIN" -c \
+  'koshkit diff batch-input.txt diff-right.txt; printf "status=%s\n" "$?"'
+echo "--- diff reads standard input on the right ---"
+printf 'first\n' | "$BIN" -c \
+  'koshkit diff cat-first.txt -; printf "status=%s\n" "$?"'
+echo "--- diff reports a missing second operand ---"
+"$BIN" -c \
+  'koshkit diff batch-input.txt missing.txt; printf "status=%s\n" "$?"' \
+  2>&1
 echo "--- wc multi-chunk input with a missing operand ---"
 "$BIN" -c \
   'koshkit wc -c batch-input.txt missing.txt empty.txt; printf "status=%s\n" "$?"' \

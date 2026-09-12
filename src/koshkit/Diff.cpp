@@ -517,25 +517,53 @@ fn Diff::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (operands[0] == "-" && operands[1] == "-") return 0;
 
-  let left_contents = read_named_or_stdin(ec, operands[0].view());
-  if (!left_contents.has_value()) {
+  let const sources =
+      source_list_from_operands(operands, cxt.scratch_allocator());
+  let left_contents = String{heap_allocator()};
+  let right_contents = String{heap_allocator()};
+  let reader = SourceBatchReader{ec, sources, cxt.scratch_allocator()};
+  let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
+  i32 right_error_number = 0;
+  let const do_report_read_error = [&](usize source_index, i32 error_number)
+                                       throws -> void {
+    os::set_last_system_error(error_number);
     report_soft_koshkit_error(ec, cxt,
-                              "diff: cannot read '" + operands[0] +
+                              "diff: cannot read '" + operands[source_index] +
                                   "': " + os::last_system_error_message());
+  };
+
+  loop
+  {
+    let const read_result = reader.read_next(chunks);
+    if (read_result == SourceBatchReader::ReadResult::Complete) break;
+    if (read_result == SourceBatchReader::ReadResult::Interrupted) return 130;
+
+    for (let const &chunk : chunks) {
+      if (chunk.error_number != 0) {
+        if (chunk.source_index == 0) {
+          do_report_read_error(chunk.source_index, chunk.error_number);
+          return 2;
+        }
+
+        right_error_number = chunk.error_number;
+        continue;
+      }
+
+      let &contents = chunk.source_index == 0 ? left_contents : right_contents;
+      contents.append(chunk.content);
+    }
+  }
+
+  if (right_error_number != 0) {
+    do_report_read_error(1, right_error_number);
     return 2;
   }
-  let right_contents = read_named_or_stdin(ec, operands[1].view());
-  if (!right_contents.has_value()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "diff: cannot read '" + operands[1] +
-                                  "': " + os::last_system_error_message());
-    return 2;
-  }
-  if (left_contents->view() == right_contents->view()) return 0;
+
+  if (left_contents.view() == right_contents.view()) return 0;
 
   if (!FLAG_DIFF_TEXT.is_enabled() &&
-      (left_contents->view().find_character('\0').has_value() ||
-       right_contents->view().find_character('\0').has_value()))
+      (left_contents.view().find_character('\0').has_value() ||
+       right_contents.view().find_character('\0').has_value()))
   {
     let const left_name = FLAG_DIFF_LABEL.count() >= 1 ? FLAG_DIFF_LABEL.get(0)
                                                        : operands[0].view();
@@ -548,10 +576,10 @@ fn Diff::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const left_lines =
-      split_diff_lines(left_contents->view(), cxt.scratch_allocator());
+      split_diff_lines(left_contents.view(), cxt.scratch_allocator());
   if (os::INTERRUPT_REQUESTED) return 130;
   let const right_lines =
-      split_diff_lines(right_contents->view(), cxt.scratch_allocator());
+      split_diff_lines(right_contents.view(), cxt.scratch_allocator());
   if (os::INTERRUPT_REQUESTED) return 130;
   let const result = make_diff_edits(left_lines, right_lines,
                                      FLAG_DIFF_IGNORE_SPACE.is_enabled(),

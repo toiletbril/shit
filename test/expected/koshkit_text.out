@@ -39,6 +39,19 @@ tail
 first
 last
 status=1
+--- diff reads two multi-chunk files ---
+20000c20000
+< 20000
+---
+> 20001
+status=1
+--- diff reads standard input on the right ---
+status=0
+--- diff reports a missing second operand ---
+1:1: error: diff: cannot read 'missing.txt': No such file or directory.
+     1 |  koshkit diff batch-input.txt missing.txt; printf "status=%s\n" "$?"
+       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+status=2
 --- wc multi-chunk input with a missing operand ---
 1:1: error: wc: missing.txt: No such file or directory.
      1 |  koshkit wc -c batch-input.txt missing.txt empty.txt; printf "status=%s\n" "$?"
