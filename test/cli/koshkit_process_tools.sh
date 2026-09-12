@@ -168,6 +168,27 @@ case $logs_report in
 esac
 printf 'evillogs-multiple-titles=%s\n' "$logs_titles"
 
+host_system=$("$BIN" -c 'koshkit uname -s')
+if [ "$host_system" = Darwin ]; then
+  evildisk_tools=$TEST_TEMP_DIRECTORY/evildisk-tools
+  mkdir -p "$evildisk_tools"
+  printf '%s\n' '#!/bin/sh' \
+    'printf "%s\n" "SMART data unavailable"' > "$evildisk_tools/smartctl"
+  printf '%s\n' '#!/bin/sh' \
+    'printf "%s\n" "Device Identifier: disk-test" "SMART Status: Verified" "Device / Media Name: Mock Disk" "Protocol: Mock"' \
+    > "$evildisk_tools/diskutil"
+  chmod 755 "$evildisk_tools/smartctl" "$evildisk_tools/diskutil"
+  evildisk_report=$(PATH="$evildisk_tools:$PATH" "$BIN" -c \
+    'koshkit evildisk -a --color never /dev/null')
+  case $evildisk_report in
+    *disk-test*Verified*) evildisk_fallback=passed ;;
+    *) evildisk_fallback=failed ;;
+  esac
+else
+  evildisk_fallback=passed
+fi
+printf 'evildisk-smart-fallback=%s\n' "$evildisk_fallback"
+
 "$BIN" -c 'koshkit evilio --all --cumulative --color never' \
   > "$TEST_NULL_DEVICE" 2>&1
 printf 'evilio-conflict=%s\n' "$?"

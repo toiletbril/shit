@@ -77,15 +77,9 @@ fn report_value(StringView report, const StringView *names, usize name_count,
   return String{allocator};
 }
 
-fn read_smart_rows(EvalContext &cxt,
-                   const ArrayList<os::mounted_filesystem> &filesystems,
-                   Allocator allocator) throws -> ArrayList<smart_row>
+fn parse_smart_report(StringView report, StringView fallback_device,
+                      smart_row &row, Allocator allocator) throws -> bool
 {
-  let rows = ArrayList<smart_row>{allocator};
-  let const smartctl = resolve_util_program(cxt, "smartctl");
-#if defined __APPLE__
-  let const diskutil = resolve_util_program(cxt, "diskutil");
-#endif
   static constexpr StringView DEVICE_NAMES[] = {"Device Identifier"};
   static constexpr StringView STATUS_NAMES[] = {
       "SMART Status", "SMART overall-health self-assessment test result",
@@ -95,40 +89,58 @@ fn read_smart_rows(EvalContext &cxt,
   static constexpr StringView PROTOCOL_NAMES[] = {"Protocol",
                                                   "Transport protocol"};
 
+  row.status =
+      report_value(report, STATUS_NAMES, countof(STATUS_NAMES), allocator);
+  if (row.status.is_empty()) return false;
+
+  row.device =
+      report_value(report, DEVICE_NAMES, countof(DEVICE_NAMES), allocator);
+  if (row.device.is_empty()) row.device = String{allocator, fallback_device};
+  row.model =
+      report_value(report, MODEL_NAMES, countof(MODEL_NAMES), allocator);
+  if (row.model.is_empty()) row.model = String{allocator, "-"};
+  row.protocol =
+      report_value(report, PROTOCOL_NAMES, countof(PROTOCOL_NAMES), allocator);
+  if (row.protocol.is_empty()) row.protocol = String{allocator, "-"};
+  return true;
+}
+
+fn read_smart_rows(EvalContext &cxt,
+                   const ArrayList<os::mounted_filesystem> &filesystems,
+                   Allocator allocator) throws -> ArrayList<smart_row>
+{
+  let rows = ArrayList<smart_row>{allocator};
+  let const smartctl = resolve_util_program(cxt, "smartctl");
+#if defined __APPLE__
+  let const diskutil = resolve_util_program(cxt, "diskutil");
+#endif
+
   for (let const &filesystem : filesystems) {
-    let report = Maybe<String>{};
+    let row = smart_row{};
+    bool has_row = false;
     if (smartctl.has_value() && filesystem.source.starts_with("/dev/")) {
       let arguments = ArrayList<String>{heap_allocator()};
       arguments.push(String{"-H"});
       arguments.push(filesystem.source.clone());
-      report = capture_util_program_output(*smartctl, steal(arguments),
-                                           10'000'000'000);
+      let const report = capture_util_program_output(
+          *smartctl, steal(arguments), 10'000'000'000);
+      if (report.has_value())
+        has_row = parse_smart_report(report->view(), filesystem.source.view(),
+                                     row, allocator);
     }
 #if defined __APPLE__
-    else if (diskutil.has_value())
-    {
+    if (!has_row && diskutil.has_value()) {
       let arguments = ArrayList<String>{heap_allocator()};
       arguments.push(String{"info"});
       arguments.push(filesystem.target.clone());
-      report = capture_util_program_output(*diskutil, steal(arguments),
-                                           10'000'000'000);
+      let const report = capture_util_program_output(
+          *diskutil, steal(arguments), 10'000'000'000);
+      if (report.has_value())
+        has_row = parse_smart_report(report->view(), filesystem.source.view(),
+                                     row, allocator);
     }
 #endif
-    if (!report.has_value()) continue;
-
-    let row = smart_row{};
-    row.device = report_value(report->view(), DEVICE_NAMES,
-                              countof(DEVICE_NAMES), allocator);
-    if (row.device.is_empty()) row.device = filesystem.source.clone();
-    row.status = report_value(report->view(), STATUS_NAMES,
-                              countof(STATUS_NAMES), allocator);
-    if (row.status.is_empty()) continue;
-    row.model = report_value(report->view(), MODEL_NAMES, countof(MODEL_NAMES),
-                             allocator);
-    if (row.model.is_empty()) row.model = String{allocator, "-"};
-    row.protocol = report_value(report->view(), PROTOCOL_NAMES,
-                                countof(PROTOCOL_NAMES), allocator);
-    if (row.protocol.is_empty()) row.protocol = String{allocator, "-"};
+    if (!has_row) continue;
 
     bool is_duplicate = false;
     for (let const &existing : rows) {
