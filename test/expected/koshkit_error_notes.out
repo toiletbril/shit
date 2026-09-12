@@ -267,6 +267,15 @@ note: use owner, owner:group, or :group.
      1 |  koshkit chown :KOSH_MISSING_GROUP LICENSE
        |                ^~~~~~~~~~~~~~~~~~~
 note: use a group name or an unsigned decimal group id.
+=== cut position list location ===
+1:16: error: cut: invalid position list '0'.
+     1 |  koshkit cut -b 0
+       |                 ^
+note: positions start at 1 and use N, N-M, -M, or N- separated by commas or blanks.
+=== cut delimiter location ===
+1:21: error: cut: the delimiter must be one byte.
+     1 |  koshkit cut -f 1 -d ::
+       |                      ^~
 === evildisk color value location ===
 1:26: error: evildisk: invalid color mode.
      1 |  koshkit evildisk --color invalid

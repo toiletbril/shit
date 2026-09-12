@@ -43,8 +43,7 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let const operands = PARSE_KOSHKIT_ARGS(args, arg_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -59,18 +58,27 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
   let const list = FLAG_CUT_BYTES.is_set()        ? FLAG_CUT_BYTES.value()
                    : FLAG_CUT_CHARACTERS.is_set() ? FLAG_CUT_CHARACTERS.value()
                                                   : FLAG_CUT_FIELDS.value();
+  let const list_location =
+      FLAG_CUT_BYTES.is_set()        ? FLAG_CUT_BYTES.value_location()
+      : FLAG_CUT_CHARACTERS.is_set() ? FLAG_CUT_CHARACTERS.value_location()
+                                     : FLAG_CUT_FIELDS.value_location();
   let const ranges = parse_text_position_ranges(list, cxt.scratch_allocator());
-  if (!ranges.has_value())
-    throw Error{
-        "cut: invalid position list '" + String{cxt.scratch_allocator(), list}
-          +
-        "'"
-    };
+  if (!ranges.has_value()) {
+    KOSHKIT_REPORT_ERROR_AT(
+        list_location,
+        "invalid position list '" + String{cxt.scratch_allocator(), list} + "'",
+        "positions start at 1 and use N, N-M, -M, or N- separated by commas "
+        "or blanks");
+    return 1;
+  }
 
   char delimiter = '\t';
   if (FLAG_CUT_DELIMITER.is_set()) {
-    if (FLAG_CUT_DELIMITER.value().length != 1)
-      throw Error{"cut: the delimiter must be one byte"};
+    if (FLAG_CUT_DELIMITER.value().length != 1) {
+      KOSHKIT_REPORT_ERROR_AT(FLAG_CUT_DELIMITER.value_location(),
+                              "the delimiter must be one byte");
+      return 1;
+    }
     delimiter = FLAG_CUT_DELIMITER.value()[0];
   }
 

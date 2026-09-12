@@ -167,6 +167,12 @@ echo "=== chown specification location ==="
 echo "=== chown group location ==="
 "$BIN" -c 'koshkit chown :KOSH_MISSING_GROUP LICENSE' 2>&1
 
+echo "=== cut position list location ==="
+"$BIN" -c 'koshkit cut -b 0' 2>&1
+
+echo "=== cut delimiter location ==="
+"$BIN" -c 'koshkit cut -f 1 -d ::' 2>&1
+
 echo "=== evildisk color value location ==="
 "$BIN" -c 'koshkit evildisk --color invalid' 2>&1
 
