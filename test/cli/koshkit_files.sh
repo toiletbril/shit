@@ -21,6 +21,13 @@ echo "--- file batched operands ---"
 echo "file-status=$?"
 echo "--- stat preserves nonadjacent repeated operands ---"
 "$BIN" -c 'koshkit stat -c "%n=%s" nums.txt stamp nums.txt'
+mkdir batch-a batch-b
+printf one > batch-a/first
+printf two-two > batch-a/second
+printf three > batch-b/third
+printf four-four > batch-b/fourth
+echo "--- stat preserves interleaved directory operands ---"
+"$BIN" -c 'koshkit stat -c "%n=%s" batch-a/first batch-b/third batch-a/second batch-b/fourth'
 # The owner, the group, and the time of a long row vary by machine, so only the
 # mode, the link count, the size, and the name are kept for a stable golden.
 echo "--- ls -l sym (mode nlink size name) ---"

@@ -15,10 +15,17 @@ file-status=1
 nums.txt=6
 stamp=0
 nums.txt=6
+--- stat preserves interleaved directory operands ---
+batch-a/first=3
+batch-b/third=5
+batch-a/second=7
+batch-b/fourth=9
 --- ls -l sym (mode nlink size name) ---
 lrwxrwxrwx 1 8 sym
 --- ls after operations ---
 a
+batch-a
+batch-b
 moved.txt
 nums.txt
 stamp

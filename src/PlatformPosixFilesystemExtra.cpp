@@ -908,21 +908,39 @@ execute_getattrlistbulk_batch(const batched_syscall *operations,
   }
 
   try {
+    let parent_paths = ArrayList<Path>{heap_allocator()};
+    let operation_positions = ArrayList<usize>{heap_allocator()};
+    parent_paths.reserve(operation_count);
+    operation_positions.reserve(operation_count);
+    for (usize index = 0; index < operation_count; index++) {
+      parent_paths.push(operations[index].path->parent_or_current());
+      operation_positions.push(index);
+    }
+    operation_positions.sort([&](usize left, usize right) {
+      let const left_parent = parent_paths[left].text().view();
+      let const right_parent = parent_paths[right].text().view();
+      if (left_parent != right_parent) return left_parent < right_parent;
+      return left < right;
+    });
+
     usize group_start = 0;
     while (group_start < operation_count) {
-      let const group_parent =
-          operations[group_start].path->parent_or_current();
+      let const first_position = operation_positions[group_start];
+      let const &group_parent = parent_paths[first_position];
       usize group_end = group_start + 1;
       while (group_end < operation_count) {
-        let const candidate_parent =
-            operations[group_end].path->parent_or_current();
-        if (candidate_parent.text().view() != group_parent.text().view()) break;
+        let const candidate_position = operation_positions[group_end];
+        if (parent_paths[candidate_position].text().view() !=
+            group_parent.text().view())
+        {
+          break;
+        }
         group_end++;
       }
 
       if (group_end - group_start == 1) {
-        execute_batched_syscall_direct(operations[group_start],
-                                       results[group_start]);
+        execute_batched_syscall_direct(operations[first_position],
+                                       results[first_position]);
         group_start = group_end;
         continue;
       }
@@ -935,9 +953,12 @@ execute_getattrlistbulk_batch(const batched_syscall *operations,
           return left.child.name.view() < right.child.name.view();
         });
       }
-      for (usize index = group_start; index < group_end; index++) {
-        let const &operation = operations[index];
-        let &result = results[index];
+      for (usize group_position = group_start; group_position < group_end;
+           group_position++)
+      {
+        let const operation_position = operation_positions[group_position];
+        let const &operation = operations[operation_position];
+        let &result = results[operation_position];
         result = {operation.request_id, 0, 0};
 
         bool has_status = false;
