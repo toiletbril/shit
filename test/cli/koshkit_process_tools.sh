@@ -169,19 +169,19 @@ esac
 printf 'evillogs-multiple-titles=%s\n' "$logs_titles"
 
 host_system=$("$BIN" -c 'koshkit uname -s')
+evildisk_tools=$TEST_TEMP_DIRECTORY/evildisk-tools
+mkdir -p "$evildisk_tools"
 if [ "$host_system" = Darwin ]; then
-  evildisk_tools=$TEST_TEMP_DIRECTORY/evildisk-tools
-  mkdir -p "$evildisk_tools"
   printf '%s\n' '#!/bin/sh' \
     'printf "%s\n" "SMART data unavailable"' > "$evildisk_tools/smartctl"
   printf '%s\n' '#!/bin/sh' \
-    'printf "%s\n" "Device Identifier: disk-test" "SMART Status: Verified" "Device / Media Name: Mock Disk" "Protocol: NVMe" "Temperature: 42 Celsius" "Percentage Used: 7%" "Power On Hours: 123" "Unsafe Shutdowns: 2" "Media and Data Integrity Errors: 3" "Data Units Read: 1,000" "Data Units Written: 2,000"' \
+    'printf "%s\n" "Device Identifier: disk-test" "SMART Status: Verified" "Device / Media Name: Mock Disk" "Protocol: NVMe" "Temperature: 42 Celsius" "Percentage Used: 7%" "Power On Hours: 123" "Unsafe Shutdowns: 2" "Media and Data Integrity Errors: 5,075" "Data Units Read: 1,000" "Data Units Written: 2,000"' \
     > "$evildisk_tools/diskutil"
   chmod 755 "$evildisk_tools/smartctl" "$evildisk_tools/diskutil"
   evildisk_report=$(PATH="$evildisk_tools:$PATH" "$BIN" -c \
-    'koshkit evildisk -a --color never /dev/null')
+    'koshkit evildisk -a --color never /dev/null' 2>&1)
   case $evildisk_report in
-    *disk-test*Verified*temperature*"42 Celsius"*"used 7%"*"media errors 3"*)
+    *disk-test*Verified*temperature*"42 Celsius"*"used 7%"*"media errors 5,075"*warning:*"nonzero SMART counters"*)
       evildisk_fallback=passed
       ;;
     *) evildisk_fallback=failed ;;
@@ -189,7 +189,21 @@ if [ "$host_system" = Darwin ]; then
 else
   evildisk_fallback=passed
 fi
+printf '%s\n' '#!/bin/sh' \
+  'printf "%s\n" "Device Model: Mock ATA" "Transport protocol: SATA" "SMART overall-health self-assessment test result: PASSED" "ID# ATTRIBUTE_NAME FLAG VALUE WORST THRESH TYPE UPDATED WHEN_FAILED RAW_VALUE" "5 Retired_Block_Count 0x0033 100 100 010 Pre-fail Always - 2" "188 Command_Timeouts 0x0032 100 100 000 Old_age Always - 0" "197 Pending_Sectors 0x0012 100 100 000 Old_age Always - 3" "198 Truncated_Row 0x0010" "199 CRC_Error_Count 0x003e 200 200 000 Old_age Always - 4"' \
+  > "$evildisk_tools/smartctl"
+chmod 755 "$evildisk_tools/smartctl"
+evildisk_ata_report=$(PATH="$evildisk_tools:$PATH" "$BIN" -c \
+  'koshkit evildisk -a --color never /dev/null' 2>&1)
+case $evildisk_ata_report in
+  *uncorrectable*) evildisk_ata=failed ;;
+  *"Mock ATA"*"reallocated 2"*"timeouts 0"*"pending 3"*"CRC errors 4"*warning:*"nonzero SMART counters reallocated 2, pending 3, CRC errors 4"*)
+    evildisk_ata=passed
+    ;;
+  *) evildisk_ata=failed ;;
+esac
 printf 'evildisk-smart-fallback=%s\n' "$evildisk_fallback"
+printf 'evildisk-smart-ata=%s\n' "$evildisk_ata"
 
 "$BIN" -c 'koshkit evilio --all --cumulative --color never' \
   > "$TEST_NULL_DEVICE" 2>&1

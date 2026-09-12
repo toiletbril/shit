@@ -12,6 +12,7 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
+#include "../StaticStringMap.hpp"
 
 FLAG_LIST_DECL();
 
@@ -50,12 +51,14 @@ struct smart_row
   String model{heap_allocator()};
   String protocol{heap_allocator()};
   String statistics{heap_allocator()};
+  String warning_statistics{heap_allocator()};
 };
 
 struct smart_statistic_field
 {
   StringView report_name;
   StringView label;
+  bool should_warn;
 };
 
 fn usage_style(u64 percent) wontthrow -> StringView
@@ -84,32 +87,108 @@ fn report_value(StringView report, const StringView *names, usize name_count,
   return String{allocator};
 }
 
-fn format_smart_statistics(StringView report, Allocator allocator) throws
-    -> String
+pure fn is_nonzero_smart_counter(StringView value) wontthrow -> bool
 {
-  static constexpr smart_statistic_field FIELDS[] = {
-      {"Temperature",                     "temperature"     },
-      {"Percentage Used",                 "used"            },
-      {"Power On Hours",                  "power-on hours"  },
-      {"Unsafe Shutdowns",                "unsafe shutdowns"},
-      {"Media and Data Integrity Errors", "media errors"    },
-      {"Data Units Read",                 "read"            },
-      {"Data Units Written",              "written"         },
-  };
-
-  let statistics = String{allocator};
-  for (let const &field : FIELDS) {
-    let const value = report_value(report, &field.report_name, 1, allocator);
-    if (value.is_empty()) continue;
-
-    if (!statistics.is_empty()) statistics += ", ";
-    statistics += field.label;
-    statistics += " ";
-    statistics += value.view();
+  bool is_nonzero = false;
+  for (usize index = 0; index < value.length; index++) {
+    let const byte = value[index];
+    if (byte >= '0' && byte <= '9') {
+      if (byte != '0') is_nonzero = true;
+      continue;
+    }
+    if (byte != ',') return false;
   }
+
+  return is_nonzero;
+}
+
+fn append_smart_statistic(String &statistics, String &warning_statistics,
+                          const smart_statistic_field &field,
+                          StringView value) throws -> void
+{
+  if (value.is_empty()) return;
+
+  if (!statistics.is_empty()) statistics += ", ";
+  statistics += field.label;
+  statistics += " ";
+  statistics += value;
+
+  if (field.should_warn && is_nonzero_smart_counter(value)) {
+    if (!warning_statistics.is_empty()) warning_statistics += ", ";
+    warning_statistics += field.label;
+    warning_statistics += " ";
+    warning_statistics += value;
+  }
+}
+
+fn append_ata_smart_statistics(StringView report, String &statistics,
+                               String &warning_statistics) throws -> void
+{
+  static constexpr static_string_entry<smart_statistic_field> FIELD_ENTRIES[] =
+      {
+          {SSK("5"),   {"", "reallocated", true}    },
+          {SSK("9"),   {"", "power-on hours", false}},
+          {SSK("187"), {"", "reported errors", true}},
+          {SSK("188"), {"", "timeouts", true}       },
+          {SSK("194"), {"", "temperature", false}   },
+          {SSK("197"), {"", "pending", true}        },
+          {SSK("198"), {"", "uncorrectable", true}  },
+          {SSK("199"), {"", "CRC errors", true}     },
+  };
+  static constexpr StaticStringMap FIELDS{FIELD_ENTRIES};
+  constexpr usize METADATA_WORD_COUNT = 7;
+
+  usize position = 0;
+  while (position < report.length) {
+    let const line = report.next_line(position).trim_blanks();
+    usize word_position = 0;
+    let const attribute_id = line.next_ascii_whitespace_word(word_position);
+    let const field = FIELDS.find(attribute_id);
+    if (!field.has_value()) continue;
+    if (line.next_ascii_whitespace_word(word_position).is_empty()) continue;
+
+    bool has_metadata = true;
+    for (usize index = 0; index < METADATA_WORD_COUNT; index++) {
+      if (!line.next_ascii_whitespace_word(word_position).is_empty()) continue;
+      has_metadata = false;
+      break;
+    }
+    if (!has_metadata) continue;
+
+    let const value = line.next_ascii_whitespace_word(word_position);
+    append_smart_statistic(statistics, warning_statistics, *field, value);
+  }
+}
+
+fn format_smart_statistics(StringView report, String &warning_statistics,
+                           Allocator allocator) throws -> String
+{
+  static constexpr smart_statistic_field REPORT_FIELDS[] = {
+      {"Temperature",                     "temperature",      false},
+      {"Percentage Used",                 "used",             false},
+      {"Power On Hours",                  "power-on hours",   false},
+      {"Unsafe Shutdowns",                "unsafe shutdowns", false},
+      {"Media and Data Integrity Errors", "media errors",     true },
+      {"Data Units Read",                 "read",             false},
+      {"Data Units Written",              "written",          false},
+  };
+  let statistics = String{allocator};
+  for (let const &field : REPORT_FIELDS) {
+    let const value = report_value(report, &field.report_name, 1, allocator);
+    append_smart_statistic(statistics, warning_statistics, field, value.view());
+  }
+  append_ata_smart_statistics(report, statistics, warning_statistics);
 
   if (statistics.is_empty()) statistics += "-";
   return statistics;
+}
+
+pure fn smart_status_is_healthy(StringView status) wontthrow -> bool
+{
+  static constexpr PackedStringKey HEALTHY_STATUS_KEYS[] = {
+      SSK("Verified"), SSK("PASSED"), SSK("OK"), SSK("0x00")};
+  static constexpr StaticStringSet HEALTHY_STATUSES{HEALTHY_STATUS_KEYS};
+  return HEALTHY_STATUSES.contains(status);
 }
 
 fn parse_smart_report(StringView report, StringView fallback_device,
@@ -137,7 +216,8 @@ fn parse_smart_report(StringView report, StringView fallback_device,
   row.protocol =
       report_value(report, PROTOCOL_NAMES, countof(PROTOCOL_NAMES), allocator);
   if (row.protocol.is_empty()) row.protocol = String{allocator, "-"};
-  row.statistics = format_smart_statistics(report, allocator);
+  row.statistics =
+      format_smart_statistics(report, row.warning_statistics, allocator);
   return true;
 }
 
@@ -190,7 +270,7 @@ fn read_smart_rows(EvalContext &cxt,
   return rows;
 }
 
-}
+} // namespace
 
 EvilDisk::EvilDisk() = default;
 
@@ -290,6 +370,7 @@ fn EvilDisk::execute(
   }
 
   let output = String{allocator};
+  let warnings = ArrayList<String>{allocator};
   append_report_text(output, "DISKS", colors::ansi::BOLD_BLUE, should_color);
   output += "\n  ";
   append_report_column(output, "FILESYSTEM", source_width, false,
@@ -457,11 +538,9 @@ fn EvilDisk::execute(
         append_report_column(output, row.device.view(), device_width, false,
                              colors::ansi::BOLD_GREEN, should_color);
         output += "  ";
-        let const status_style =
-            row.status == "Verified" || row.status == "PASSED" ||
-                    row.status == "0x00"
-                ? colors::ansi::BOLD_GREEN
-                : colors::ansi::BOLD_YELLOW;
+        let const status_style = smart_status_is_healthy(row.status.view())
+                                     ? colors::ansi::BOLD_GREEN
+                                     : colors::ansi::BOLD_YELLOW;
         append_report_column(output, row.status.view(), status_width, false,
                              status_style, should_color);
         output += "  ";
@@ -474,12 +553,23 @@ fn EvilDisk::execute(
         append_report_text(output, row.statistics.view(), colors::ansi::CYAN,
                            should_color);
         output += "\n";
+
+        if (!smart_status_is_healthy(row.status.view())) {
+          warnings.push(row.device + " reports SMART status " + row.status);
+        }
+        if (!row.warning_statistics.is_empty()) {
+          warnings.push(row.device + " reports nonzero SMART counters " +
+                        row.warning_statistics);
+        }
       }
     }
   }
 
   ec.print_to_stdout(output);
+  for (let const &warning : warnings)
+    show_message(Warning{warning.view()}.to_string());
+
   return status;
 }
 
-}
+} // namespace koshka::koshkit

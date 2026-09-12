@@ -22,4 +22,5 @@ evilfs-multiple-titles=present
 evillogs-single-title=omitted
 evillogs-multiple-titles=present
 evildisk-smart-fallback=passed
+evildisk-smart-ata=passed
 evilio-conflict=1
