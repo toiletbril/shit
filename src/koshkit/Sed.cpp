@@ -459,18 +459,24 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
   contents.reserve(sources.count());
   let lines = ArrayList<StringView>{cxt.scratch_allocator()};
   i32 status = 0;
+  let source_results =
+      read_named_or_stdin_batch(ec, sources, cxt.scratch_allocator());
+  if (os::INTERRUPT_REQUESTED) return 130;
 
-  for (let const source : sources) {
-    let content = read_named_or_stdin(ec, source);
-    if (!content.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "sed: cannot read '" +
-                                    String{cxt.scratch_allocator(), source} +
-                                    "': " + os::last_system_error_message());
+  for (usize source_index = 0; source_index < sources.count(); source_index++) {
+    let &source_result = source_results[source_index];
+    if (!source_result.content.has_value()) {
+      os::set_last_system_error(source_result.error_number);
+      report_soft_koshkit_error(
+          ec, cxt,
+          "sed: cannot read '" +
+              String{cxt.scratch_allocator(), sources[source_index]} +
+              "': " + os::last_system_error_message());
       status = 2;
       continue;
     }
-    contents.push(steal(*content));
+
+    contents.push(source_result.content.take());
     for (let const line : utils::split_lines(contents.back().view(),
                                              cxt.scratch_allocator(), true))
       lines.push(line);

@@ -14,3 +14,16 @@ sed_data=$TEST_TEMP_DIRECTORY/koshkit-sed-data
 printf 'alpha\n' > "$sed_data"
 printf 's/alpha/ALPHA/\n' | \
   "$BIN" -c 'koshkit sed -f - "$1"' sed-test "$sed_data"
+
+sed_first=$TEST_TEMP_DIRECTORY/koshkit-sed-first
+sed_last=$TEST_TEMP_DIRECTORY/koshkit-sed-last
+printf 'first\nsecond\n' > "$sed_first"
+printf 'third\n' > "$sed_last"
+
+echo "--- multiple data files with a missing operand ---"
+"$BIN" -c \
+  'koshkit sed -n "2,3p" "$1" missing.txt "$2"; printf "status=%s\n" "$?"' \
+  sed-test "$sed_first" "$sed_last" 2>&1
+
+echo "--- repeated standard input ---"
+printf 'left\nright\n' | "$BIN" -c 'koshkit sed -n "1,3p" - -'
