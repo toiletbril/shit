@@ -16,7 +16,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-a] [--live] [--cumulative [duration]] "
+HELP_SYNOPSIS_DECL("[-a] [--live] [--cumulative [seconds]] "
                    "[--ps | -NUMBER | -n count | -p pid] [--color when]");
 
 HELP_DESCRIPTION_DECL(
@@ -35,7 +35,7 @@ static koshka::FlagOptionalValue FLAG_EVILIO_CUMULATIVE{
     '\0',
     "cumulative",
     koshka::flag_section::NoSection,
-    "Show only rates and IOPS over an optional sample duration.",
+    "Show sampled activity over an optional number of seconds.",
     is_evilio_sample_duration};
 FLAG(EVILIO_PS, Bool, '\0', "ps", "Show every visible process.");
 FLAG(EVILIO_LIVE, Bool, 'l', "live",
@@ -769,16 +769,9 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     has_swap_after = os::read_swap_status(swap_after);
   }
 
-  if (FLAG_EVILIO_CUMULATIVE.is_enabled()) {
-    let output = String{allocator};
-    append_disk_io_rate_report(output, disk_before, disk_after,
-                               elapsed_nanoseconds, allocator, should_color);
-    ec.print_to_stdout(output);
-    return 0;
-  }
-
   os::memory_status memory{};
-  let const has_memory_status = os::read_memory_status(memory);
+  let const has_memory_status =
+      !FLAG_EVILIO_CUMULATIVE.is_enabled() && os::read_memory_status(memory);
 
   let output = String{allocator};
   if (has_activity_before && has_activity_after &&
@@ -1077,12 +1070,16 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     output += "\n";
   }
 
-  if (!disk_after.disks.is_empty()) {
-    append_report_text(output, "DISKS", colors::ansi::BOLD_BLUE, should_color);
-    output += "\n  ";
+  if (!disk_after.disks.is_empty() || FLAG_EVILIO_CUMULATIVE.is_enabled()) {
+    if (!FLAG_EVILIO_CUMULATIVE.is_enabled()) {
+      append_report_text(output, "DISKS", colors::ansi::BOLD_BLUE,
+                         should_color);
+      output += "\n  ";
+    }
     append_report_column(output, "DEVICE", 16, false, colors::ansi::BOLD_CYAN,
                          should_color);
-    let const is_sampled = FLAG_EVILIO_ALL.is_enabled();
+    let const is_sampled =
+        FLAG_EVILIO_ALL.is_enabled() || FLAG_EVILIO_CUMULATIVE.is_enabled();
     let const do_append_header = [&](StringView text, usize width)
                                      throws -> void {
       output += "  ";
@@ -1105,7 +1102,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     output += "\n";
     for (let const &after : disk_after.disks) {
       let const before = find_disk_io_status(disk_before, after.name.view());
-      output += "  ";
+      if (!FLAG_EVILIO_CUMULATIVE.is_enabled()) output += "  ";
       append_report_column(output, after.name.view(), 16, false,
                            colors::ansi::BOLD_GREEN, should_color);
       let read_value = Maybe<u64>{};
@@ -1342,7 +1339,12 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
           should_color);
       output += "\n";
     }
-    output += "\n";
+    if (!FLAG_EVILIO_CUMULATIVE.is_enabled()) output += "\n";
+  }
+
+  if (FLAG_EVILIO_CUMULATIVE.is_enabled()) {
+    ec.print_to_stdout(output);
+    return 0;
   }
 
   append_report_text(output, "SWAP", colors::ansi::BOLD_BLUE, should_color);
