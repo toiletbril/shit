@@ -105,8 +105,7 @@ fn Retry::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let const operands = PARSE_KOSHKIT_ARGS(args, arg_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -123,9 +122,9 @@ fn Retry::execute(const ExecContext &ec, EvalContext &cxt,
     if (parsed.is_error() || parsed.value() < 1 ||
         parsed.value() > MAXIMUM_ATTEMPT_COUNT)
     {
-      report_soft_koshkit_error(
-          ec, cxt,
-          "retry: invalid attempt count '" +
+      report_soft_koshkit_util_error(
+          ec, cxt, FLAG_RETRY_ATTEMPTS.value_location(), "retry",
+          "invalid attempt count '" +
               String{allocator, FLAG_RETRY_ATTEMPTS.value()} + "'",
           "the value is a count of attempts of one or more");
       return 1;
@@ -137,21 +136,22 @@ fn Retry::execute(const ExecContext &ec, EvalContext &cxt,
   f64 delay_seconds = DEFAULT_DELAY_SECONDS;
   if (FLAG_RETRY_DELAY.is_set()) {
     delay_seconds = parse_koshkit_duration_seconds(
-        FLAG_RETRY_DELAY.value(), StringView{"retry"}, allocator);
+        FLAG_RETRY_DELAY.value(), FLAG_RETRY_DELAY.value_location(), allocator);
   }
 
   f64 maximum_delay_seconds = 0.0;
   if (FLAG_RETRY_MAX_DELAY.is_set()) {
     maximum_delay_seconds = parse_koshkit_duration_seconds(
-        FLAG_RETRY_MAX_DELAY.value(), StringView{"retry"}, allocator);
+        FLAG_RETRY_MAX_DELAY.value(), FLAG_RETRY_MAX_DELAY.value_location(),
+        allocator);
   }
 
   f64 backoff_factor = DEFAULT_BACKOFF_FACTOR;
   if (FLAG_RETRY_BACKOFF.is_set()) {
     if (!parse_backoff_factor(FLAG_RETRY_BACKOFF.value(), backoff_factor)) {
-      report_soft_koshkit_error(
-          ec, cxt,
-          "retry: invalid backoff factor '" +
+      report_soft_koshkit_util_error(
+          ec, cxt, FLAG_RETRY_BACKOFF.value_location(), "retry",
+          "invalid backoff factor '" +
               String{allocator, FLAG_RETRY_BACKOFF.value()} + "'",
           "the value is a multiplier between one and sixty");
       return 1;

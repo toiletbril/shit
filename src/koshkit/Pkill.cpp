@@ -46,23 +46,27 @@ static fn uppercase_signal_name(StringView spelled, Allocator allocator) throws
   return uppercased;
 }
 
-fn resolve_koshkit_signal(StringView spelled, Allocator allocator) throws -> i32
+fn resolve_koshkit_signal(StringView spelled, SourceLocation location,
+                          Allocator allocator) throws -> i32
 {
   if (spelled.is_empty()) return SIGTERM;
   let const parsed = spelled.to<i64>();
   if (!parsed.is_error()) {
     if (parsed.value() < INT32_MIN || parsed.value() > INT32_MAX) {
-      throw Error{"signal number is out of range"};
+      throw ErrorWithLocationAndDetails{
+          location, "signal number is out of range",
+          "Use a signal name such as TERM or a number such as 15"};
     }
     return static_cast<i32>(parsed.value());
   }
   let const uppercased = uppercase_signal_name(spelled, allocator);
   let const named = os::signal_number_from_name(uppercased.view());
-  if (!named.has_value())
-    throw Error{
-        "unknown signal '" + String{allocator, spelled}
-          + "'"
-    };
+  if (!named.has_value()) {
+    let const unknown_signal = String{allocator, spelled};
+    throw ErrorWithLocationAndDetails{
+        location, "unknown signal '" + unknown_signal + "'",
+        "Use a signal name such as TERM or a number such as 15"};
+  }
   return *named;
 }
 
@@ -103,7 +107,7 @@ fn Pkill::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const signal_number = resolve_koshkit_signal(
       FLAG_PKILL_SIGNAL.is_set() ? FLAG_PKILL_SIGNAL.value() : StringView{},
-      cxt.scratch_allocator());
+      FLAG_PKILL_SIGNAL.value_location(), cxt.scratch_allocator());
 
   let const self_pid = os::get_shell_process_id();
   let const processes = os::enumerate_processes();

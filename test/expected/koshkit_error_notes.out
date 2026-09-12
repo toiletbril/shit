@@ -328,3 +328,52 @@ note: pass a pattern, e.g. `pkill ssh`.
 1:15: error: rmdir: failed to remove 'KOSH_MISSING_DIRECTORY': No such file or directory.
      1 |  koshkit rmdir KOSH_MISSING_DIRECTORY
        |                ^~~~~~~~~~~~~~~~~~~~~~
+=== sleep duration location ===
+1:15: error: koshkit sleep: invalid duration 'invalid'.
+     1 |  koshkit sleep invalid
+       |                ^~~~~~~
+note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, such as `5` or `0.25s`.
+=== watch interval location ===
+1:26: error: koshkit watch: invalid duration 'invalid'.
+     1 |  koshkit watch --interval invalid true
+       |                           ^~~~~~~
+note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, such as `5` or `0.25s`.
+=== goodfsw latency location ===
+1:27: error: koshkit goodfsw: invalid duration 'invalid'.
+     1 |  koshkit goodfsw --latency invalid .
+       |                            ^~~~~~~
+note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, such as `5` or `0.25s`.
+=== retry delay location ===
+1:23: error: koshkit retry: invalid duration 'invalid'.
+     1 |  koshkit retry --delay invalid true
+       |                        ^~~~~~~
+note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, such as `5` or `0.25s`.
+=== timeout duration location ===
+1:17: error: koshkit timeout: invalid duration 'invalid'.
+     1 |  koshkit timeout invalid true
+       |                  ^~~~~~~
+note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, such as `5` or `0.25s`.
+=== timeout signal location ===
+1:26: error: koshkit timeout: unknown signal 'KOSH_MISSING_SIGNAL'.
+     1 |  koshkit timeout --signal KOSH_MISSING_SIGNAL 1 true
+       |                           ^~~~~~~~~~~~~~~~~~~
+note: Use a signal name such as TERM or a number such as 15.
+=== timeout signal range location ===
+1:26: error: koshkit timeout: signal number is out of range.
+     1 |  koshkit timeout --signal 999999999999999999999 1 true
+       |                           ^~~~~~~~~~~~~~~~~~~~~
+note: Use a signal name such as TERM or a number such as 15.
+=== timeout command location ===
+1:19: error: timeout: command 'KOSH_MISSING_COMMAND' was not found.
+     1 |  koshkit timeout 1 KOSH_MISSING_COMMAND
+       |                    ^~~~~~~~~~~~~~~~~~~~
+=== killall signal location ===
+1:26: error: koshkit killall: unknown signal 'KOSH_MISSING_SIGNAL'.
+     1 |  koshkit killall --signal KOSH_MISSING_SIGNAL process
+       |                           ^~~~~~~~~~~~~~~~~~~
+note: Use a signal name such as TERM or a number such as 15.
+=== pkill signal location ===
+1:24: error: koshkit pkill: unknown signal 'KOSH_MISSING_SIGNAL'.
+     1 |  koshkit pkill --signal KOSH_MISSING_SIGNAL process
+       |                         ^~~~~~~~~~~~~~~~~~~
+note: Use a signal name such as TERM or a number such as 15.

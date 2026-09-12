@@ -220,15 +220,15 @@ fn preflight_timeout_stage(const ExecContext &ec, EvalContext &cxt,
 
   try {
     unused(parse_koshkit_duration_seconds(
-        operands[0].view(), StringView{"timeout"}, cxt.scratch_allocator()));
+        operands[0].view(), operand_locations[0], cxt.scratch_allocator()));
     if (FLAG_TIMEOUT_KILL_AFTER.is_set())
-      unused(parse_koshkit_duration_seconds(FLAG_TIMEOUT_KILL_AFTER.value(),
-                                            StringView{"timeout"},
-                                            cxt.scratch_allocator()));
+      unused(parse_koshkit_duration_seconds(
+          FLAG_TIMEOUT_KILL_AFTER.value(),
+          FLAG_TIMEOUT_KILL_AFTER.value_location(), cxt.scratch_allocator()));
     let const timeout_signal = resolve_koshkit_signal(
         FLAG_TIMEOUT_SIGNAL.is_set() ? FLAG_TIMEOUT_SIGNAL.value()
                                      : StringView{"TERM"},
-        cxt.scratch_allocator());
+        FLAG_TIMEOUT_SIGNAL.value_location(), cxt.scratch_allocator());
     if (!os::is_process_signal_supported(timeout_signal)) return None;
   } catch (const ErrorBase &) {
     return None;
@@ -261,31 +261,34 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
   if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
 
   let const timeout_seconds = parse_koshkit_duration_seconds(
-      operands[0].view(), StringView{"timeout"}, cxt.scratch_allocator());
+      operands[0].view(), operand_locations[0], cxt.scratch_allocator());
   let const timeout_nanos = duration_to_nanos(timeout_seconds);
 
   u64 kill_after_nanos = 0;
   if (FLAG_TIMEOUT_KILL_AFTER.is_set()) {
     let const kill_after_seconds = parse_koshkit_duration_seconds(
-        FLAG_TIMEOUT_KILL_AFTER.value(), StringView{"timeout"},
-        cxt.scratch_allocator());
+        FLAG_TIMEOUT_KILL_AFTER.value(),
+        FLAG_TIMEOUT_KILL_AFTER.value_location(), cxt.scratch_allocator());
     kill_after_nanos = duration_to_nanos(kill_after_seconds);
   }
 
   let const timeout_signal = resolve_koshkit_signal(
       FLAG_TIMEOUT_SIGNAL.is_set() ? FLAG_TIMEOUT_SIGNAL.value()
                                    : StringView{"TERM"},
-      cxt.scratch_allocator());
+      FLAG_TIMEOUT_SIGNAL.value_location(), cxt.scratch_allocator());
   if (!os::is_process_signal_supported(timeout_signal))
-    throw Error{"timeout cannot deliver signal " +
-                String::from(timeout_signal, cxt.scratch_allocator()) +
-                " on this platform"};
+    throw ErrorWithLocation{
+        FLAG_TIMEOUT_SIGNAL.value_location(),
+        "timeout cannot deliver signal " +
+            String::from(timeout_signal, cxt.scratch_allocator()) +
+            " on this platform"};
 
   let const program_path =
       checked_timeout_program(operands[1].view(), operand_locations[1], cxt);
   if (!program_path.has_value()) {
-    report_soft_koshkit_error(
-        ec, cxt, "timeout: command '" + operands[1] + "' was not found");
+    report_soft_koshkit_util_error(ec, cxt, operand_locations[1], "timeout",
+                                   "command '" + operands[1] +
+                                       "' was not found");
     return 127;
   }
 

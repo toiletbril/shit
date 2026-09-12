@@ -797,7 +797,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   f64 sample_duration_seconds = 1.0;
   if (sample_duration_operand.has_value()) {
     sample_duration_seconds = parse_koshkit_duration_seconds(
-        *sample_duration_operand, "evilio", allocator);
+        *sample_duration_operand, *sample_duration_location, allocator);
     if (sample_duration_seconds <= 0.0) {
       KOSHKIT_REPORT_ERROR_AT(*sample_duration_location, "invalid duration",
                               "the duration must be greater than zero");

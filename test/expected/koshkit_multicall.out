@@ -17,6 +17,11 @@ rc=1
   reached through a symlink, not a system program of the same name.
 --- the koshkit form opens with the description instead ---
 DESCRIPTION
+--- a symlinked utility locates an invalid operand ---
+1:7: error: sleep: invalid duration 'invalid'.
+     1 |  sleep invalid
+       |        ^~~~~~~
+note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, such as `5` or `0.25s`.
 == a symlink was installed for head:
 head-linked
 == a symlinked head routes its own -c flag to the utility:

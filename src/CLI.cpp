@@ -453,12 +453,12 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
      the source span of the argv token it came from, so a builtin can caret the
      specific operand after flag parsing drops the flags. */
   let const do_record_operand =
-      [arg_locations, operand_locations](usize arg_index) wontthrow -> void {
+      [argv, base_position, arg_locations, operand_locations](usize arg_index)
+          throws -> void {
     if (operand_locations == nullptr) return;
-    if (arg_locations != nullptr && arg_index < arg_locations->count())
-      operand_locations->push((*arg_locations)[arg_index]);
-    else
-      operand_locations->push(SourceLocation{});
+
+    operand_locations->push(
+        argument_location(argv, arg_index, base_position, arg_locations));
   };
 
   Flag *previous_flag{};

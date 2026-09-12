@@ -36,8 +36,9 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -45,9 +46,13 @@ fn Sleep::execute(const ExecContext &ec, EvalContext &cxt,
 
   f64 total_seconds = 0.0;
   bool should_sleep_forever = false;
-  for (const String &operand : operands) {
+  for (usize operand_index = 0; operand_index < operands.count();
+       operand_index++)
+  {
+    let const &operand = operands[operand_index];
     let const seconds_value = parse_koshkit_duration_seconds(
-        operand.view(), StringView{"sleep"}, cxt.scratch_allocator());
+        operand.view(), operand_locations[operand_index],
+        cxt.scratch_allocator());
 
     if (__builtin_isinf(seconds_value)) {
       should_sleep_forever = true;

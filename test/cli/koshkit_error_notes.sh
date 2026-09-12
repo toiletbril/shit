@@ -217,3 +217,33 @@ echo "=== realpath operand location ==="
 
 echo "=== rmdir operand location ==="
 "$BIN" -c 'koshkit rmdir KOSH_MISSING_DIRECTORY' 2>&1
+
+echo "=== sleep duration location ==="
+"$BIN" -c 'koshkit sleep invalid' 2>&1
+
+echo "=== watch interval location ==="
+"$BIN" -c 'koshkit watch --interval invalid true' 2>&1
+
+echo "=== goodfsw latency location ==="
+"$BIN" -c 'koshkit goodfsw --latency invalid .' 2>&1
+
+echo "=== retry delay location ==="
+"$BIN" -c 'koshkit retry --delay invalid true' 2>&1
+
+echo "=== timeout duration location ==="
+"$BIN" -c 'koshkit timeout invalid true' 2>&1
+
+echo "=== timeout signal location ==="
+"$BIN" -c 'koshkit timeout --signal KOSH_MISSING_SIGNAL 1 true' 2>&1
+
+echo "=== timeout signal range location ==="
+"$BIN" -c 'koshkit timeout --signal 999999999999999999999 1 true' 2>&1
+
+echo "=== timeout command location ==="
+"$BIN" -c 'koshkit timeout 1 KOSH_MISSING_COMMAND' 2>&1
+
+echo "=== killall signal location ==="
+"$BIN" -c 'koshkit killall --signal KOSH_MISSING_SIGNAL process' 2>&1
+
+echo "=== pkill signal location ==="
+"$BIN" -c 'koshkit pkill --signal KOSH_MISSING_SIGNAL process' 2>&1

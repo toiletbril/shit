@@ -220,7 +220,8 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
   f64 latency_seconds = DEFAULT_LATENCY_SECONDS;
   if (FLAG_GOODFSW_LATENCY.is_set()) {
     latency_seconds = parse_koshkit_duration_seconds(
-        FLAG_GOODFSW_LATENCY.value(), "goodfsw", allocator);
+        FLAG_GOODFSW_LATENCY.value(), FLAG_GOODFSW_LATENCY.value_location(),
+        allocator);
     if (latency_seconds < 0.05) latency_seconds = 0.05;
   }
 

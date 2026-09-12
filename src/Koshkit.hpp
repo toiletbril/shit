@@ -712,11 +712,11 @@ fn format_file_timestamp(i64 seconds, u32 nanoseconds,
                          Allocator allocator) throws -> String;
 fn get_init_system_name(Allocator allocator) throws -> String;
 
-fn parse_koshkit_duration_seconds(StringView text, StringView utility_name,
+fn parse_koshkit_duration_seconds(StringView text, SourceLocation location,
                                   Allocator allocator) throws -> f64;
 
-fn resolve_koshkit_signal(StringView spelled, Allocator allocator) throws
-    -> i32;
+fn resolve_koshkit_signal(StringView spelled, SourceLocation location,
+                          Allocator allocator) throws -> i32;
 
 fn format_signal_list() throws -> String;
 

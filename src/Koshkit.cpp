@@ -876,18 +876,15 @@ fn get_init_system_name(Allocator allocator) throws -> String
   return String{allocator, "unknown"};
 }
 
-fn parse_koshkit_duration_seconds(StringView text, StringView utility_name,
+fn parse_koshkit_duration_seconds(StringView text, SourceLocation location,
                                   Allocator allocator) throws -> f64
 {
   let const do_throw_invalid = [&]() throws -> void {
-    throw ErrorWithDetails{
-        String{allocator, utility_name}
-        + ": invalid duration '" + text + "'",
+    let const invalid_value = String{allocator, text};
+    throw ErrorWithLocationAndDetails{
+        location, "invalid duration '" + invalid_value + "'",
         "Use a non-negative number with an optional `s`, `m`, `h`, or `d` "
-        "suffix, e.g. `" +
-            String{allocator, utility_name}
-        + " 5`"
-    };
+        "suffix, such as `5` or `0.25s`"};
   };
 
   f64 multiplier = 1.0;

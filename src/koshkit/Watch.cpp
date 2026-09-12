@@ -127,7 +127,8 @@ fn Watch::execute(const ExecContext &ec, EvalContext &cxt,
   f64 interval_seconds = DEFAULT_INTERVAL_SECONDS;
   if (FLAG_WATCH_INTERVAL.is_set()) {
     interval_seconds = parse_koshkit_duration_seconds(
-        FLAG_WATCH_INTERVAL.value(), "watch", allocator);
+        FLAG_WATCH_INTERVAL.value(), FLAG_WATCH_INTERVAL.value_location(),
+        allocator);
     if (interval_seconds < 0.1) interval_seconds = 0.1;
   }
 

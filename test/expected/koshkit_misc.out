@@ -7,16 +7,16 @@ rc=0
 --- sleep accepts representable subnormal values ---
 minimum=0
 subnormal=0
-1:1: error: sleep: invalid duration '1e-4000'.
+1:15: error: koshkit sleep: invalid duration '1e-4000'.
      1 |  koshkit sleep 1e-4000
-       |  ^~~~~~~~~~~~~~~~~~~~~
-note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, e.g. `sleep 5`.
+       |                ^~~~~~~
+note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, such as `5` or `0.25s`.
 underflow=1
 --- sleep bad duration ---
-1:1: error: sleep: invalid duration 'abc'.
+1:15: error: koshkit sleep: invalid duration 'abc'.
      1 |  koshkit sleep abc
-       |  ^~~~~~~~~~~~~~~~~
-note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, e.g. `sleep 5`.
+       |                ^~~
+note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, such as `5` or `0.25s`.
 rc=1
 --- env runs the command ---
 1
@@ -32,9 +32,9 @@ rc=2
 --- pkill with no match ---
 rc=1
 --- killall with no match ---
-1:1: error: killall: no_such_process_xyz_123: no process found.
+1:17: error: killall: no_such_process_xyz_123: no process found.
      1 |  koshkit killall no_such_process_xyz_123
-       |  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+       |                  ^~~~~~~~~~~~~~~~~~~~~~~
 rc=1
 --- kill is a builtin, not a koshkit utility ---
 1:9: error: koshkit has no utility named 'kill'.
