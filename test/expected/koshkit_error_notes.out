@@ -214,6 +214,21 @@ note: use --all without --cumulative or --live.
      1 |  koshkit basename path suffix extra
        |                               ^~~~~
 note: basename takes a path and an optional suffix, e.g. `basename a.c .c`.
+=== cal extra operand location ===
+1:20: error: cal: extra operand 'extra'.
+     1 |  koshkit cal 1 2024 extra
+       |                     ^~~~~
+note: use `cal [month] year`.
+=== cal month location ===
+1:13: error: cal: invalid month '13'.
+     1 |  koshkit cal 13 2024
+       |              ^~
+note: use a month from 1 through 12.
+=== cal year location ===
+1:15: error: cal: invalid year '0'.
+     1 |  koshkit cal 1 0
+       |                ^
+note: use a positive decimal year no greater than 9223372036854775807.
 === evildisk color value location ===
 1:26: error: evildisk: invalid color mode.
      1 |  koshkit evildisk --color invalid

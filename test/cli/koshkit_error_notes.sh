@@ -140,6 +140,15 @@ echo "=== evilio live mode location ==="
 echo "=== basename extra operand location ==="
 "$BIN" -c 'koshkit basename path suffix extra' 2>&1
 
+echo "=== cal extra operand location ==="
+"$BIN" -c 'koshkit cal 1 2024 extra' 2>&1
+
+echo "=== cal month location ==="
+"$BIN" -c 'koshkit cal 13 2024' 2>&1
+
+echo "=== cal year location ==="
+"$BIN" -c 'koshkit cal 1 0' 2>&1
+
 echo "=== evildisk color value location ==="
 "$BIN" -c 'koshkit evildisk --color invalid' 2>&1
 

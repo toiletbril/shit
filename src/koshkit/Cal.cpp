@@ -82,12 +82,18 @@ fn Cal::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
-  if (operands.count() > 2) return report_usage_error(ec, cxt, args[0].view());
+  if (operands.count() > 2) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[2],
+                            "extra operand '" + operands[2] + "'",
+                            "use `cal [month] year`");
+    return 1;
+  }
 
   usize month = 0;
   i64 year = 0;
@@ -100,17 +106,34 @@ fn Cal::execute(const ExecContext &ec, EvalContext &cxt,
   } else if (operands.count() == 2) {
     let const parsed_month = utils::parse_decimal_u64(operands[0].view());
     let const parsed_year = utils::parse_decimal_u64(operands[1].view());
-    if (parsed_month.is_error() || parsed_year.is_error() ||
-        parsed_month.value() < 1 || parsed_month.value() > 12 ||
-        parsed_year.value() < 1 || parsed_year.value() > INT64_MAX)
-      throw Error{"cal: invalid month or year"};
+    if (parsed_month.is_error() || parsed_month.value() < 1 ||
+        parsed_month.value() > 12)
+    {
+      KOSHKIT_REPORT_ERROR_AT(operand_locations[0],
+                              "invalid month '" + operands[0] + "'",
+                              "use a month from 1 through 12");
+      return 1;
+    }
+    if (parsed_year.is_error() || parsed_year.value() < 1 ||
+        parsed_year.value() > INT64_MAX)
+    {
+      KOSHKIT_REPORT_ERROR_AT(
+          operand_locations[1], "invalid year '" + operands[1] + "'",
+          "use a positive decimal year no greater than 9223372036854775807");
+      return 1;
+    }
     month = static_cast<usize>(parsed_month.value());
     year = static_cast<i64>(parsed_year.value());
   } else {
     let const parsed_year = utils::parse_decimal_u64(operands[0].view());
     if (parsed_year.is_error() || parsed_year.value() < 1 ||
         parsed_year.value() > INT64_MAX)
-      throw Error{"cal: invalid year"};
+    {
+      KOSHKIT_REPORT_ERROR_AT(
+          operand_locations[0], "invalid year '" + operands[0] + "'",
+          "use a positive decimal year no greater than 9223372036854775807");
+      return 1;
+    }
     year = static_cast<i64>(parsed_year.value());
   }
 
