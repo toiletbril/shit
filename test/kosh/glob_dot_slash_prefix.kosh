@@ -2,7 +2,9 @@
 start=$PWD
 directory=$TEST_TEMP_DIRECTORY/glob-dot-slash
 koshkit rm -rf "$directory"
-koshkit mkdir -p "$directory"
-cd "$directory" && : > a.sh && : > b.sh && echo ./*.sh && echo *.sh
+koshkit mkdir -p "$directory/real/nested"
+koshkit ln -s real "$directory/linked"
+koshkit ln -s missing "$directory/broken"
+cd "$directory" && : > a.sh && : > b.sh && : > plain && echo ./*.sh && echo *.sh && echo */nested
 cd "$start"
 koshkit rm -rf "$directory"

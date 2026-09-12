@@ -6,9 +6,15 @@
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "rm" "-rf" "$directory"]
   [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "mkdir" "-p" "$directory"]
+    [SimpleCommand "koshkit" "mkdir" "-p" "$directory/real/nested"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "ln" "-s" "real" "$directory/linked"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "ln" "-s" "missing" "$directory/broken"]
   [CompoundListCondition, None]
     [SimpleCommand "cd" "$directory"]
+  [CompoundListCondition, &&]
+    [SimpleCommand ":"]
   [CompoundListCondition, &&]
     [SimpleCommand ":"]
   [CompoundListCondition, &&]
@@ -17,6 +23,8 @@
     [SimpleCommand "echo" "./*.sh"]
   [CompoundListCondition, &&]
     [SimpleCommand "echo" "*.sh"]
+  [CompoundListCondition, &&]
+    [SimpleCommand "echo" "*/nested"]
   [CompoundListCondition, None]
     [SimpleCommand "cd" "$start"]
   [CompoundListCondition, None]
@@ -53,6 +61,39 @@
 ]
 [Word
   Variable "directory"
+  DoubleQuoted "/real/nested"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "real"
+]
+[Word
+  Variable "directory"
+  DoubleQuoted "/linked"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "missing"
+]
+[Word
+  Variable "directory"
+  DoubleQuoted "/broken"
 ]
 [Word
   Unquoted "cd"
@@ -73,6 +114,12 @@
   Unquoted "b.sh"
 ]
 [Word
+  Unquoted ":"
+]
+[Word
+  Unquoted "plain"
+]
+[Word
   Unquoted "echo"
 ]
 [Word
@@ -83,6 +130,12 @@
 ]
 [Word
   Unquoted "*.sh"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  Unquoted "*/nested"
 ]
 [Word
   Unquoted "cd"
@@ -104,3 +157,4 @@
 ]
 ./a.sh ./b.sh
 a.sh b.sh
+linked/nested real/nested

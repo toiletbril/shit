@@ -114,40 +114,82 @@ fn EvalContext::expand_path_once(const glob_field &field,
   if (nocaseglob_is_on) lowered_glob = glob.to_lower_ascii(scratch);
   let const match_glob = nocaseglob_is_on ? lowered_glob.view() : glob;
 
-  for (let const &entry : *entries) {
+  let const do_entry_matches = [&](const Path::directory_child &entry)
+                                   throws -> bool {
     let const filename = entry.name.view();
 
     /* A leading-dot-less pattern skips a dotfile unless dotglob is on. */
     if (filename == "." || filename == "..") {
-      if (!pattern_leads_with_dot) continue;
+      if (!pattern_leads_with_dot) return false;
     } else if (!pattern_leads_with_dot && !filename.is_empty() &&
                filename[0] == '.' && !dotglob_is_on)
     {
-      continue;
+      return false;
     }
 
-    if (!should_expand_files && (entry.kind == Path::entry_kind::Regular ||
-                                 entry.kind == Path::entry_kind::Other))
-      continue;
-
-    if (!name_matches_glob(match_glob, filename, field.glob_active, stem_start,
-                           is_extglob_enabled, nocaseglob_is_on, scratch))
-      continue;
-
-    if (!should_expand_files && entry.kind != Path::entry_kind::Directory) {
-      let full_path = parent_dir;
-      full_path.push_component(filename);
-      if (!full_path.is_directory()) continue;
-    }
-
+    return name_matches_glob(match_glob, filename, field.glob_active,
+                             stem_start, is_extglob_enabled, nocaseglob_is_on,
+                             scratch);
+  };
+  let const do_append_entry = [&](StringView filename) throws -> void {
     add_expansion();
 
-    /* A real filename is literal, so the result field never globs again. */
     let result_field = glob_field{scratch};
     result_field.text.append(typed_prefix);
     result_field.text.append(filename);
     expanded.push(steal(result_field));
+  };
+
+  if (should_expand_files) {
+    for (let const &entry : *entries)
+      if (do_entry_matches(entry)) do_append_entry(entry.name.view());
+
+    return expanded;
   }
+
+  let should_include = ArrayList<bool>{scratch};
+  let uncertain_positions = ArrayList<usize>{scratch};
+  let uncertain_paths = ArrayList<Path>{scratch};
+  let uncertain_statuses = ArrayList<os::file_status>{scratch};
+  should_include.reserve(entries->count());
+  uncertain_positions.reserve(entries->count());
+  uncertain_paths.reserve(entries->count());
+  uncertain_statuses.reserve(entries->count());
+  for (usize index = 0; index < entries->count(); index++) {
+    let const &entry = (*entries)[index];
+    should_include.push(false);
+    if (!do_entry_matches(entry)) continue;
+
+    if (entry.kind == Path::entry_kind::Directory) {
+      should_include[index] = true;
+      continue;
+    }
+    if (entry.kind == Path::entry_kind::Regular ||
+        entry.kind == Path::entry_kind::Other)
+    {
+      continue;
+    }
+
+    let full_path = parent_dir.clone();
+    full_path.push_component(entry.name.view());
+    uncertain_positions.push(index);
+    uncertain_paths.push(steal(full_path));
+    uncertain_statuses.push({});
+  }
+
+  let directory_batch = os::Batch{scratch};
+  directory_batch.reserve(uncertain_paths.count());
+  for (usize index = 0; index < uncertain_paths.count(); index++)
+    directory_batch.add(os::BatchOperation::stat(uncertain_paths[index],
+                                                 uncertain_statuses[index]));
+  let const directory_results = directory_batch.execute();
+  for (usize index = 0; index < uncertain_paths.count(); index++)
+    should_include[uncertain_positions[index]] =
+        directory_results[index].error_number == 0 &&
+        os::file_type_letter(uncertain_statuses[index].mode) == 'd';
+
+  for (usize index = 0; index < entries->count(); index++)
+    if (should_include[index]) do_append_entry((*entries)[index].name.view());
 
   return expanded;
 }
