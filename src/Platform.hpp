@@ -425,6 +425,8 @@ fn release_process_lock(descriptor lock) wontthrow -> void;
 fn write_to_temp_file(StringView content) throws -> Maybe<descriptor>;
 fn write_to_named_temp_file(const Path &directory, StringView prefix,
                             StringView content) throws -> Maybe<Path>;
+fn make_temp_directory(const Path &directory, StringView prefix) throws
+    -> Maybe<Path>;
 
 /* On a platform that leaves no temp file, such as POSIX, it holds nothing. */
 class TempFileSet
@@ -592,11 +594,26 @@ struct mounted_filesystem
   String target{heap_allocator()};
   String type{heap_allocator()};
   String options{heap_allocator()};
+  String volume_name{heap_allocator()};
+  String volume_uuid{heap_allocator()};
 };
 
 fn stat_filesystem(StringView path, filesystem_status &status) wontthrow
     -> bool;
 fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>;
+
+struct filesystem_error_counters
+{
+  u64 read_count{0};
+  u64 write_count{0};
+  u64 flush_count{0};
+  u64 corruption_count{0};
+  u64 generation_count{0};
+};
+
+fn read_filesystem_error_counters(StringView path,
+                                  filesystem_error_counters &counters) throws
+    -> bool;
 
 fn sync_filesystems() wontthrow -> bool;
 
@@ -641,12 +658,27 @@ fn read_process_io_status(i64 pid, process_io_status &status) wontthrow -> bool;
 enum class system_activity_field : u32
 {
   Cpu = 1u << 0,
-  Paging = 1u << 1,
-  Faults = 1u << 2,
-  Scheduler = 1u << 3,
-  CpuStall = 1u << 4,
-  MemoryStall = 1u << 5,
-  IoStall = 1u << 6,
+  CpuWait = 1u << 1,
+  CpuStolen = 1u << 2,
+  PageInput = 1u << 3,
+  PageOutput = 1u << 4,
+  Faults = 1u << 5,
+  MajorFaults = 1u << 6,
+  Runnable = 1u << 7,
+  Blocked = 1u << 8,
+  CpuSomeStall = 1u << 9,
+  CpuFullStall = 1u << 10,
+  MemorySomeStall = 1u << 11,
+  MemoryFullStall = 1u << 12,
+  IoSomeStall = 1u << 13,
+  IoFullStall = 1u << 14,
+  PageScan = 1u << 15,
+  PageSteal = 1u << 16,
+  DirectReclaim = 1u << 17,
+  CompactionStall = 1u << 18,
+  DirtyPages = 1u << 19,
+  WritebackPages = 1u << 20,
+  OomKills = 1u << 21,
 };
 
 struct system_activity_status
@@ -663,10 +695,18 @@ struct system_activity_status
   u64 runnable_process_count{0};
   u64 blocked_process_count{0};
   u64 cpu_some_stall_microseconds{0};
+  u64 cpu_full_stall_microseconds{0};
   u64 memory_some_stall_microseconds{0};
   u64 memory_full_stall_microseconds{0};
   u64 io_some_stall_microseconds{0};
   u64 io_full_stall_microseconds{0};
+  u64 page_scan_count{0};
+  u64 page_steal_count{0};
+  u64 direct_reclaim_count{0};
+  u64 compaction_stall_count{0};
+  u64 dirty_page_count{0};
+  u64 writeback_page_count{0};
+  u64 oom_kill_count{0};
   u32 available_fields{0};
 
   pure fn has_field(system_activity_field field) const wontthrow -> bool
@@ -763,37 +803,7 @@ struct file_status
 
 static_assert(sizeof(usize) != 8 || sizeof(file_status) == 104);
 
-enum class batched_syscall_id : u8
-{
-  Read = 0,
-  Write = 1,
-  Lstat = 2,
-  Stat = 3,
-};
-
-struct batched_syscall
-{
-  const Path *path{nullptr};
-  const opaque *input_buffer{nullptr};
-  opaque *output_buffer{nullptr};
-  file_status *status{nullptr};
-  u64 request_id{0};
-  u64 byte_offset{0};
-  usize byte_count{0};
-  descriptor fd{KOSH_INVALID_FD};
-  batched_syscall_id syscall_id{batched_syscall_id::Read};
-};
-
-struct batched_syscall_result
-{
-  u64 request_id{0};
-  usize transferred_byte_count{0};
-  i32 error_number{0};
-};
-
-fn execute_batched_syscalls(const batched_syscall *syscalls,
-                            usize syscall_count,
-                            batched_syscall_result *results) wontthrow -> void;
+#include "PlatformBatch.hpp"
 
 struct directory_status_entry
 {
@@ -1253,6 +1263,10 @@ enum class network_statistics_field : u32
   TransmitErrors = 1u << 5,
   ReceiveDrops = 1u << 6,
   TransmitDrops = 1u << 7,
+  ReceiveLinkSpeed = 1u << 8,
+  TransmitLinkSpeed = 1u << 9,
+  TransmitQueueLength = 1u << 10,
+  TransmitQueueLimit = 1u << 11,
 };
 
 struct network_interface_statistics_entry
@@ -1266,6 +1280,10 @@ struct network_interface_statistics_entry
   u64 transmit_error_count{0};
   u64 receive_drop_count{0};
   u64 transmit_drop_count{0};
+  u64 receive_link_bits_per_second{0};
+  u64 transmit_link_bits_per_second{0};
+  u64 transmit_queue_length{0};
+  u64 transmit_queue_limit{0};
   u32 available_fields{0};
 
   pure fn has_field(network_statistics_field field) const wontthrow -> bool
@@ -1277,6 +1295,24 @@ struct network_interface_statistics_entry
 fn read_network_interface_statistics() throws
     -> ArrayList<network_interface_statistics_entry>;
 
+enum class tcp_statistics_field : u32
+{
+  ActiveOpens = 1u << 0,
+  PassiveOpens = 1u << 1,
+  ReceivedSegments = 1u << 2,
+  SentSegments = 1u << 3,
+  RetransmittedSegments = 1u << 4,
+  InputErrors = 1u << 5,
+  AttemptFailures = 1u << 6,
+  EstablishedResets = 1u << 7,
+  CurrentEstablished = 1u << 8,
+  SentResets = 1u << 9,
+  ConnectionDrops = 1u << 10,
+  ReceiveMemoryDrops = 1u << 11,
+  ListenDrops = 1u << 12,
+  RetransmitTimeouts = 1u << 13,
+};
+
 struct tcp_statistics
 {
   u64 active_open_count{0};
@@ -1285,6 +1321,20 @@ struct tcp_statistics
   u64 sent_segment_count{0};
   u64 retransmitted_segment_count{0};
   u64 input_error_count{0};
+  u64 attempt_failure_count{0};
+  u64 established_reset_count{0};
+  u64 current_established_count{0};
+  u64 sent_reset_count{0};
+  u64 connection_drop_count{0};
+  u64 receive_memory_drop_count{0};
+  u64 listen_drop_count{0};
+  u64 retransmit_timeout_count{0};
+  u32 available_fields{0};
+
+  pure fn has_field(tcp_statistics_field field) const wontthrow -> bool
+  {
+    return (available_fields & static_cast<u32>(field)) != 0;
+  }
 };
 
 fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool;
@@ -1518,6 +1568,8 @@ fn execute_program(
 fn shell_has_controlling_terminal() wontthrow -> bool;
 
 fn canonical_path(const Path &path) wontthrow -> Maybe<Path>;
+fn path_from_file_id(StringView filesystem_path, u64 file_id) wontthrow
+    -> Maybe<Path>;
 
 /* On Windows the wildcard applies to the last path component the way
    FindFirstFile expands it. */

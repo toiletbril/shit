@@ -199,6 +199,14 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
   return resolved;
 }
 
+fn path_from_file_id(StringView filesystem_path, u64 file_id) wontthrow
+    -> Maybe<Path>
+{
+  unused(filesystem_path);
+  unused(file_id);
+  return None;
+}
+
 fn glob_matches(StringView pattern, Allocator allocator) throws
     -> ArrayList<String>
 {
@@ -828,6 +836,40 @@ fn write_to_named_temp_file(const Path &directory, StringView prefix,
   return Path{path->view()};
 }
 
+fn make_temp_directory(const Path &directory, StringView prefix) throws
+    -> Maybe<Path>
+{
+  if (prefix.find_character('\\').has_value() ||
+      prefix.find_character('/').has_value())
+  {
+    return None;
+  }
+
+  for (u32 attempt = 1; attempt <= 256; attempt++) {
+    let directory_name = String{heap_allocator(), prefix};
+    directory_name += "_";
+    directory_name +=
+        String::from(GetCurrentProcessId(), heap_allocator()).view();
+    directory_name += "_";
+    directory_name += String::from(GetTickCount64(), heap_allocator()).view();
+    directory_name += "_";
+    directory_name += String::from(attempt, heap_allocator()).view();
+    let const candidate =
+        PathBuilder{directory.text()}.append(directory_name).build();
+    let const wide_candidate =
+        utf8_to_wide(candidate.text().view(), heap_allocator());
+    if (wide_candidate.has_value() &&
+        CreateDirectoryW(wide_candidate->begin(), nullptr) != 0)
+    {
+      return candidate;
+    }
+    if (GetLastError() != ERROR_ALREADY_EXISTS) return None;
+  }
+
+  SetLastError(ERROR_FILE_EXISTS);
+  return None;
+}
+
 fn make_directory(StringView path, u32 mode) wontthrow -> bool
 {
   unused(mode);
@@ -1225,8 +1267,12 @@ fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>
     let target = drive.take();
 
     let filesystem_type = String{heap_allocator()};
+    let volume_name = String{heap_allocator()};
+    let volume_uuid = String{heap_allocator()};
+    wchar_t volume_name_buffer[MAX_PATH + 1]{};
     wchar_t type_buffer[MAX_PATH + 1]{};
-    if (GetVolumeInformationW(drives + position, nullptr, 0, nullptr, nullptr,
+    if (GetVolumeInformationW(drives + position, volume_name_buffer,
+                              countof(volume_name_buffer), nullptr, nullptr,
                               nullptr, type_buffer, countof(type_buffer)) != 0)
     {
       if (let const named = wide_to_utf8(
@@ -1234,16 +1280,55 @@ fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>
               heap_allocator());
           named.has_value())
         filesystem_type = named->clone();
+      if (let const named =
+              wide_to_utf8(volume_name_buffer,
+                           static_cast<usize>(lstrlenW(volume_name_buffer)),
+                           heap_allocator());
+          named.has_value())
+        volume_name = named->clone();
+    }
+
+    wchar_t volume_path[MAX_PATH + 1]{};
+    if (GetVolumeNameForVolumeMountPointW(drives + position, volume_path,
+                                          countof(volume_path)) != 0)
+    {
+      let const volume_path_length = static_cast<usize>(lstrlenW(volume_path));
+      usize uuid_start = 0;
+      usize uuid_end = volume_path_length;
+      for (usize index = 0; index < volume_path_length; index++) {
+        if (volume_path[index] == L'{') uuid_start = index + 1;
+        if (volume_path[index] == L'}') {
+          uuid_end = index;
+          break;
+        }
+      }
+      if (uuid_start < uuid_end) {
+        if (let const uuid =
+                wide_to_utf8(volume_path + uuid_start, uuid_end - uuid_start,
+                             heap_allocator());
+            uuid.has_value())
+          volume_uuid = uuid->clone();
+      }
     }
 
     let const options =
         String{drive_type_name(GetDriveTypeW(drives + position))};
     result.push(mounted_filesystem{target.clone(), steal(target),
-                                   steal(filesystem_type), steal(options)});
+                                   steal(filesystem_type), steal(options),
+                                   steal(volume_name), steal(volume_uuid)});
     position += drive_length + 1;
   }
 
   return result;
+}
+
+fn read_filesystem_error_counters(StringView path,
+                                  filesystem_error_counters &counters) throws
+    -> bool
+{
+  unused(path);
+  unused(counters);
+  return false;
 }
 
 fn sync_filesystems() wontthrow -> bool
@@ -1432,12 +1517,19 @@ fn stat_path_following(StringView path, file_status &status) wontthrow -> bool
   return resolved.has_value() && stat_path(resolved->text().view(), status);
 }
 
-fn execute_batched_syscalls(const batched_syscall *operations,
+namespace internal {
+
+fn execute_batch_operations(const batched_syscall *operations,
                             usize operation_count,
                             batched_syscall_result *results) wontthrow -> void
 {
   if (operation_count == 0) return;
   if (operations == nullptr || results == nullptr) return;
+  if (INTERRUPT_REQUESTED) {
+    for (usize index = 0; index < operation_count; index++)
+      results[index] = {operations[index].request_id, 0, EINTR};
+    return;
+  }
 
   for (usize index = 0; index < operation_count; index++) {
     let const &operation = operations[index];
@@ -1520,6 +1612,8 @@ fn execute_batched_syscalls(const batched_syscall *operations,
     default: result.error_number = EINVAL; break;
     }
   }
+}
+
 }
 
 fn format_mode_string(u32 mode) throws -> String

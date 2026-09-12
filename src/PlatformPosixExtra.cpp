@@ -1204,16 +1204,17 @@ static fn parse_decimal_words(StringView text, u64 *values,
 }
 
 static fn read_pressure_totals(const char *path, u64 &some_microseconds,
-                               u64 &full_microseconds) wontthrow -> bool
+                               u64 &full_microseconds, bool &has_some,
+                               bool &has_full) wontthrow -> void
 {
+  has_some = false;
+  has_full = false;
   char buffer[512];
   let const length = read_small_file(path, buffer, sizeof(buffer));
-  if (length == 0) return false;
+  if (length == 0) return;
 
   let const text = StringView{buffer, length};
   usize position = 0;
-  bool has_some = false;
-  bool has_full = false;
   while (position < text.length) {
     let const line = each_line(text, position);
     let const total_position = line.find_substring("total=");
@@ -1229,8 +1230,6 @@ static fn read_pressure_totals(const char *path, u64 &some_microseconds,
       has_full = true;
     }
   }
-
-  return has_some || has_full;
 }
 
 #endif
@@ -1263,8 +1262,10 @@ fn read_system_activity_status(system_activity_status &status) wontthrow -> bool
     status.page_input_bytes = vm.pageins * static_cast<u64>(page_bytes);
     status.page_output_bytes = vm.pageouts * static_cast<u64>(page_bytes);
     status.page_fault_count = vm.faults;
-    status.available_fields |= static_cast<u32>(system_activity_field::Paging) |
-                               static_cast<u32>(system_activity_field::Faults);
+    status.available_fields |=
+        static_cast<u32>(system_activity_field::PageInput) |
+        static_cast<u32>(system_activity_field::PageOutput) |
+        static_cast<u32>(system_activity_field::Faults);
   }
 
   return status.available_fields != 0;
@@ -1285,11 +1286,19 @@ fn read_system_activity_status(system_activity_status &status) wontthrow -> bool
           status.cpu_user_units = values[0] + values[1];
           status.cpu_system_units = values[2];
           status.cpu_idle_units = values[3];
-          if (value_count > 4) status.cpu_wait_units = values[4];
+          if (value_count > 4) {
+            status.cpu_wait_units = values[4];
+            status.available_fields |=
+                static_cast<u32>(system_activity_field::CpuWait);
+          }
           if (value_count > 6) {
             status.cpu_system_units += values[5] + values[6];
           }
-          if (value_count > 7) status.cpu_stolen_units = values[7];
+          if (value_count > 7) {
+            status.cpu_stolen_units = values[7];
+            status.available_fields |=
+                static_cast<u32>(system_activity_field::CpuStolen);
+          }
           status.available_fields |=
               static_cast<u32>(system_activity_field::Cpu);
         }
@@ -1298,14 +1307,14 @@ fn read_system_activity_status(system_activity_status &status) wontthrow -> bool
         if (!value.is_error()) {
           status.runnable_process_count = value.value();
           status.available_fields |=
-              static_cast<u32>(system_activity_field::Scheduler);
+              static_cast<u32>(system_activity_field::Runnable);
         }
       } else if (line.starts_with("procs_blocked ")) {
         let const value = leading_digits(line, 14).to<u64>();
         if (!value.is_error()) {
           status.blocked_process_count = value.value();
           status.available_fields |=
-              static_cast<u32>(system_activity_field::Scheduler);
+              static_cast<u32>(system_activity_field::Blocked);
         }
       }
     }
@@ -1325,22 +1334,71 @@ fn read_system_activity_status(system_activity_status &status) wontthrow -> bool
         u64 system_activity_status::*field;
         u64 multiplier;
         system_activity_field capability;
+        bool is_additive;
       };
       static constexpr vm_field FIELDS[] = {
-          {"pgpgin ",     &system_activity_status::page_input_bytes,       1024,
-           system_activity_field::Paging},
-          {"pgpgout ",    &system_activity_status::page_output_bytes,      1024,
-           system_activity_field::Paging},
-          {"pgfault ",    &system_activity_status::page_fault_count,       1,
-           system_activity_field::Faults},
-          {"pgmajfault ", &system_activity_status::major_page_fault_count, 1,
-           system_activity_field::Faults},
+          {"pgpgin ",             &system_activity_status::page_input_bytes,       1024,
+           system_activity_field::PageInput,       false},
+          {"pgpgout ",            &system_activity_status::page_output_bytes,      1024,
+           system_activity_field::PageOutput,      false},
+          {"pgfault ",            &system_activity_status::page_fault_count,       1,
+           system_activity_field::Faults,          false},
+          {"pgmajfault ",         &system_activity_status::major_page_fault_count, 1,
+           system_activity_field::MajorFaults,     false},
+          {"pgscan_kswapd ",      &system_activity_status::page_scan_count,        1,
+           system_activity_field::PageScan,        true },
+          {"pgscan_direct ",      &system_activity_status::page_scan_count,        1,
+           system_activity_field::PageScan,        true },
+          {"pgscan_khugepaged ",  &system_activity_status::page_scan_count,        1,
+           system_activity_field::PageScan,        true },
+          {"pgscan_proactive ",   &system_activity_status::page_scan_count,        1,
+           system_activity_field::PageScan,        true },
+          {"pgsteal_kswapd ",     &system_activity_status::page_steal_count,       1,
+           system_activity_field::PageSteal,       true },
+          {"pgsteal_direct ",     &system_activity_status::page_steal_count,       1,
+           system_activity_field::PageSteal,       true },
+          {"pgsteal_khugepaged ", &system_activity_status::page_steal_count,       1,
+           system_activity_field::PageSteal,       true },
+          {"pgsteal_proactive ",  &system_activity_status::page_steal_count,       1,
+           system_activity_field::PageSteal,       true },
+          {"compact_stall ",      &system_activity_status::compaction_stall_count, 1,
+           system_activity_field::CompactionStall, false},
+          {"nr_dirty ",           &system_activity_status::dirty_page_count,       1,
+           system_activity_field::DirtyPages,      false},
+          {"nr_writeback ",       &system_activity_status::writeback_page_count,   1,
+           system_activity_field::WritebackPages,  false},
+          {"oom_kill ",           &system_activity_status::oom_kill_count,         1,
+           system_activity_field::OomKills,        false},
       };
+      if (line.starts_with("allocstall_") || line.starts_with("allocstall ")) {
+        let const space_position = line.find_character(' ');
+        if (space_position.has_value()) {
+          let const value = leading_digits(line, *space_position + 1).to<u64>();
+          if (!value.is_error()) {
+            status.direct_reclaim_count =
+                status.direct_reclaim_count > UINT64_MAX - value.value()
+                    ? UINT64_MAX
+                    : status.direct_reclaim_count + value.value();
+            status.available_fields |=
+                static_cast<u32>(system_activity_field::DirectReclaim);
+          }
+        }
+        continue;
+      }
       for (let const &known : FIELDS) {
         if (!line.starts_with(known.name)) continue;
         let const value = leading_digits(line, known.name.length).to<u64>();
         if (!value.is_error()) {
-          status.*known.field = value.value() * known.multiplier;
+          let const scaled = value.value() > UINT64_MAX / known.multiplier
+                                 ? UINT64_MAX
+                                 : value.value() * known.multiplier;
+          if (known.is_additive) {
+            status.*known.field = status.*known.field > UINT64_MAX - scaled
+                                      ? UINT64_MAX
+                                      : status.*known.field + scaled;
+          } else {
+            status.*known.field = scaled;
+          }
           status.available_fields |= static_cast<u32>(known.capability);
         }
         break;
@@ -1348,25 +1406,38 @@ fn read_system_activity_status(system_activity_status &status) wontthrow -> bool
     }
   }
 
-  if (read_pressure_totals("/proc/pressure/cpu",
-                           status.cpu_some_stall_microseconds,
-                           status.cpu_some_stall_microseconds))
-  {
+  bool has_some = false;
+  bool has_full = false;
+  read_pressure_totals("/proc/pressure/cpu", status.cpu_some_stall_microseconds,
+                       status.cpu_full_stall_microseconds, has_some, has_full);
+  if (has_some) {
     status.available_fields |=
-        static_cast<u32>(system_activity_field::CpuStall);
+        static_cast<u32>(system_activity_field::CpuSomeStall);
   }
-  if (read_pressure_totals("/proc/pressure/memory",
-                           status.memory_some_stall_microseconds,
-                           status.memory_full_stall_microseconds))
-  {
+  if (has_full) {
     status.available_fields |=
-        static_cast<u32>(system_activity_field::MemoryStall);
+        static_cast<u32>(system_activity_field::CpuFullStall);
   }
-  if (read_pressure_totals("/proc/pressure/io",
-                           status.io_some_stall_microseconds,
-                           status.io_full_stall_microseconds))
-  {
-    status.available_fields |= static_cast<u32>(system_activity_field::IoStall);
+  read_pressure_totals(
+      "/proc/pressure/memory", status.memory_some_stall_microseconds,
+      status.memory_full_stall_microseconds, has_some, has_full);
+  if (has_some) {
+    status.available_fields |=
+        static_cast<u32>(system_activity_field::MemorySomeStall);
+  }
+  if (has_full) {
+    status.available_fields |=
+        static_cast<u32>(system_activity_field::MemoryFullStall);
+  }
+  read_pressure_totals("/proc/pressure/io", status.io_some_stall_microseconds,
+                       status.io_full_stall_microseconds, has_some, has_full);
+  if (has_some) {
+    status.available_fields |=
+        static_cast<u32>(system_activity_field::IoSomeStall);
+  }
+  if (has_full) {
+    status.available_fields |=
+        static_cast<u32>(system_activity_field::IoFullStall);
   }
 
   return status.available_fields != 0;
@@ -1409,6 +1480,21 @@ fn read_network_interface_statistics() throws
       if (::sysctl(data_mib, 6, &data, &data_length, nullptr, 0) == 0 &&
           data_length >= sizeof(data))
       {
+        u32 available_fields =
+            static_cast<u32>(network_statistics_field::ReceiveBytes) |
+            static_cast<u32>(network_statistics_field::TransmitBytes) |
+            static_cast<u32>(network_statistics_field::ReceivePackets) |
+            static_cast<u32>(network_statistics_field::TransmitPackets) |
+            static_cast<u32>(network_statistics_field::ReceiveErrors) |
+            static_cast<u32>(network_statistics_field::TransmitErrors) |
+            static_cast<u32>(network_statistics_field::TransmitDrops) |
+            static_cast<u32>(network_statistics_field::TransmitQueueLength) |
+            static_cast<u32>(network_statistics_field::TransmitQueueLimit);
+        if (data.ifmd_data.ifi_baudrate != 0) {
+          available_fields |=
+              static_cast<u32>(network_statistics_field::ReceiveLinkSpeed) |
+              static_cast<u32>(network_statistics_field::TransmitLinkSpeed);
+        }
         result.push(network_interface_statistics_entry{
             String{data.ifmd_name},
             data.ifmd_data.ifi_ibytes,
@@ -1419,13 +1505,11 @@ fn read_network_interface_statistics() throws
             data.ifmd_data.ifi_oerrors,
             0,
             data.ifmd_snd_drops,
-            static_cast<u32>(network_statistics_field::ReceiveBytes) |
-                static_cast<u32>(network_statistics_field::TransmitBytes) |
-                static_cast<u32>(network_statistics_field::ReceivePackets) |
-                static_cast<u32>(network_statistics_field::TransmitPackets) |
-                static_cast<u32>(network_statistics_field::ReceiveErrors) |
-                static_cast<u32>(network_statistics_field::TransmitErrors) |
-                static_cast<u32>(network_statistics_field::TransmitDrops),
+            data.ifmd_data.ifi_baudrate,
+            data.ifmd_data.ifi_baudrate,
+            data.ifmd_snd_len,
+            data.ifmd_snd_maxlen,
+            available_fields,
         });
       }
     }
@@ -1448,6 +1532,15 @@ fn read_network_interface_statistics() throws
     {
       continue;
     }
+    constexpr u32 AVAILABLE =
+        static_cast<u32>(network_statistics_field::ReceiveBytes) |
+        static_cast<u32>(network_statistics_field::TransmitBytes) |
+        static_cast<u32>(network_statistics_field::ReceivePackets) |
+        static_cast<u32>(network_statistics_field::TransmitPackets) |
+        static_cast<u32>(network_statistics_field::ReceiveErrors) |
+        static_cast<u32>(network_statistics_field::TransmitErrors) |
+        static_cast<u32>(network_statistics_field::ReceiveDrops) |
+        static_cast<u32>(network_statistics_field::TransmitDrops);
     result.push(network_interface_statistics_entry{
         String{line.substring_of_length(0, *colon_position).trim_blanks()},
         values[0],
@@ -1458,7 +1551,11 @@ fn read_network_interface_statistics() throws
         values[10],
         values[3],
         values[11],
-        UINT8_MAX,
+        0,
+        0,
+        0,
+        0,
+        AVAILABLE,
     });
   }
 #endif
@@ -1471,7 +1568,9 @@ fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool
   int name_mib[4] = {CTL_NET, PF_INET, IPPROTO_TCP, TCPCTL_STATS};
   struct tcpstat native{};
   usize native_length = sizeof(native);
-  if (::sysctl(name_mib, 4, &native, &native_length, nullptr, 0) != 0) {
+  if (::sysctl(name_mib, 4, &native, &native_length, nullptr, 0) != 0 ||
+      native_length < sizeof(native))
+  {
     return false;
   }
   statistics.active_open_count = native.tcps_connattempt;
@@ -1481,6 +1580,21 @@ fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool
   statistics.retransmitted_segment_count = native.tcps_sndrexmitpack;
   statistics.input_error_count = static_cast<u64>(native.tcps_rcvbadsum) +
                                  native.tcps_rcvbadoff + native.tcps_rcvshort;
+  statistics.connection_drop_count = native.tcps_conndrops + native.tcps_drops;
+  statistics.receive_memory_drop_count = native.tcps_rcvmemdrop;
+  statistics.listen_drop_count = native.tcps_listendrop;
+  statistics.retransmit_timeout_count = native.tcps_rexmttimeo;
+  statistics.available_fields =
+      static_cast<u32>(tcp_statistics_field::ActiveOpens) |
+      static_cast<u32>(tcp_statistics_field::PassiveOpens) |
+      static_cast<u32>(tcp_statistics_field::ReceivedSegments) |
+      static_cast<u32>(tcp_statistics_field::SentSegments) |
+      static_cast<u32>(tcp_statistics_field::RetransmittedSegments) |
+      static_cast<u32>(tcp_statistics_field::InputErrors) |
+      static_cast<u32>(tcp_statistics_field::ConnectionDrops) |
+      static_cast<u32>(tcp_statistics_field::ReceiveMemoryDrops) |
+      static_cast<u32>(tcp_statistics_field::ListenDrops) |
+      static_cast<u32>(tcp_statistics_field::RetransmitTimeouts);
   return true;
 #elif defined __linux__
   char buffer[32768];
@@ -1498,6 +1612,7 @@ fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool
       continue;
     }
 
+    bool has_statistics = false;
     usize name_position = 0;
     usize value_position = 4;
     while (name_position < header.length && value_position < line.length) {
@@ -1509,20 +1624,39 @@ fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool
       {
         StringView name;
         u64 tcp_statistics::*field;
+        tcp_statistics_field capability;
       };
       static constexpr tcp_field FIELDS[] = {
-          {"ActiveOpens",  &tcp_statistics::active_open_count          },
-          {"PassiveOpens", &tcp_statistics::passive_open_count         },
-          {"InSegs",       &tcp_statistics::received_segment_count     },
-          {"OutSegs",      &tcp_statistics::sent_segment_count         },
-          {"RetransSegs",  &tcp_statistics::retransmitted_segment_count},
-          {"InErrs",       &tcp_statistics::input_error_count          },
+          {"ActiveOpens",  &tcp_statistics::active_open_count,
+           tcp_statistics_field::ActiveOpens          },
+          {"PassiveOpens", &tcp_statistics::passive_open_count,
+           tcp_statistics_field::PassiveOpens         },
+          {"InSegs",       &tcp_statistics::received_segment_count,
+           tcp_statistics_field::ReceivedSegments     },
+          {"OutSegs",      &tcp_statistics::sent_segment_count,
+           tcp_statistics_field::SentSegments         },
+          {"RetransSegs",  &tcp_statistics::retransmitted_segment_count,
+           tcp_statistics_field::RetransmittedSegments},
+          {"InErrs",       &tcp_statistics::input_error_count,
+           tcp_statistics_field::InputErrors          },
+          {"AttemptFails", &tcp_statistics::attempt_failure_count,
+           tcp_statistics_field::AttemptFailures      },
+          {"EstabResets",  &tcp_statistics::established_reset_count,
+           tcp_statistics_field::EstablishedResets    },
+          {"CurrEstab",    &tcp_statistics::current_established_count,
+           tcp_statistics_field::CurrentEstablished   },
+          {"OutRsts",      &tcp_statistics::sent_reset_count,
+           tcp_statistics_field::SentResets           },
       };
       for (let const &known : FIELDS) {
-        if (name == known.name) statistics.*known.field = value;
+        if (name != known.name) continue;
+        statistics.*known.field = value;
+        statistics.available_fields |= static_cast<u32>(known.capability);
+        has_statistics = true;
+        break;
       }
     }
-    return true;
+    return has_statistics;
   }
   return false;
 #else
@@ -1639,11 +1773,10 @@ fn read_disk_io_snapshot(Allocator allocator) throws -> disk_io_snapshot
     if (status.available_fields != 0) snapshot.disks.push(steal(status));
   }
 #elif defined __linux__
-  char buffer[65536];
-  let const length = read_small_file("/proc/diskstats", buffer, sizeof(buffer));
-  if (length == 0) return snapshot;
+  let const contents = Path{"/proc/diskstats"}.read_entire_file();
+  if (!contents.has_value()) return snapshot;
 
-  let const text = StringView{buffer, length};
+  let const text = contents->view();
   usize position = 0;
   while (position < text.length) {
     let const line = each_line(text, position);
@@ -1657,33 +1790,49 @@ fn read_disk_io_snapshot(Allocator allocator) throws -> disk_io_snapshot
                                                 values, countof(values));
     if (value_count < 11) continue;
 
-    constexpr u32 AVAILABLE =
-        static_cast<u32>(disk_io_field::ReadBytes) |
-        static_cast<u32>(disk_io_field::WrittenBytes) |
-        static_cast<u32>(disk_io_field::ReadOperations) |
-        static_cast<u32>(disk_io_field::WriteOperations) |
-        static_cast<u32>(disk_io_field::ReadTime) |
-        static_cast<u32>(disk_io_field::WriteTime) |
-        static_cast<u32>(disk_io_field::BusyTime) |
-        static_cast<u32>(disk_io_field::WeightedBusyTime) |
-        static_cast<u32>(disk_io_field::QueueDepth);
+    let const do_scale = [](u64 value, u64 multiplier) wontthrow -> Maybe<u64> {
+      if (value > UINT64_MAX / multiplier) return None;
+      return value * multiplier;
+    };
+    let const read_bytes = do_scale(values[2], 512);
+    let const written_bytes = do_scale(values[6], 512);
+    let const read_time = do_scale(values[3], 1000000);
+    let const write_time = do_scale(values[7], 1000000);
+    let const busy_time = do_scale(values[9], 1000000);
+    let const weighted_busy_time = do_scale(values[10], 1000000);
+    u32 available_fields = static_cast<u32>(disk_io_field::ReadOperations) |
+                           static_cast<u32>(disk_io_field::WriteOperations) |
+                           static_cast<u32>(disk_io_field::QueueDepth);
+    if (read_bytes.has_value())
+      available_fields |= static_cast<u32>(disk_io_field::ReadBytes);
+    if (written_bytes.has_value())
+      available_fields |= static_cast<u32>(disk_io_field::WrittenBytes);
+    if (read_time.has_value())
+      available_fields |= static_cast<u32>(disk_io_field::ReadTime);
+    if (write_time.has_value())
+      available_fields |= static_cast<u32>(disk_io_field::WriteTime);
+    if (busy_time.has_value())
+      available_fields |= static_cast<u32>(disk_io_field::BusyTime);
+    if (weighted_busy_time.has_value()) {
+      available_fields |= static_cast<u32>(disk_io_field::WeightedBusyTime);
+    }
     snapshot.disks.push(disk_io_status{
         String{allocator, name},
-        values[2] * 512,
-        values[6] * 512,
+        read_bytes.value_or(0),
+        written_bytes.value_or(0),
         values[0],
         values[4],
-        values[3] * 1000000,
-        values[7] * 1000000,
-        values[9] * 1000000,
+        read_time.value_or(0),
+        write_time.value_or(0),
+        busy_time.value_or(0),
         0,
-        values[10] * 1000000,
+        weighted_busy_time.value_or(0),
         values[8],
         0,
         0,
         0,
         0,
-        AVAILABLE,
+        available_fields,
     });
   }
 #endif

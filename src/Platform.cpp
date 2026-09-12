@@ -33,6 +33,7 @@ static fn is_trappable_signal(i32 signal_number) wontthrow -> bool;
 #include "PlatformPosixExtra.cpp"
 #include "PlatformPosix.cpp"
 #include "PlatformPosixFilesystem.cpp"
+#include "PlatformPosixFilesystemExtra.cpp"
 #include "PlatformPosixProcess.cpp"
 /* clang-format on */
 #elif KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32

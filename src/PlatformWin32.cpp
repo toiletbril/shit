@@ -908,6 +908,18 @@ fn read_network_interface_statistics() throws
   defer { FreeMibTable(table); };
 
   result.reserve(table->NumEntries);
+  constexpr u32 AVAILABLE =
+      static_cast<u32>(network_statistics_field::ReceiveBytes) |
+      static_cast<u32>(network_statistics_field::TransmitBytes) |
+      static_cast<u32>(network_statistics_field::ReceivePackets) |
+      static_cast<u32>(network_statistics_field::TransmitPackets) |
+      static_cast<u32>(network_statistics_field::ReceiveErrors) |
+      static_cast<u32>(network_statistics_field::TransmitErrors) |
+      static_cast<u32>(network_statistics_field::ReceiveDrops) |
+      static_cast<u32>(network_statistics_field::TransmitDrops) |
+      static_cast<u32>(network_statistics_field::ReceiveLinkSpeed) |
+      static_cast<u32>(network_statistics_field::TransmitLinkSpeed) |
+      static_cast<u32>(network_statistics_field::TransmitQueueLength);
   for (ULONG index = 0; index < table->NumEntries; index++) {
     let const &row = table->Table[index];
     let const interface_name = wide_to_utf8(
@@ -924,7 +936,11 @@ fn read_network_interface_statistics() throws
         row.OutErrors,
         row.InDiscards,
         row.OutDiscards,
-        UINT8_MAX,
+        row.ReceiveLinkSpeed,
+        row.TransmitLinkSpeed,
+        row.OutQLen,
+        0,
+        AVAILABLE,
     });
   }
 
@@ -945,6 +961,21 @@ fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool
     statistics.sent_segment_count += native.dwOutSegs;
     statistics.retransmitted_segment_count += native.dwRetransSegs;
     statistics.input_error_count += native.dwInErrs;
+    statistics.attempt_failure_count += native.dwAttemptFails;
+    statistics.established_reset_count += native.dwEstabResets;
+    statistics.current_established_count += native.dwCurrEstab;
+    statistics.sent_reset_count += native.dwOutRsts;
+    statistics.available_fields |=
+        static_cast<u32>(tcp_statistics_field::ActiveOpens) |
+        static_cast<u32>(tcp_statistics_field::PassiveOpens) |
+        static_cast<u32>(tcp_statistics_field::ReceivedSegments) |
+        static_cast<u32>(tcp_statistics_field::SentSegments) |
+        static_cast<u32>(tcp_statistics_field::RetransmittedSegments) |
+        static_cast<u32>(tcp_statistics_field::InputErrors) |
+        static_cast<u32>(tcp_statistics_field::AttemptFailures) |
+        static_cast<u32>(tcp_statistics_field::EstablishedResets) |
+        static_cast<u32>(tcp_statistics_field::CurrentEstablished) |
+        static_cast<u32>(tcp_statistics_field::SentResets);
     has_statistics = true;
   }
 

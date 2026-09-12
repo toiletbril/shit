@@ -5,7 +5,8 @@ ARCH ?= $(shell uname -m)
 NO_TOILETLINE ?= 0
 
 ROUTED_SOURCES := PlatformPosix.cpp PlatformPosixExtra.cpp \
-	PlatformPosixFilesystem.cpp PlatformPosixProcess.cpp PlatformWin32.cpp \
+	PlatformPosixFilesystem.cpp PlatformPosixFilesystemExtra.cpp \
+	PlatformPosixProcess.cpp PlatformWin32.cpp \
 	PlatformWin32Filesystem.cpp PlatformWin32Process.cpp
 SOURCES := $(filter-out $(ROUTED_SOURCES),$(wildcard *.cpp))
 HEADERS := $(wildcard *.hpp)
