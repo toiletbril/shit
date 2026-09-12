@@ -220,43 +220,31 @@ pure fn directory_entry_name_has_casefold_prefix(StringView name,
   return true;
 }
 
-fn read_directory_cached(const Path &directory, directory_validation validation,
-                         directory_listing_order order) throws
+static fn apply_directory_listing_order(cached_directory_listing &listing,
+                                        directory_listing_order order) throws
     -> const ArrayList<Path::directory_child> *
 {
-  let const do_apply_order =
-      [&](cached_directory_listing &listing)
-          throws -> const ArrayList<Path::directory_child> * {
-    if (order == directory_listing_order::FoldedName && !listing.is_sorted) {
+  if (order == directory_listing_order::FoldedName && !listing.is_sorted) {
 #if !defined NDEBUG
-      DEBUG_DIRECTORY_SORT_COUNT++;
+    DEBUG_DIRECTORY_SORT_COUNT++;
 #endif
-      listing.entries.sort([](const Path::directory_child &left,
-                              const Path::directory_child &right) {
-        return directory_entry_name_is_less(left.name.view(),
-                                            right.name.view());
-      });
-      listing.is_sorted = true;
-    }
-
-    return &listing.entries;
-  };
-
-  let const key = directory.text().view();
-  let *alias = DIR_LISTING_ALIASES.find(key);
-  if (validation == directory_validation::Cached && alias != nullptr &&
-      alias->validation_epoch == DIRECTORY_VALIDATION_EPOCH &&
-      alias->observed_generation ==
-          DIR_LISTINGS[alias->listing_position].generation)
-  {
-    return do_apply_order(DIR_LISTINGS[alias->listing_position]);
+    listing.entries.sort([](const Path::directory_child &left,
+                            const Path::directory_child &right) {
+      return directory_entry_name_is_less(left.name.view(), right.name.view());
+    });
+    listing.is_sorted = true;
   }
 
-#if !defined NDEBUG
-  DEBUG_DIRECTORY_STAT_COUNT++;
-#endif
-  os::file_status status{};
-  let const has_status = os::stat_path_following(key, status);
+  return &listing.entries;
+}
+
+static fn read_directory_cached_after_status(const Path &directory,
+                                             directory_listing_order order,
+                                             const os::file_status &status,
+                                             bool has_status) throws
+    -> const ArrayList<Path::directory_child> *
+{
+  let const key = directory.text().view();
   let physical_position = Maybe<usize>{};
   if (has_status && status.has_file_identity) {
     let const identity_key =
@@ -275,7 +263,7 @@ fn read_directory_cached(const Path &directory, directory_validation validation,
         cached.size == status.size)
     {
       set_directory_listing_alias(key, *physical_position);
-      return do_apply_order(cached);
+      return apply_directory_listing_order(cached, order);
     }
   }
 
@@ -355,7 +343,32 @@ fn read_directory_cached(const Path &directory, directory_validation validation,
   }
   set_directory_listing_alias(key, *physical_position);
 
-  return do_apply_order(DIR_LISTINGS[*physical_position]);
+  return apply_directory_listing_order(DIR_LISTINGS[*physical_position], order);
+}
+
+fn read_directory_cached(const Path &directory, directory_validation validation,
+                         directory_listing_order order) throws
+    -> const ArrayList<Path::directory_child> *
+{
+  let const key = directory.text().view();
+  let *alias = DIR_LISTING_ALIASES.find(key);
+  if (validation == directory_validation::Cached && alias != nullptr &&
+      alias->validation_epoch == DIRECTORY_VALIDATION_EPOCH &&
+      alias->observed_generation ==
+          DIR_LISTINGS[alias->listing_position].generation)
+  {
+    return apply_directory_listing_order(DIR_LISTINGS[alias->listing_position],
+                                         order);
+  }
+
+#if !defined NDEBUG
+  DEBUG_DIRECTORY_STAT_COUNT++;
+#endif
+  os::file_status status{};
+  let const has_status = os::stat_path_following(key, status);
+
+  return read_directory_cached_after_status(directory, order, status,
+                                            has_status);
 }
 
 fn directory_entry_kind(const Path &directory,
@@ -550,16 +563,51 @@ fn ProgramResolver::working_directory_changed() throws -> void
     }
 }
 
+static fn
+collect_directory_generations(const ArrayList<String> &directory_texts) throws
+    -> ArrayList<u64>
+{
+  let directories = ArrayList<Path>{heap_allocator()};
+  let statuses = ArrayList<os::file_status>{heap_allocator()};
+  let batch = os::Batch{heap_allocator()};
+  directories.reserve(directory_texts.count());
+  statuses.reserve(directory_texts.count());
+  batch.reserve(directory_texts.count());
+
+  for (let const &directory_text : directory_texts) {
+    directories.push(Path{directory_text.view()});
+    statuses.push({});
+  }
+
+  for (usize index = 0; index < directories.count(); index++)
+    batch.add(os::batch_operation::stat(directories[index], statuses[index]));
+
+  let const results = batch.execute();
+  for (let const &result : results)
+    if (result.error_number == EINTR)
+      throw InterruptErrorWithLocation{SourceLocation{}};
+
+#if !defined NDEBUG
+  DEBUG_DIRECTORY_STAT_COUNT += results.count();
+#endif
+  let generations = ArrayList<u64>{heap_allocator()};
+  generations.reserve(directories.count());
+  for (usize index = 0; index < directories.count(); index++) {
+    let const entries = read_directory_cached_after_status(
+        directories[index], directory_listing_order::Unsorted, statuses[index],
+        results[index].error_number == 0);
+    generations.push(entries == nullptr
+                         ? 0
+                         : directory_listing_generation(directories[index]));
+  }
+
+  return generations;
+}
+
 fn ProgramResolver::refresh_path_directory_generations() throws -> void
 {
-  m_path_directory_generations.clear();
-  for (let const &directory_text : get_index_path_dirs()) {
-    let const directory = Path{directory_text.view()};
-    let const entries =
-        read_directory_cached(directory, directory_validation::Validate);
-    m_path_directory_generations.push(
-        entries == nullptr ? 0 : directory_listing_generation(directory));
-  }
+  m_path_directory_generations =
+      collect_directory_generations(get_index_path_dirs());
   m_path_directory_generations_are_valid = true;
   m_path_directories_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
 }
@@ -691,22 +739,17 @@ fn ProgramResolver::validate_path_directory_generations() throws -> bool
   bool did_change =
       !m_path_directory_generations_are_valid ||
       m_path_directory_generations.count() != get_index_path_dirs().count();
-  let observed_generations = ArrayList<u64>{heap_allocator()};
-  observed_generations.reserve(get_index_path_dirs().count());
-  usize directory_position = 0;
-  for (let const &directory_text : get_index_path_dirs()) {
-    let const directory = Path{directory_text.view()};
-    let const entries =
-        read_directory_cached(directory, directory_validation::Validate);
-    let const generation =
-        entries == nullptr ? 0 : directory_listing_generation(directory);
+  let observed_generations =
+      collect_directory_generations(get_index_path_dirs());
+  for (usize directory_position = 0;
+       directory_position < observed_generations.count(); directory_position++)
+  {
     if (directory_position >= m_path_directory_generations.count() ||
-        m_path_directory_generations[directory_position] != generation)
+        m_path_directory_generations[directory_position] !=
+            observed_generations[directory_position])
     {
       did_change = true;
     }
-    observed_generations.push(generation);
-    directory_position++;
   }
   m_path_directory_generations = steal(observed_generations);
   m_path_directory_generations_are_valid = true;
