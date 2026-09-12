@@ -87,7 +87,7 @@ fn append_network_interface_report(String &output, bool should_color,
   return addresses.count();
 }
 
-fn append_network_traffic_report(String &output, String &warnings,
+fn append_network_traffic_report(String &output, ArrayList<String> &warnings,
                                  Allocator allocator, bool should_color) throws
     -> usize
 {
@@ -207,14 +207,15 @@ fn append_network_traffic_report(String &output, String &warnings,
       let message = String{allocator, entry.interface_name.view()};
       message += " reports ";
       message += warning.view();
-      append_report_warning(warnings, message.view(), should_color);
+      warnings.push(steal(message));
     }
   }
 
   return statistics.count();
 }
 
-fn append_tcp_report(String &output, String &warnings, Allocator allocator,
+fn append_tcp_report(String &output, ArrayList<String> &warnings,
+                     Allocator allocator,
                      bool should_color) throws -> bool
 {
   os::tcp_statistics statistics{};
@@ -334,7 +335,7 @@ fn append_tcp_report(String &output, String &warnings, Allocator allocator,
   if (!warning.is_empty()) {
     let message = String{allocator, "TCP counters include "};
     message += warning.view();
-    append_report_warning(warnings, message.view(), should_color);
+    warnings.push(steal(message));
   }
 
   return true;
@@ -367,7 +368,7 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};
-  let warnings = String{allocator};
+  let warnings = ArrayList<String>{allocator};
   let const should_color = colors::stdout_wants_color();
   let const should_show_sections = FLAG_EVILNET_ALL.is_enabled();
   if (should_show_sections) {
@@ -384,16 +385,13 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
                                                   should_color);
     has_tcp_statistics =
         append_tcp_report(output, warnings, allocator, should_color);
-    if (!warnings.is_empty()) {
-      output += "\n";
-      append_report_text(output, "WARNINGS", colors::ansi::BOLD_BLUE,
-                         should_color);
-      output += "\n";
-      append_report_body(output, warnings.view());
-    }
   }
 
   ec.print_to_stdout(output);
+  for (let const &warning : warnings) {
+    show_message(Warning{warning.view()}.to_string());
+  }
+
   return address_count == 0 && (!FLAG_EVILNET_ALL.is_enabled() ||
                                 (traffic_count == 0 && !has_tcp_statistics))
              ? 1

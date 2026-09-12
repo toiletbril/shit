@@ -1090,17 +1090,6 @@ fn append_report_inline_field(String &output, StringView name, StringView value,
   output += value;
 }
 
-fn append_report_warning(String &output, StringView text,
-                         bool should_color) throws -> void
-{
-  if (text.is_empty()) return;
-
-  append_report_text(output, "Warning", colors::ansi::BOLD_RED, should_color);
-  output += ": ";
-  output += text;
-  output += '\n';
-}
-
 static pure fn report_indentation_width(StringView indentation) wontthrow
     -> usize
 {

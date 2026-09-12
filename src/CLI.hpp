@@ -334,8 +334,6 @@ fn append_report_field(String &output, StringView name, StringView value,
 fn append_report_inline_field(String &output, StringView name, StringView value,
                               StringView style, bool should_color) throws
     -> void;
-fn append_report_warning(String &output, StringView text,
-                         bool should_color) throws -> void;
 fn append_report_name_section(String &output, StringView title,
                               const ArrayList<StringView> &names,
                               bool should_color,

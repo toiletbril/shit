@@ -125,7 +125,8 @@ case $network_report in
 esac
 printf 'evilnet-single-title=%s\n' "$network_title"
 
-network_all_report=$("$BIN" -c 'koshkit evilnet --all')
+network_all_report=$("$BIN" -c 'koshkit evilnet --all' \
+  2> "$TEST_NULL_DEVICE")
 case $network_all_report in
   INTERFACES*) network_all_title=present ;;
   *) network_all_title=missing ;;
