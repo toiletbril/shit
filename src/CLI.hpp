@@ -241,15 +241,18 @@ public:
 
   FlagOptionalValue(FlagList &flags, char short_name, StringView long_name,
                     flag_section section, StringView description,
-                    value_acceptor should_accept_value);
+                    value_acceptor should_accept_value,
+                    StringView value_name = "...");
   FlagOptionalValue(char short_name, StringView long_name, flag_section section,
-                    StringView description, value_acceptor should_accept_value);
+                    StringView description, value_acceptor should_accept_value,
+                    StringView value_name = "...");
 
   fn enable() wontthrow -> void;
   fn set(StringView value) throws -> void;
   pure fn is_enabled() const wontthrow -> bool;
   pure fn has_value() const wontthrow -> bool;
   pure fn value() const wontthrow -> StringView;
+  pure fn value_name() const wontthrow -> StringView;
   pure fn should_accept_value(StringView value) const wontthrow -> bool;
 
   fn reset() throws -> void;
@@ -259,6 +262,7 @@ private:
   bool m_has_value{false};
   String m_value{heap_allocator()};
   value_acceptor m_should_accept_value;
+  StringView m_value_name;
 };
 
 /* operand_value_flag names the one flag whose value is read from the first

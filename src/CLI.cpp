@@ -214,18 +214,20 @@ fn FlagManyStrings::reset() throws -> void
 FlagOptionalValue::FlagOptionalValue(char short_name, StringView long_name,
                                      flag_section section,
                                      StringView description,
-                                     value_acceptor should_accept_value)
+                                     value_acceptor should_accept_value,
+                                     StringView value_name)
     : Flag(Flag::Kind::OptionalValue, short_name, long_name, section,
            description),
-      m_should_accept_value(should_accept_value)
+      m_should_accept_value(should_accept_value), m_value_name(value_name)
 {}
 
 FlagOptionalValue::FlagOptionalValue(FlagList &flags, char short_name,
                                      StringView long_name, flag_section section,
                                      StringView description,
-                                     value_acceptor should_accept_value)
+                                     value_acceptor should_accept_value,
+                                     StringView value_name)
     : FlagOptionalValue(short_name, long_name, section, description,
-                        should_accept_value)
+                        should_accept_value, value_name)
 {
   flags.push(this);
 }
@@ -257,6 +259,11 @@ pure fn FlagOptionalValue::has_value() const wontthrow -> bool
 pure fn FlagOptionalValue::value() const wontthrow -> StringView
 {
   return m_value.view();
+}
+
+pure fn FlagOptionalValue::value_name() const wontthrow -> StringView
+{
+  return m_value_name;
 }
 
 pure fn FlagOptionalValue::should_accept_value(StringView value) const wontthrow
@@ -1291,7 +1298,12 @@ cold fn make_flag_help(const FlagList &flags, bool should_color) throws
       switch (f->kind()) {
       case koshka::Flag::Kind::String: flag_value += "=<...>"; break;
       case koshka::Flag::Kind::ManyStrings: flag_value += "=<.., ..>"; break;
-      case koshka::Flag::Kind::OptionalValue: flag_value += "[=<...>]"; break;
+      case koshka::Flag::Kind::OptionalValue: {
+        flag_value += "[=<";
+        flag_value += static_cast<const FlagOptionalValue *>(f)->value_name();
+        flag_value += ">]";
+        break;
+      }
       case koshka::Flag::Kind::Bool:
       case koshka::Flag::Kind::RepeatedBool: break;
       }

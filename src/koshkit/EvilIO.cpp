@@ -36,7 +36,8 @@ static koshka::FlagOptionalValue FLAG_EVILIO_CUMULATIVE{
     "cumulative",
     koshka::flag_section::NoSection,
     "Show sampled activity over an optional number of seconds.",
-    is_evilio_sample_duration};
+    is_evilio_sample_duration,
+    "seconds"};
 FLAG(EVILIO_PS, Bool, '\0', "ps", "Show every visible process.");
 FLAG(EVILIO_LIVE, Bool, 'l', "live",
      "Refresh rate and IOPS samples until interrupted.");

@@ -80,7 +80,7 @@ printf 'evilio-disk-row=%s\n' "$disk_row_layout"
 
 evilio_help=$("$BIN" -c 'koshkit evilio --help')
 case $evilio_help in
-  *--cumulative*seconds*) cumulative_help=seconds ;;
+  *"--cumulative[=<seconds>]"*) cumulative_help=named-seconds ;;
   *) cumulative_help=unclear ;;
 esac
 printf 'evilio-cumulative-help=%s\n' "$cumulative_help"
