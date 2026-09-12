@@ -35,6 +35,39 @@ koshkit file -M magic-continuation magic-child
 printf '%s\n' 'invalid line' '0 string hello greeting' > magic-malformed
 printf hello > magic-hello
 koshkit file -M magic-malformed magic-hello
+
+format_rows='png|\211PNG\r\n\032\n
+jpeg|\377\330\377
+gzip|\037\213
+xz|\3757zXZ\0
+zip|PK\003\004
+pdf|%PDF-
+sqlite|SQLite format 3\0
+wasm|\0asm
+llvm|BC\300\336
+java|\312\376\272\276\0\0\0\075
+universal|\312\376\272\276\0\0\0\001
+webp|RIFF\0\0\0\0WEBP
+avif|\0\0\0\0ftypavif
+matroska|\032E\337\243matroska
+flac|fLaC
+ogg|OggS
+midi|MThd\0\0\0\006
+postgres|PGDMP
+git-pack|PACK
+flash|FWS'
+old_ifs=$IFS
+IFS='
+'
+for format_row in $format_rows; do
+  format_name=${format_row%%|*}
+  format_bytes=${format_row#*|}
+  printf '%b' "$format_bytes" > "$format_name"
+done
+IFS=$old_ifs
+koshkit file png jpeg gzip xz zip pdf sqlite wasm llvm java universal webp \
+  avif matroska flac ogg midi postgres git-pack flash
+
 koshkit strings binary
 koshkit strings -n 2 -t d binary
 koshkit od -An -tx1 text

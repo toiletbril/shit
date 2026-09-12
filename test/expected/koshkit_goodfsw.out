@@ -1,0 +1,29 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "goodfsw"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "missing-path=$?"]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "goodfsw"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "missing-path="
+  Variable "?"
+]
+missing-path=2

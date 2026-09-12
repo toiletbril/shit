@@ -148,11 +148,12 @@ complete -F _kosh_fc_complete fc
 complete -W '-r -R -p --help' hash
 complete -c -W '--help --posix -p -R' time
 
-_koshkit_utils="basename bc cal calc cat chgrp chmod chown cksum cmp comm cp csplit cut date \
-df diff dirname du env expand expr file find flock fold fuser getconf grep head id killall link ln locale \
-logger logname ls make man mkdir mkfifo more mv nice nl nohup nproc od paste pathchk pkill pr printenv ps \
-readlink realpath renice rm rmdir sed seq sleep sort split strings stty tabs tail tee timeout touch tput \
-tr tsort tty uname unexpand uniq unlink wc which who whoami xargs yes"
+_koshkit_utils="basename bc cal calc cat chgrp chmod chown cksum cmp comm cp csplit cut date df diff \
+dirname du env evil evildisk evilfiles evilfs evilio evillogs evilnet evilps evilss expand expr file find flock \
+fold fuser getconf goodcore goodfsw goodnode goodstat grep head id killall link ln locale logger logname ls make man mkdir mkfifo more \
+mv nice nl nohup nproc od paste pathchk pkill pr printenv ps readlink realpath renice retry rm rmdir sed seq \
+sleep sort split stat strings stty sync tabs tail tee timeout touch tput tr tsort tty uname unexpand uniq \
+unlink watch wc which who whoami xargs yes"
 
 _koshkit_util_flags()
 {
@@ -163,7 +164,19 @@ _koshkit_util_flags()
     cut)           echo "-b --bytes -c --characters -f --fields -d --delimiter -n --no-split -s --only-delimited" ;;
     diff)          echo "-u --unified -w --ignore-all-space -a --text -L --label" ;;
     file)          echo "-d --default-tests -h --no-dereference -i --regular-only -L --dereference -m --magic-file -M --magic-only" ;;
-    ls)            echo "-a -A -1 -l -h" ;;
+    evil)          echo "-a --all -s --short --color" ;;
+    goodcore)      echo "-p --pid -b --binary -o --output -q --quiet --no-compress" ;;
+    evildisk)      echo "-a --all --color" ;;
+    evilfiles)     echo "-t --terse -p --pid -u --user -c --command" ;;
+    evilfs)        echo "-a --all" ;;
+    evilio)        echo "-a --all --cumulative --ps -n --count -p --pid --color" ;;
+    evillogs)      echo "--cores --logs" ;;
+    evilnet)       echo "-a --all" ;;
+    goodnode)      echo "-i --inode -r --root --color" ;;
+    evilps)        echo "-p --show-pids -n --numeric-sort -a --arguments -U --show-owner -C --cpu -M --memory --sort" ;;
+    goodstat)      echo "-L --dereference --color" ;;
+    goodfsw)       echo "-r --recursive -t --timestamp -x --event-flags -1 --one-event -l --latency -e --exclude" ;;
+    ls)            echo "-a -A -1 -l -h -F -t -S -r -R -L --classify --recursive --level --tree --color" ;;
     nproc)         echo "--all --ignore=" ;;
     ln)            echo "-s -f -L -P" ;;
     locale)        echo "-a --all-locales -m --charmaps -c --category-name -k --keyword-name" ;;
@@ -196,6 +209,11 @@ _koshkit_util_flags()
     fuser)         echo "-c -f -u" ;;
     readlink)      echo "-n" ;;
     ps)            echo "-a -u -x -w" ;;
+    retry)         echo "-n --attempts -d --delay -b --backoff -m --max-delay -q --quiet" ;;
+    evilss)        echo "-4 -a -H -l -n -p -t -u -6" ;;
+    stat)          echo "-L --dereference -f --file-system -t --terse -c --format --printf" ;;
+    sync)          echo "-d --data -f --file-system" ;;
+    watch)         echo "-n --interval -t --no-title -g --chgexit -e --errexit -x --exec" ;;
     which)         echo "-a --all -q --quiet" ;;
     *)             echo "" ;;
   esac

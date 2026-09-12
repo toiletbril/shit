@@ -1,0 +1,82 @@
+--- plain ---
+bad-link
+empty
+good-link
+plain.txt
+run.sh
+sized
+sub
+--- classify ---
+bad-link@
+empty/
+good-link@
+plain.txt
+run.sh*
+sized/
+sub/
+--- reverse name ---
+sub
+sized
+run.sh
+plain.txt
+good-link
+empty
+bad-link
+--- sort by size ---
+large
+medium
+small
+--- sort by size reversed ---
+small
+medium
+large
+--- color never is bare ---
+bad-link@
+empty/
+good-link@
+plain.txt
+run.sh*
+sized/
+sub/
+--- color always ---
+^[[1;31mbad-link^[[0m@
+^[[1;34mempty^[[0m/
+^[[1;36mgood-link^[[0m@
+plain.txt
+^[[1;32mrun.sh^[[0m*
+^[[1;34msized^[[0m/
+^[[1;34msub^[[0m/
+--- redirected output carries no escape ---
+bad-link@
+empty/
+good-link@
+plain.txt
+run.sh*
+sized/
+sub/
+--- tree ---
+sub
+├── deep
+│   └── leaf.txt
+└── inner.txt
+--- tree bounded to one level ---
+sub
+├── deep
+└── inner.txt
+--- recursive ---
+sub:
+deep
+inner.txt
+
+sub/deep:
+leaf.txt
+--- recursive bounded to one level ---
+sub:
+deep
+inner.txt
+--- recursive reaches an empty directory ---
+empty:
+--- invalid level ---
+rc=2
+--- invalid color ---
+rc=2

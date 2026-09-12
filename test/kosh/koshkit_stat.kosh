@@ -1,0 +1,8 @@
+(
+  cd "$TEST_TEMP_DIRECTORY" || exit
+  printf data > stat-file
+  printf more > stat-file-two
+  koshkit ln -sf stat-file stat-link
+  koshkit stat -c '%n=%s' stat-file stat-file-two
+  koshkit stat -c '%n=%F' stat-file stat-link
+)

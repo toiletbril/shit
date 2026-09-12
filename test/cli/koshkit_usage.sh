@@ -1,7 +1,5 @@
-# A builtin or a utility that is missing a required argument renders a located
-# error followed by a note that points at the help, the same caret in every
-# mood. Each case is a fixed error path that delivers no real signal and touches
-# no file.
+# A missing required argument reports its location and points to the help.
+# These fixed error cases do not send signals or modify files.
 unset KOSH_FLAGS
 
 echo "--- builtin getopts with no arguments ---"
@@ -17,7 +15,15 @@ echo "--- koshkit cp with one operand ---"
 "$BIN" -c 'koshkit cp onlyone' 2>&1; echo "rc=$?"
 echo "--- koshkit grep with no pattern ---"
 "$BIN" -c 'koshkit grep' 2>&1; echo "rc=$?"
-echo "--- the note is located in the bash mood too ---"
+for utility in goodcore goodfsw goodnode goodstat retry stat watch; do
+  echo "--- koshkit $utility with no required argument ---"
+  "$BIN" -c "koshkit $utility" 2>&1; echo "rc=$?"
+done
+echo "--- koshkit sync data mode with no file ---"
+"$BIN" -c 'koshkit sync -d' 2>&1; echo "rc=$?"
+echo "--- koshkit sync filesystem mode with no file ---"
+"$BIN" -c 'koshkit sync -f' 2>&1; echo "rc=$?"
+echo "--- the bash mood locates the note ---"
 "$BIN" --mood bash -c 'koshkit mkdir' 2>&1; echo "rc=$?"
-echo "--- and in the sh mood ---"
+echo "--- the sh mood locates the note ---"
 "$BIN" --mood sh -c 'koshkit mkdir' 2>&1; echo "rc=$?"

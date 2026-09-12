@@ -1,0 +1,36 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "retry" "-n" "2" "-d" "0" "-q" "printf" "retry-ok"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo"]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "retry"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "-q"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Unquoted "retry-ok"
+]
+[Word
+  Unquoted "echo"
+]
+retry-ok

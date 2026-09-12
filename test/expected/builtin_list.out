@@ -3,6 +3,8 @@
     [SimpleCommand "builtin" "--list"]
   [CompoundListCondition, None]
     [SimpleCommand "builtin"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit"]
 [Word
   Unquoted "builtin"
 ]
@@ -11,6 +13,9 @@
 ]
 [Word
   Unquoted "builtin"
+]
+[Word
+  Unquoted "koshkit"
 ]
 .
 :
@@ -81,15 +86,49 @@ wait
 z
 Koshka has 67 builtins:
 
-  .           :           [           alias       assimilate  bench
-  bg          bind        break       builtin     caller      cd
-  command     compgen     complete    compopt     continue    declare
-  dirs        disown      echo        enable      eval        exec
-  exit        export      false       fc          fg          getopts
-  hash        help        history     jobs        kill        koshkit
-  let         local       logout      mapfile     newgrp      popd
-  printf      pushd       pwd         read        readarray   readonly
-  return      set         shift       shopt       source      suspend
-  test        time        times       trap        true        type
-  typeset     ulimit      umask       unalias     unset       wait
-  z
+POSIX
+  .         :         [         alias     bg        break     cd
+  command   continue  echo      eval      exec      exit      export
+  false     fc        fg        getopts   hash      jobs      kill
+  newgrp    printf    pwd       read      readonly  return    set
+  shift     test      times     trap      true      type      ulimit
+  umask     unalias   unset     wait
+
+BASH
+  bind       builtin    caller     compgen    complete   compopt    declare
+  dirs       disown     enable     help       history    let        local
+  logout     mapfile    popd       pushd      readarray  shopt      source
+  suspend    time       typeset
+
+Koshka
+  assimilate  bench       koshkit     z
+
+DESCRIPTION
+  The koshkit builtin runs a bundled utility.
+
+SYNOPSIS
+  koshkit [utility] [arg ...]
+  koshkit --list
+  koshkit --assimilate DIR
+
+UTILITIES
+
+  POSIX
+    basename  bc        cal       calc      cat       chgrp     chmod
+    chown     cksum     cmp       comm      cp        csplit    cut
+    date      df        diff      dirname   du        env       expand
+    expr      file      find      flock     fold      fuser     getconf
+    grep      head      id        killall   link      ln        locale
+    logger    logname   ls        make      man       mkdir     mkfifo
+    more      mv        nice      nl        nohup     nproc     od
+    paste     pathchk   pkill     pr        printenv  ps        readlink
+    realpath  renice    retry     rm        rmdir     sed       seq
+    sleep     sort      split     stat      strings   stty      sync
+    tabs      tail      tee       timeout   touch     tput      tr
+    tsort     tty       uname     unexpand  uniq      unlink    watch
+    wc        which     who       whoami    xargs     yes
+
+  Koshka
+    evil       evildisk   evilfiles  evilfs     evilio     evillogs
+    evilnet    evilps     evilss     goodcore   goodfsw    goodnode
+    goodstat

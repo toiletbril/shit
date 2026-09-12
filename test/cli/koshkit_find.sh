@@ -10,6 +10,7 @@ cd "$d" || exit 1
 "$BIN" -c 'koshkit touch a/one.txt'
 "$BIN" -c 'koshkit touch a/b/two.log'
 "$BIN" -c 'koshkit touch a/b/c/three.txt'
+"$BIN" -c 'koshkit ln -sf missing broken'
 
 echo "--- find all ---"
 "$BIN" -c 'koshkit find .'
@@ -23,6 +24,10 @@ echo "--- find -mindepth 3 -type f ---"
 "$BIN" -c 'koshkit find . -mindepth 3 -type f'
 echo "--- find a named root ---"
 "$BIN" -c 'koshkit find a/b'
+echo "--- find multiple roots ---"
+"$BIN" -c 'koshkit find a/one.txt a/b -maxdepth 0'
+echo "--- find a dangling symlink root ---"
+"$BIN" -c 'koshkit find broken -type l -maxdepth 0'
 echo "--- find unknown predicate ---"
 "$BIN" -c 'koshkit find . -bogus' 2>&1
 echo "--- find missing -name argument ---"

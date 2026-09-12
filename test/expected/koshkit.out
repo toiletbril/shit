@@ -6,12 +6,23 @@ mkfifo
 more
 mv
 == ls flags through koshkit:
+--classify
+--color
 --help
+--level
+--recursive
+--tree
 -1
 -A
+-F
+-L
+-R
+-S
 -a
 -h
 -l
+-r
+-t
 == du flags through koshkit:
 --help
 -h
@@ -28,6 +39,164 @@ mv
 --all
 --help
 --ignore
+== evil flags through koshkit:
+--all
+--color
+--help
+--short
+-a
+-s
+== evildisk flags through koshkit:
+--all
+--color
+--help
+-a
+== evilfiles flags through koshkit:
+--command
+--help
+--pid
+--terse
+--user
+-c
+-p
+-t
+-u
+== evilfs flags through koshkit:
+--all
+--help
+-a
+== evilio flags through koshkit:
+--all
+--color
+--count
+--cumulative
+--help
+--pid
+--ps
+-a
+-n
+-p
+== evillogs flags through koshkit:
+--cores
+--help
+--logs
+== evilnet flags through koshkit:
+--all
+--help
+-a
+== evilps flags through koshkit:
+--arguments
+--cpu
+--help
+--memory
+--numeric-sort
+--show-owner
+--show-pids
+--sort
+-C
+-M
+-U
+-a
+-n
+-p
+== evilss flags through koshkit:
+--all
+--help
+--ipv4
+--ipv6
+--listening
+--no-header
+--numeric
+--processes
+--tcp
+--udp
+-4
+-6
+-H
+-a
+-l
+-n
+-p
+-t
+-u
+== goodcore flags through koshkit:
+--binary
+--help
+--no-compress
+--output
+--pid
+--quiet
+-b
+-o
+-p
+-q
+== goodfsw flags through koshkit:
+--event-flags
+--exclude
+--help
+--latency
+--one-event
+--recursive
+--timestamp
+-1
+-e
+-l
+-r
+-t
+-x
+== goodnode flags through koshkit:
+--color
+--help
+--inode
+--root
+-i
+-r
+== goodstat flags through koshkit:
+--color
+--dereference
+--help
+-L
+== retry flags through koshkit:
+--attempts
+--backoff
+--delay
+--help
+--max-delay
+--quiet
+-b
+-d
+-m
+-n
+-q
+== stat flags through koshkit:
+--dereference
+--file-system
+--format
+--help
+--printf
+--terse
+-L
+-c
+-f
+-t
+== sync flags through koshkit:
+--data
+--file-system
+--help
+-d
+-f
+== watch flags through koshkit:
+--chgexit
+--errexit
+--exec
+--help
+--interval
+--no-title
+-e
+-g
+-n
+-t
+-x
 == cat flags through koshkit:
 --syntax-highlighting
 == date format directives through koshkit:
@@ -73,12 +242,23 @@ mv
 --help
 --list
 == bare utility flags under set -o koshkit:
+--classify
+--color
 --help
+--level
+--recursive
+--tree
 -1
 -A
+-F
+-L
+-R
+-S
 -a
 -h
 -l
+-r
+-t
 == bare utility names in the default mood:
 whoami
 == bare utility flags in the default mood:

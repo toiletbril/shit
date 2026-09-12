@@ -933,6 +933,12 @@ mood rejects the RETURN condition.
 The shell provides the POSIX and Bash builtins listed below. The standard forms
 follow the active compatibility mood unless a difference is stated here.
 .PP
+With no operand,
+.B builtin
+groups the names under POSIX, BASH, and Koshka headings. The Koshka section
+contains assimilate, bench, koshkit, and z. The headings are colored when
+standard output is a color terminal.
+.PP
 .BR : ,
 .BR . ,
 .BR [ ,
@@ -1488,16 +1494,22 @@ The
 .B koshkit \-\-list
 form prints the utility names one per line.
 .PP
+With no utility,
+.B koshkit
+groups the catalog under POSIX and Koshka headings. The Koshka section contains
+the additional inspection and reporting utilities. The headings are colored
+when standard output is a color terminal.
+.PP
 The bundled set contains basename, bc, cal, calc, cat, chgrp, chmod, chown,
-cksum, cmp, comm, cp, csplit, cut, date, df, diff, dirname, du, env, expand,
-expr,
-file, find, flock, fold, fuser, getconf, grep, head, id, killall, link, ln,
-locale, logger, logname, ls, make, man, mkdir, mkfifo, more, mv, nice, nl,
-nohup, nproc, od, paste, pathchk, pkill, pr, printenv, ps, readlink, realpath,
-renice, rm, rmdir,
-sed, seq, sleep,
-sort, split, strings, stty, tabs, tail, tee, timeout, touch, tput, tr, tsort,
-tty, uname, unexpand, uniq, unlink, wc, which, who, whoami, xargs, and yes.
+cksum, cmp, comm, cp, csplit, cut, date, df, diff, dirname, du, env, evil,
+evildisk, evilfiles, evilfs, evilio, evillogs, evilnet, evilps, evilss, expand,
+expr, file, find, flock, fold, fuser, getconf, goodcore, goodfsw, goodnode,
+goodstat, grep, head, id, killall, link, ln, locale, logger, logname, ls, make,
+man, mkdir, mkfifo, more, mv, nice, nl, nohup, nproc, od, paste, pathchk,
+pkill, pr, printenv, ps, readlink, realpath, renice, retry, rm, rmdir, sed, seq,
+sleep, sort, split, stat, strings, stty, sync, tabs, tail, tee, timeout, touch,
+tput, tr, tsort, tty, uname, unexpand, uniq, unlink, watch, wc, which, who,
+whoami, xargs, and yes.
 .PP
 The command
 .BI "koshkit \-\-assimilate " DIR
@@ -1562,11 +1574,13 @@ files return one, and usage or input errors return two.
 The directory portion of one path is printed.
 .TP
 .B du
-Path sizes are totaled without following symbolic links. The
+Every file and directory below each path is printed in descending size order.
+Symbolic links are not followed. Output is colored on a color terminal. The
 .B \-s
-and
+option prints only each path total. The
 .B \-h
-options are supported.
+option prints human-readable sizes. With no path, the current directory is
+used.
 .TP
 .B env
 Temporary assignments are applied before a command, or the environment is
@@ -1575,6 +1589,21 @@ printed.
 .B printenv
 The whole environment is printed when no name is given. Named values are
 printed in operand order. The status is one if any name is absent.
+.TP
+.B file
+Filesystem object kinds and file contents are classified. The default content
+tests recognize more than 100 executable, archive, document, data, image, audio,
+and video formats. The
+.BR \-h ", " \-\-no\-dereference
+option classifies a symbolic link. The
+.BR \-L ", " \-\-dereference
+option follows it. The
+.BR \-i ", " \-\-regular\-only
+option skips content tests. The
+.BR \-m ", " \-\-magic\-file
+option adds a magic database, and
+.BR \-M ", " \-\-magic\-only
+uses only the named databases.
 .TP
 .B find
 Sorted trees are walked with
@@ -1660,6 +1689,23 @@ Sorted entries are listed with
 .BR \-l ,
 and
 .BR \-h .
+The
+.B \-F
+option appends a type indicator to each name. The
+.BR \-t ,
+.BR \-S ,
+and
+.B \-r
+options sort by modification time, by size, and in reverse. The
+.B \-R
+option lists every subdirectory that is reached, and
+.B \-\-tree
+prints an indented directory tree. The
+.B \-L
+option sets the maximum recursion depth. Names are colored by file
+type when the standard output is a terminal. The
+.B \-\-color
+option accepts always, auto, and never.
 .TP
 .B make
 Compact make rules are run. The
@@ -1813,6 +1859,171 @@ option prints run counts.
 .TP
 .B unlink
 One non-directory path is removed.
+.TP
+.B evil
+System identity, uptime, processor, memory, swap, root filesystem, process,
+filesystem, and network information is printed. The
+.B \-a
+option adds system details that are omitted from the default report. The
+.B \-s
+option selects identity fields. The
+.B \-\-color
+option accepts always, auto, and never.
+.TP
+.B goodcore
+A running process can be captured with
+.BR \-p .
+An existing core can be packaged with its executable through
+.BR \-b .
+Mapped libraries and host metadata are included. Zstandard compression is used
+when available, with gzip as the fallback.
+.TP
+.B evildisk
+The utility prints capacity and filesystem identity for each named path or
+mounted filesystem. It also prints native disk error and retry totals when the
+operating system provides them. The
+.B \-a
+option adds SMART status, model, and protocol data when smartctl or macOS
+diskutil is available.
+.TP
+.B evilfiles
+Open files are listed for visible processes. The
+.BR \-p ,
+.BR \-u ,
+.BR \-c ,
+and
+.B \-t
+options filter by process, owner, command prefix, and terse process identifier
+output.
+.TP
+.B evilfs
+Mounted filesystem sources, targets, types, and options are printed in a sorted
+table.
+.TP
+.B evilio
+Current memory, swap, and cumulative disk I/O counters are printed without
+waiting. The
+.B \-a
+option adds processor usage, paging, scheduler state, pressure stalls, disk
+activity, and swap rates from a one second sample. The
+.B \-\-cumulative
+option prints only disk byte rates and IOPS. An optional duration selects the
+sample interval and defaults to one second. With
+.BR \-\-ps ,
+each mode prints per-process data. The
+.BR \-\-ps ,
+.BR \-n ,
+.BR \-p ,
+and
+.B \-NUMBER
+options otherwise print only lifetime process I/O counters. They show every
+process, limit the table, select one process, or limit the table to NUMBER rows.
+.TP
+.B evillogs
+Core dump settings, recognized dump reports, and known log directories are
+printed. The
+.BR \-\-cores
+and
+.B \-\-logs
+options select one report.
+.TP
+.B evilnet
+Assigned IPv4 and IPv6 addresses are printed in a sorted table. The
+.B \-a
+option adds interface traffic, packet errors, packet drops, and TCP totals.
+.TP
+.B goodnode
+Inode identity, allocation, known filesystem capabilities, verification state,
+and a CRC32C checksum are printed for each path. The
+.B \-i
+option locates an inode beneath the path selected by
+.BR \-r .
+.TP
+.B evilps
+Visible processes are printed as a parent and child tree. The
+.BR \-p ,
+.BR \-n ,
+.BR \-a ,
+.BR \-U ,
+.BR \-C ,
+and
+.B \-M
+options show process identifiers, sort numerically, show command lines, show
+owners, show processor time, and show resident memory. The
+.B \-\-sort
+option accepts name, pid, cpu, and memory.
+The
+.B \-NUMBER
+operand limits the output to NUMBER processes.
+.TP
+.B evilss
+Visible TCP and UDP sockets are printed in a table. Address family, protocol,
+listening state, process identifiers, and the header can be selected with
+ss-compatible options.
+.TP
+.B goodstat
+File metadata is printed as a labeled report. Its type uses the same classifier
+as
+.BR "koshkit file" .
+The
+.B \-L
+option follows symbolic links.
+.TP
+.B goodfsw
+Path changes are reported by polling filesystem metadata. The
+.BR \-r ,
+.BR \-t ,
+.BR \-x ,
+.BR \-1 ,
+.BR \-l ,
+and
+.B \-e
+options select recursion, timestamps, event names, one event batch, the polling
+period, and an excluded substring.
+.TP
+.B retry
+A command is repeated until it succeeds or its attempt limit is reached. The
+.BR \-n ,
+.BR \-d ,
+.BR \-b ,
+.BR \-m ,
+and
+.B \-q
+options set the attempt count, initial delay, backoff factor, maximum delay,
+and quiet mode.
+.TP
+.B stat
+File or filesystem metadata is printed. The
+.BR \-L ,
+.BR \-f ,
+.BR \-t ,
+.BR \-c ,
+and
+.B \-\-printf
+options dereference links, select filesystem data, select terse output, apply a
+format, and apply a format without an automatic newline.
+.TP
+.B sync
+Dirty filesystem data is flushed. The
+.B \-d
+option flushes file data for each operand. The
+.B \-f
+option flushes the filesystem containing each operand.
+.TP
+.B watch
+A command is run at a fixed interval. The
+.BR \-n ,
+.BR \-t ,
+.BR \-g ,
+.B \-e
+options set the interval, omit the title, exit after output changes, and exit
+after a command error. The
+.B \-x
+option is accepted for compatibility. The title and screen controls are emitted
+only when standard output is a terminal.
+.PP
+Utilities with styled reports use color when their output stream is a terminal.
+Redirected output contains no terminal escape sequences.
 .TP
 .B wc
 Lines, words, and bytes are counted with

@@ -1,0 +1,32 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "evilfs" "extra"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "unexpected-operand=$?"]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "evilfs"
+]
+[Word
+  Unquoted "extra"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "unexpected-operand="
+  Variable "?"
+]
+unexpected-operand=1

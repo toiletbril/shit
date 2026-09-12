@@ -1,0 +1,35 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "evilps" "1" "2"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "too-many-operands=$?"]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "evilps"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "too-many-operands="
+  Variable "?"
+]
+too-many-operands=1

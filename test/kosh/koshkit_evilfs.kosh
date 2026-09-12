@@ -1,0 +1,2 @@
+(koshkit evilfs extra) 2> "$TEST_NULL_DEVICE"
+echo "unexpected-operand=$?"

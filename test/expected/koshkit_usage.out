@@ -27,13 +27,67 @@ rc=2
        |  ^~~~~~~~~~~~
 note: Try `grep --help` for more info.
 rc=2
---- the note is located in the bash mood too ---
+--- koshkit goodcore with no required argument ---
+1:1: error: goodcore: Not enough arguments.
+     1 |  koshkit goodcore
+       |  ^~~~~~~~~~~~~~~~
+note: Try `goodcore --help` for more info.
+rc=2
+--- koshkit goodfsw with no required argument ---
+1:1: error: goodfsw: Not enough arguments.
+     1 |  koshkit goodfsw
+       |  ^~~~~~~~~~~~~~~
+note: Try `goodfsw --help` for more info.
+rc=2
+--- koshkit goodnode with no required argument ---
+1:1: error: goodnode: Not enough arguments.
+     1 |  koshkit goodnode
+       |  ^~~~~~~~~~~~~~~~
+note: Try `goodnode --help` for more info.
+rc=2
+--- koshkit goodstat with no required argument ---
+1:1: error: goodstat: Not enough arguments.
+     1 |  koshkit goodstat
+       |  ^~~~~~~~~~~~~~~~
+note: Try `goodstat --help` for more info.
+rc=2
+--- koshkit retry with no required argument ---
+1:1: error: retry: Not enough arguments.
+     1 |  koshkit retry
+       |  ^~~~~~~~~~~~~
+note: Try `retry --help` for more info.
+rc=2
+--- koshkit stat with no required argument ---
+1:1: error: stat: Not enough arguments.
+     1 |  koshkit stat
+       |  ^~~~~~~~~~~~
+note: Try `stat --help` for more info.
+rc=2
+--- koshkit watch with no required argument ---
+1:1: error: watch: Not enough arguments.
+     1 |  koshkit watch
+       |  ^~~~~~~~~~~~~
+note: Try `watch --help` for more info.
+rc=2
+--- koshkit sync data mode with no file ---
+1:1: error: sync: Not enough arguments.
+     1 |  koshkit sync -d
+       |  ^~~~~~~~~~~~~~~
+note: Try `sync --help` for more info.
+rc=2
+--- koshkit sync filesystem mode with no file ---
+1:1: error: sync: Not enough arguments.
+     1 |  koshkit sync -f
+       |  ^~~~~~~~~~~~~~~
+note: Try `sync --help` for more info.
+rc=2
+--- the bash mood locates the note ---
 1:1: error: mkdir: Not enough arguments.
      1 |  koshkit mkdir
        |  ^~~~~~~~~~~~~
 note: Try `mkdir --help` for more info.
 rc=2
---- and in the sh mood ---
+--- the sh mood locates the note ---
 1:1: error: mkdir: Not enough arguments.
      1 |  koshkit mkdir
        |  ^~~~~~~~~~~~~

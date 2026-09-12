@@ -1,0 +1,2 @@
+(koshkit evil --color invalid) 2> "$TEST_NULL_DEVICE"
+echo "invalid-color=$?"

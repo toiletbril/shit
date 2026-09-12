@@ -3,6 +3,14 @@ a
 nums.txt
 --- ls a ---
 b
+--- file batched operands ---
+nums.txt: text
+stamp: empty
+sym: text
+1:33: error: file: cannot open 'missing.txt': No such file or directory.
+     1 |  koshkit file nums.txt stamp sym missing.txt
+       |                                  ^~~~~~~~~~~
+file-status=1
 --- ls -l sym (mode nlink size name) ---
 lrwxrwxrwx 1 8 sym
 --- ls after operations ---
@@ -11,6 +19,14 @@ moved.txt
 nums.txt
 stamp
 sym
+--- file signature variants ---
+zip-span: ZIP archive
+sqlite-wal: SQLite write-ahead log
+netcdf-2: NetCDF data
+netcdf-5: NetCDF data
+pcap-le: pcap capture
+pcap-ns-be: pcap capture
+pcap-ns-le: pcap capture
 cp-interactive-no=old
 cp-interactive-yes=new
 cp-preserve-mode=passed
@@ -19,7 +35,15 @@ cp-hardlink-status=1 contents=same-file
 mv-interactive-no=old source=present
 mv-interactive-yes=new source=missing
 --- du -s nums.txt ---
-6	nums.txt
+6  nums.txt
+--- du with no operand lists every entry and the total ---
+19  .
+10  ./long-name
+ 3  ./sub
+ 3  ./sub-link
+ 3  ./sub/c
+ 2  ./b
+ 1  ./a
 du-unreadable=ok
 --- basename ---
 libfoo

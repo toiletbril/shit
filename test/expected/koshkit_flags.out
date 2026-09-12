@@ -1,7 +1,7 @@
 --- du -s prints bytes ---
-1892	big.txt
+1892  big.txt
 --- du -sh is human-readable ---
-1.8K	big.txt
+1.8K  big.txt
 --- ls -l prints bytes ---
 -rw-r--r-- 1 1892 big.txt
 --- ls -lh is human-readable ---

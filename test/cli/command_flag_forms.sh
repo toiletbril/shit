@@ -10,7 +10,7 @@ success_output=$("$BIN" --no-diagnostics --show-exit-code -c ':' 2>&1)
 [ -z "$success_output" ] || exit 1
 echo "show-exit-code success is quiet"
 
-"$BIN" --help 2>&1 | grep -F 'Show diagnostics for every non-zero exit code.' >/dev/null || exit 1
+"$BIN" --help 2>&1 | grep -F 'Show diagnostics for every non-zero exit' >/dev/null || exit 1
 "$BIN" -c 'set --help' 2>&1 | grep -F 'Show diagnostics for every non-zero exit code.' >/dev/null || exit 1
 "$BIN" --help 2>&1 | grep -F 'Show diagnostics for every exit code,' >/dev/null || exit 1
 "$BIN" -c 'set --help' 2>&1 | grep -F 'Show diagnostics for every exit code,' >/dev/null || exit 1

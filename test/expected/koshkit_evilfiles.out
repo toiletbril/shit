@@ -1,0 +1,35 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "evilfiles" "-p" "invalid"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "invalid-pid=$?"]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "evilfiles"
+]
+[Word
+  Unquoted "-p"
+]
+[Word
+  Unquoted "invalid"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "invalid-pid="
+  Variable "?"
+]
+invalid-pid=1

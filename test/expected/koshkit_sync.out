@@ -1,0 +1,86 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "sync" "-d" "-f"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "conflicting-modes=$?"]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "cd" "$TEST_TEMP_DIRECTORY"]
+        [CompoundListCondition, ||]
+          [SimpleCommand "exit"]
+        [CompoundListCondition, None]
+          [SimpleCommand "printf" "data"]
+        [CompoundListCondition, None]
+          [SimpleCommand "koshkit" "sync" "-d" "sync-file"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "data-status=$?"]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "sync"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "conflicting-modes="
+  Variable "?"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+]
+[Word
+  Unquoted "exit"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Unquoted "data"
+]
+[Word
+  Unquoted "sync-file"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "sync"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Unquoted "sync-file"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "data-status="
+  Variable "?"
+]
+conflicting-modes=1
+data-status=0

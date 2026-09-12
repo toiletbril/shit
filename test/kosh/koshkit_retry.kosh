@@ -1,0 +1,2 @@
+koshkit retry -n 2 -d 0 -q printf retry-ok
+echo

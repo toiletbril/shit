@@ -1,3 +1,4 @@
 #!/bin/env kosh
 builtin --list
 builtin
+koshkit

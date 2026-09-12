@@ -1,0 +1,2 @@
+(koshkit evilfiles -p invalid) 2> "$TEST_NULL_DEVICE"
+echo "invalid-pid=$?"

@@ -1,0 +1,2 @@
+(koshkit goodfsw) 2> "$TEST_NULL_DEVICE"
+echo "missing-path=$?"

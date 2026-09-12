@@ -1,0 +1,100 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Subshell]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "cd" "$TEST_TEMP_DIRECTORY"]
+        [CompoundListCondition, ||]
+          [SimpleCommand "exit"]
+        [CompoundListCondition, None]
+          [SimpleCommand "printf" "data"]
+        [CompoundListCondition, None]
+          [SimpleCommand "printf" "more"]
+        [CompoundListCondition, None]
+          [SimpleCommand "koshkit" "ln" "-sf" "stat-file" "stat-link"]
+        [CompoundListCondition, None]
+          [SimpleCommand "koshkit" "stat" "-c" "%n=%s" "stat-file" "stat-file-two"]
+        [CompoundListCondition, None]
+          [SimpleCommand "koshkit" "stat" "-c" "%n=%F" "stat-file" "stat-link"]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Variable "TEST_TEMP_DIRECTORY"
+]
+[Word
+  Unquoted "exit"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Unquoted "data"
+]
+[Word
+  Unquoted "stat-file"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Unquoted "more"
+]
+[Word
+  Unquoted "stat-file-two"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "ln"
+]
+[Word
+  Unquoted "-sf"
+]
+[Word
+  Unquoted "stat-file"
+]
+[Word
+  Unquoted "stat-link"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "stat"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Literal "%n=%s"
+]
+[Word
+  Unquoted "stat-file"
+]
+[Word
+  Unquoted "stat-file-two"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "stat"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Literal "%n=%F"
+]
+[Word
+  Unquoted "stat-file"
+]
+[Word
+  Unquoted "stat-link"
+]
+stat-file=4
+stat-file-two=4
+stat-file=regular file
+stat-link=symbolic link

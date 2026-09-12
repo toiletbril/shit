@@ -1,0 +1,35 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "evil" "--color" "invalid"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "invalid-color=$?"]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "evil"
+]
+[Word
+  Unquoted "--color"
+]
+[Word
+  Unquoted "invalid"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "invalid-color="
+  Variable "?"
+]
+invalid-color=1

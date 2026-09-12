@@ -1,0 +1,2 @@
+(koshkit evilps 1 2) 2> "$TEST_NULL_DEVICE"
+echo "too-many-operands=$?"

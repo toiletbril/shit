@@ -16,6 +16,9 @@ echo "--- ls a ---"
 "$BIN" -c 'koshkit mv copy.txt moved.txt'
 "$BIN" -c 'koshkit touch stamp'
 "$BIN" -c 'koshkit ln -s nums.txt sym'
+echo "--- file batched operands ---"
+"$BIN" -c 'koshkit file nums.txt stamp sym missing.txt' 2>&1
+echo "file-status=$?"
 # The owner, the group, and the time of a long row vary by machine, so only the
 # mode, the link count, the size, and the name are kept for a stable golden.
 echo "--- ls -l sym (mode nlink size name) ---"
@@ -25,6 +28,15 @@ echo "--- ls -l sym (mode nlink size name) ---"
 "$BIN" -c 'koshkit ls -l sym' | sed 's/^l[rwxsStT-]\{9\}/lrwxrwxrwx/; s/^\([^[:space:]]*\)[[:space:]][[:space:]]*\([^[:space:]]*\)[[:space:]][[:space:]]*[^[:space:]]*[[:space:]][[:space:]]*[^[:space:]]*[[:space:]][[:space:]]*\([^[:space:]]*\).*[^[:space:]][[:space:]][[:space:]]*\([^[:space:]]*\)$/\1 \2 \3 \4/'
 echo "--- ls after operations ---"
 "$BIN" -c 'koshkit ls'
+printf 'PK\007\010' > zip-span
+printf '\067\177\006\203' > sqlite-wal
+printf 'CDF\002' > netcdf-2
+printf 'CDF\005' > netcdf-5
+printf '\324\303\262\241' > pcap-le
+printf '\241\262\074\115' > pcap-ns-be
+printf '\115\074\262\241' > pcap-ns-le
+echo "--- file signature variants ---"
+"$BIN" -c 'koshkit file zip-span sqlite-wal netcdf-2 netcdf-5 pcap-le pcap-ns-be pcap-ns-le'
 printf 'old\n' > cp-target.txt
 printf 'new\n' > cp-source.txt
 printf 'n\n' | "$BIN" -c 'koshkit cp -i cp-source.txt cp-target.txt' 2>/dev/null
@@ -58,6 +70,14 @@ printf 'y\n' | "$BIN" -c 'koshkit mv -i mv-source.txt mv-target.txt' 2>/dev/null
 printf 'mv-interactive-yes=%s source=%s\n' "$(cat mv-target.txt)" "$([ -e mv-source.txt ] && echo present || echo missing)"
 echo "--- du -s nums.txt ---"
 "$BIN" -c 'koshkit du -s nums.txt'
+mkdir -p du-default/sub
+printf a > du-default/a
+printf bb > du-default/b
+printf 1234567890 > du-default/long-name
+printf ccc > du-default/sub/c
+ln -s sub du-default/sub-link
+echo "--- du with no operand lists every entry and the total ---"
+(cd du-default && "$BIN" -c 'koshkit du')
 mkdir unreadable
 touch unreadable/entry
 chmod 000 unreadable

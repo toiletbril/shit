@@ -74,6 +74,45 @@
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "file" "-M" "magic-malformed" "magic-hello"]
   [CompoundListCondition, None]
+    [Assign format_rows=png|\211PNG\r\n\032\n
+jpeg|\377\330\377
+gzip|\037\213
+xz|\3757zXZ\0
+zip|PK\003\004
+pdf|%PDF-
+sqlite|SQLite format 3\0
+wasm|\0asm
+llvm|BC\300\336
+java|\312\376\272\276\0\0\0\075
+universal|\312\376\272\276\0\0\0\001
+webp|RIFF\0\0\0\0WEBP
+avif|\0\0\0\0ftypavif
+matroska|\032E\337\243matroska
+flac|fLaC
+ogg|OggS
+midi|MThd\0\0\0\006
+postgres|PGDMP
+git-pack|PACK
+flash|FWS]
+  [CompoundListCondition, None]
+    [Assign old_ifs=$IFS]
+  [CompoundListCondition, None]
+    [Assign IFS=
+]
+  [CompoundListCondition, None]
+    [ForLoop "format_row"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign format_name=$format_row%%|*]
+        [CompoundListCondition, None]
+          [Assign format_bytes=$format_row#*|]
+        [CompoundListCondition, None]
+          [SimpleCommand "printf" "%b" "$format_bytes"]
+  [CompoundListCondition, None]
+    [Assign IFS=$old_ifs]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "file" "png" "jpeg" "gzip" "xz" "zip" "pdf" "sqlite" "wasm" "llvm" "java" "universal" "webp" "avif" "matroska" "flac" "ogg" "midi" "postgres" "git-pack" "flash"]
+  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "strings" "binary"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "strings" "-n" "2" "-t" "d" "binary"]
@@ -530,6 +569,146 @@
   Unquoted "magic-hello"
 ]
 [Word
+  Unquoted "format_rows="
+  Literal "png|\211PNG\r\n\032\n
+jpeg|\377\330\377
+gzip|\037\213
+xz|\3757zXZ\0
+zip|PK\003\004
+pdf|%PDF-
+sqlite|SQLite format 3\0
+wasm|\0asm
+llvm|BC\300\336
+java|\312\376\272\276\0\0\0\075
+universal|\312\376\272\276\0\0\0\001
+webp|RIFF\0\0\0\0WEBP
+avif|\0\0\0\0ftypavif
+matroska|\032E\337\243matroska
+flac|fLaC
+ogg|OggS
+midi|MThd\0\0\0\006
+postgres|PGDMP
+git-pack|PACK
+flash|FWS"
+]
+[Word
+  Unquoted "old_ifs="
+  Variable "IFS"
+]
+[Word
+  Unquoted "IFS="
+  Literal "
+"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "format_row"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Variable "format_rows"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "format_name="
+  Variable "format_row%%|*"
+]
+[Word
+  Unquoted "format_bytes="
+  Variable "format_row#*|"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%b"
+]
+[Word
+  Variable "format_bytes"
+]
+[Word
+  Variable "format_name"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "IFS="
+  Variable "old_ifs"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "file"
+]
+[Word
+  Unquoted "png"
+]
+[Word
+  Unquoted "jpeg"
+]
+[Word
+  Unquoted "gzip"
+]
+[Word
+  Unquoted "xz"
+]
+[Word
+  Unquoted "zip"
+]
+[Word
+  Unquoted "pdf"
+]
+[Word
+  Unquoted "sqlite"
+]
+[Word
+  Unquoted "wasm"
+]
+[Word
+  Unquoted "llvm"
+]
+[Word
+  Unquoted "java"
+]
+[Word
+  Unquoted "universal"
+]
+[Word
+  Unquoted "webp"
+]
+[Word
+  Unquoted "avif"
+]
+[Word
+  Unquoted "matroska"
+]
+[Word
+  Unquoted "flac"
+]
+[Word
+  Unquoted "ogg"
+]
+[Word
+  Unquoted "midi"
+]
+[Word
+  Unquoted "postgres"
+]
+[Word
+  Unquoted "git-pack"
+]
+[Word
+  Unquoted "flash"
+]
+[Word
   Unquoted "koshkit"
 ]
 [Word
@@ -685,6 +864,26 @@ magic-masked: masked
 magic-low: value-is-5
 magic-child: parent child
 magic-hello: greeting
+png: PNG image
+jpeg: JPEG image
+gzip: gzip compressed data
+xz: XZ compressed data
+zip: ZIP archive
+pdf: PDF document
+sqlite: SQLite database
+wasm: WebAssembly module
+llvm: LLVM bitcode
+java: Java class
+universal: Mach-O universal binary
+webp: WebP image
+avif: AVIF image
+matroska: Matroska video
+flac: FLAC audio
+ogg: Ogg data
+midi: MIDI audio
+postgres: PostgreSQL custom dump
+git-pack: Git pack
+flash: Flash file
 abcde
       1 abcde
       7 xy

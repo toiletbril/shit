@@ -1,0 +1,2 @@
+(koshkit watch) 2> "$TEST_NULL_DEVICE"
+echo "missing-command=$?"
