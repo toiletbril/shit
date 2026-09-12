@@ -14,6 +14,7 @@
 #include "../Koshkit.hpp"
 #include "../Path.hpp"
 #include "../Platform.hpp"
+#include "../StaticStringMap.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();
@@ -70,6 +71,21 @@ fn file_crc32c(const ExecContext &ec, StringView path,
   return digest;
 }
 
+fn filesystem_features(StringView filesystem_type) throws -> Maybe<StringView>
+{
+  static constexpr static_string_entry<StringView> FEATURE_ENTRIES[] = {
+      {SSK("NTFS"),           "transaction log, encryption, quotas, compression" },
+      {SSK("apfs"),           "clones, snapshots, encryption, metadata checksums"},
+      {SSK("btrfs"),
+       "copy-on-write, snapshots, compression, data and metadata checksums"      },
+      {SSK("ext2/ext3/ext4"), "journaling, journal checksums, file encryption"   },
+      {SSK("ntfs"),           "transaction log, encryption, quotas, compression" },
+  };
+  static constexpr StaticStringMap FEATURES{FEATURE_ENTRIES};
+
+  return FEATURES.find(filesystem_type);
+}
+
 fn append_node_report(String &output, const ExecContext &ec, StringView path,
                       const os::file_status &status, bool should_color,
                       Allocator allocator) throws -> void
@@ -102,6 +118,8 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
     do_append_field("Filesystem ID",
                     String::from(filesystem.filesystem_id, allocator));
     do_append_field("Name limit", String::from(filesystem.name_max, allocator));
+    let const features = filesystem_features(filesystem_type);
+    if (features.has_value()) do_append_field("Features", *features);
   }
 
   os::filesystem_error_counters errors{};
