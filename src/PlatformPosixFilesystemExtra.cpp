@@ -873,6 +873,25 @@ execute_batched_syscall_direct(const batched_syscall &operation,
 
 #if defined __APPLE__
 
+static pure fn find_directory_status_entry(
+    const ArrayList<directory_status_entry> &entries, StringView name) wontthrow
+    -> const directory_status_entry *
+{
+  usize lower = 0;
+  usize upper = entries.count();
+  while (lower < upper) {
+    let const middle = lower + (upper - lower) / 2;
+    if (entries[middle].child.name.view() < name)
+      lower = middle + 1;
+    else
+      upper = middle;
+  }
+  if (lower == entries.count() || entries[lower].child.name.view() != name)
+    return nullptr;
+
+  return &entries[lower];
+}
+
 static fn
 execute_getattrlistbulk_batch(const batched_syscall *operations,
                               usize operation_count,
@@ -908,8 +927,14 @@ execute_getattrlistbulk_batch(const batched_syscall *operations,
         continue;
       }
 
-      let const entries = list_directory_status_bulk(group_parent.text().view(),
-                                                     heap_allocator());
+      let entries = list_directory_status_bulk(group_parent.text().view(),
+                                               heap_allocator());
+      if (entries.has_value()) {
+        entries->sort([](const directory_status_entry &left,
+                         const directory_status_entry &right) {
+          return left.child.name.view() < right.child.name.view();
+        });
+      }
       for (usize index = group_start; index < group_end; index++) {
         let const &operation = operations[index];
         let &result = results[index];
@@ -918,12 +943,10 @@ execute_getattrlistbulk_batch(const batched_syscall *operations,
         bool has_status = false;
         if (entries.has_value()) {
           let const filename = operation.path->filename();
-          for (let const &entry : *entries) {
-            if (entry.has_status && entry.child.name.view() == filename) {
-              *operation.status = entry.status;
-              has_status = true;
-              break;
-            }
+          let const *entry = find_directory_status_entry(*entries, filename);
+          if (entry != nullptr && entry->has_status) {
+            *operation.status = entry->status;
+            has_status = true;
           }
         }
         if (!has_status) execute_batched_syscall_direct(operation, result);
