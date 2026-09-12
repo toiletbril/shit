@@ -1090,6 +1090,17 @@ fn append_report_inline_field(String &output, StringView name, StringView value,
   output += value;
 }
 
+fn append_report_warning(String &output, StringView text,
+                         bool should_color) throws -> void
+{
+  if (text.is_empty()) return;
+
+  append_report_text(output, "Warning", colors::ansi::BOLD_RED, should_color);
+  output += ": ";
+  output += text;
+  output += '\n';
+}
+
 static pure fn report_indentation_width(StringView indentation) wontthrow
     -> usize
 {
@@ -1269,24 +1280,16 @@ cold fn make_flag_help(const FlagList &flags, bool should_color) throws
       flag_name += "--";
       flag_name += f->long_name();
       switch (f->kind()) {
-      case koshka::Flag::Kind::String:
-        flag_name += '=';
-        flag_value += "<...>";
-        break;
-      case koshka::Flag::Kind::ManyStrings:
-        flag_name += '=';
-        flag_value += "<.., ..>";
-        break;
-      case koshka::Flag::Kind::OptionalValue:
-        flag_name += "[=";
-        flag_value += "<...>]";
-        break;
+      case koshka::Flag::Kind::String: flag_value += "=<...>"; break;
+      case koshka::Flag::Kind::ManyStrings: flag_value += "=<.., ..>"; break;
+      case koshka::Flag::Kind::OptionalValue: flag_value += "[=<...>]"; break;
       case koshka::Flag::Kind::Bool:
       case koshka::Flag::Kind::RepeatedBool: break;
       }
     }
 
-    append_report_text(s, flag_name.view(), {}, should_color);
+    append_report_text(s, flag_name.view(), colors::ansi::BOLD_WHITE,
+                       should_color);
     append_report_text(s, flag_value.view(), colors::ansi::DIM, should_color);
 
     let const flag_width = flag_name.length() + flag_value.length();
@@ -1327,8 +1330,7 @@ cold fn make_flag_help(const FlagList &flags, bool should_color) throws
       }
       word_start = i + 1;
     }
-    append_report_text(s, description_text.view(), colors::ansi::DIM,
-                       should_color);
+    append_report_text(s, description_text.view(), {}, should_color);
   };
 
   static const StringView SECTION_HEADERS[] = {

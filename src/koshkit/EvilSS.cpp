@@ -254,7 +254,7 @@ fn append_network_socket_report(String &output,
   return !rows.is_empty();
 }
 
-}
+} /* namespace */
 
 EvilSS::EvilSS() = default;
 
@@ -286,8 +286,6 @@ fn EvilSS::execute(const ExecContext &ec, EvalContext &cxt,
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};
   let const should_color = colors::stdout_wants_color();
-  append_report_text(output, "SOCKETS", colors::ansi::BOLD_BLUE, should_color);
-  output += "\n";
   append_network_socket_report(
       output,
       network_socket_report_options{
@@ -300,10 +298,10 @@ fn EvilSS::execute(const ExecContext &ec, EvalContext &cxt,
           .should_show_processes = FLAG_EVILSS_PROCESSES.is_enabled(),
           .should_show_header = !FLAG_EVILSS_NO_HEADER.is_enabled(),
       },
-      allocator, should_color, "  ");
+      allocator, should_color, {});
 
   ec.print_to_stdout(output);
   return 0;
 }
 
-}
+} /* namespace koshka::koshkit */

@@ -167,7 +167,7 @@ _koshkit_util_flags()
     evil)          echo "-a --all -s --short --color" ;;
     goodcore)      echo "-p --pid -b --binary -o --output -q --quiet --no-compress" ;;
     evildisk)      echo "-a --all --color" ;;
-    evilfiles)     echo "-t --terse -p --pid -u --user -c --command" ;;
+    evilfiles)     echo "-t --terse -p --pid -u --user -c --command -i --network" ;;
     evilfs)        echo "-a --all" ;;
     evilio)        echo "-a --all --cumulative --ps -n --count -p --pid --color" ;;
     evillogs)      echo "--cores --logs" ;;

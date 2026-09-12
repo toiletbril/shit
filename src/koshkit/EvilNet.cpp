@@ -87,8 +87,9 @@ fn append_network_interface_report(String &output, bool should_color,
   return addresses.count();
 }
 
-fn append_network_traffic_report(String &output, Allocator allocator,
-                                 bool should_color) throws -> usize
+fn append_network_traffic_report(String &output, String &warnings,
+                                 Allocator allocator, bool should_color) throws
+    -> usize
 {
   let statistics = os::read_network_interface_statistics();
   statistics.sort([](const os::network_interface_statistics_entry &left,
@@ -178,12 +179,42 @@ fn append_network_traffic_report(String &output, Allocator allocator,
                            WIDTHS[index + 2], true, {}, should_color);
     }
     output += "\n";
+
+    let warning = String{allocator};
+    let const do_append_nonzero =
+        [&](StringView name, os::network_statistics_field field, u64 value)
+            throws -> void {
+      if (!entry.has_field(field) || value == 0) return;
+
+      if (!warning.is_empty()) warning += ", ";
+      warning += name;
+      warning += " ";
+      warning += String::from(value, allocator).view();
+    };
+    do_append_nonzero("receive errors",
+                      os::network_statistics_field::ReceiveErrors,
+                      entry.receive_error_count);
+    do_append_nonzero("transmit errors",
+                      os::network_statistics_field::TransmitErrors,
+                      entry.transmit_error_count);
+    do_append_nonzero("receive drops",
+                      os::network_statistics_field::ReceiveDrops,
+                      entry.receive_drop_count);
+    do_append_nonzero("transmit drops",
+                      os::network_statistics_field::TransmitDrops,
+                      entry.transmit_drop_count);
+    if (!warning.is_empty()) {
+      let message = String{allocator, entry.interface_name.view()};
+      message += " reports ";
+      message += warning.view();
+      append_report_warning(warnings, message.view(), should_color);
+    }
   }
 
   return statistics.count();
 }
 
-fn append_tcp_report(String &output, Allocator allocator,
+fn append_tcp_report(String &output, String &warnings, Allocator allocator,
                      bool should_color) throws -> bool
 {
   os::tcp_statistics statistics{};
@@ -259,10 +290,57 @@ fn append_tcp_report(String &output, Allocator allocator,
   do_append_group("Failures", FAILURE_NAMES, failure_values, FAILURE_FIELDS,
                   countof(FAILURE_NAMES));
   append_report_body(output, body.view());
+
+  constexpr StringView WARNING_NAMES[] = {
+      "failed connections",   "established resets", "retransmitted segments",
+      "input errors",         "sent resets",        "connection drops",
+      "receive memory drops", "listen drops",       "retransmit timeouts",
+  };
+  const u64 warning_values[] = {
+      statistics.attempt_failure_count,
+      statistics.established_reset_count,
+      statistics.retransmitted_segment_count,
+      statistics.input_error_count,
+      statistics.sent_reset_count,
+      statistics.connection_drop_count,
+      statistics.receive_memory_drop_count,
+      statistics.listen_drop_count,
+      statistics.retransmit_timeout_count,
+  };
+  constexpr os::tcp_statistics_field WARNING_FIELDS[] = {
+      os::tcp_statistics_field::AttemptFailures,
+      os::tcp_statistics_field::EstablishedResets,
+      os::tcp_statistics_field::RetransmittedSegments,
+      os::tcp_statistics_field::InputErrors,
+      os::tcp_statistics_field::SentResets,
+      os::tcp_statistics_field::ConnectionDrops,
+      os::tcp_statistics_field::ReceiveMemoryDrops,
+      os::tcp_statistics_field::ListenDrops,
+      os::tcp_statistics_field::RetransmitTimeouts,
+  };
+  let warning = String{allocator};
+  for (usize index = 0; index < countof(WARNING_NAMES); index++) {
+    if (!statistics.has_field(WARNING_FIELDS[index]) ||
+        warning_values[index] == 0)
+    {
+      continue;
+    }
+
+    if (!warning.is_empty()) warning += ", ";
+    warning += WARNING_NAMES[index];
+    warning += " ";
+    warning += String::from(warning_values[index], allocator).view();
+  }
+  if (!warning.is_empty()) {
+    let message = String{allocator, "TCP counters include "};
+    message += warning.view();
+    append_report_warning(warnings, message.view(), should_color);
+  }
+
   return true;
 }
 
-}
+} /* namespace */
 
 EvilNet::EvilNet() = default;
 
@@ -289,6 +367,7 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};
+  let warnings = String{allocator};
   let const should_color = colors::stdout_wants_color();
   let const should_show_sections = FLAG_EVILNET_ALL.is_enabled();
   if (should_show_sections) {
@@ -296,15 +375,22 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
                        should_color);
     output += "\n";
   }
-  let const address_count =
-      append_network_interface_report(output, should_color,
-                                      should_show_sections ? "  " : "");
+  let const address_count = append_network_interface_report(
+      output, should_color, should_show_sections ? "  " : "");
   usize traffic_count = 0;
   bool has_tcp_statistics = false;
   if (FLAG_EVILNET_ALL.is_enabled()) {
-    traffic_count =
-        append_network_traffic_report(output, allocator, should_color);
-    has_tcp_statistics = append_tcp_report(output, allocator, should_color);
+    traffic_count = append_network_traffic_report(output, warnings, allocator,
+                                                  should_color);
+    has_tcp_statistics =
+        append_tcp_report(output, warnings, allocator, should_color);
+    if (!warnings.is_empty()) {
+      output += "\n";
+      append_report_text(output, "WARNINGS", colors::ansi::BOLD_BLUE,
+                         should_color);
+      output += "\n";
+      append_report_body(output, warnings.view());
+    }
   }
 
   ec.print_to_stdout(output);
@@ -314,4 +400,4 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
              : 0;
 }
 
-}
+} /* namespace koshka::koshkit */

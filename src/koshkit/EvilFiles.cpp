@@ -17,7 +17,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-t] [-p pid] [-u user] [-c command] [path ...]");
+HELP_SYNOPSIS_DECL("[-it] [-p pid] [-u user] [-c command] [path ...]");
 
 HELP_DESCRIPTION_DECL(
     "The evilfiles utility lists the files that running processes hold open.");
@@ -29,6 +29,7 @@ FLAG(EVILFILES_USER, String, 'u', "user",
      "List only the processes of this owner.");
 FLAG(EVILFILES_COMMAND, String, 'c', "command",
      "List only the processes whose name starts with this text.");
+FLAG(EVILFILES_NETWORK, Bool, 'i', "network", "List only socket descriptors.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(EvilFiles);
@@ -167,7 +168,12 @@ fn matches_path_operands(StringView path,
   return false;
 }
 
+pure fn is_network_file(StringView path) wontthrow -> bool
+{
+  return path == "[socket]" || path.starts_with("socket:[");
 }
+
+} /* namespace */
 
 EvilFiles::EvilFiles() = default;
 
@@ -254,6 +260,11 @@ fn EvilFiles::execute(
     if (FLAG_EVILFILES_TERSE.is_enabled()) {
       bool did_match_this_process = false;
       for (let const &file : files) {
+        if (FLAG_EVILFILES_NETWORK.is_enabled() &&
+            !is_network_file(file.path.view()))
+        {
+          continue;
+        }
         if (!matches_path_operands(file.path.view(), operands)) continue;
 
         did_match = true;
@@ -273,6 +284,11 @@ fn EvilFiles::execute(
     for (usize file_position = 0; file_position < files.count();
          file_position++)
     {
+      if (FLAG_EVILFILES_NETWORK.is_enabled() &&
+          !is_network_file(files[file_position].path.view()))
+      {
+        continue;
+      }
       if (!matches_path_operands(files[file_position].path.view(), operands))
         continue;
 
@@ -339,8 +355,6 @@ fn EvilFiles::execute(
 
   let const should_color = colors::stdout_wants_color();
   let output = String{allocator};
-  append_report_text(output, "FILES", colors::ansi::BOLD_BLUE, should_color);
-  output += "\n  ";
   append_report_column(output, "COMMAND", widths.command, false,
                        colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
@@ -369,7 +383,6 @@ fn EvilFiles::execute(
   output += "\n";
 
   for (let const &row : rows) {
-    output += "  ";
     append_report_column(output, row.command.view(), widths.command, false,
                          colors::ansi::BOLD_GREEN, should_color);
     output += "  ";
@@ -402,4 +415,4 @@ fn EvilFiles::execute(
   return 0;
 }
 
-}
+} /* namespace koshka::koshkit */

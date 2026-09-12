@@ -233,8 +233,6 @@ fn append_kernel_settings(String &output, bool should_color) throws -> void
 fn append_core_dump_report(String &output, Allocator allocator,
                            bool should_color) throws -> void
 {
-  append_report_text(output, "CORES", colors::ansi::BOLD_BLUE, should_color);
-  output += "\n";
   append_kernel_settings(output, should_color);
 
   let directories = ArrayList<String>{allocator};
@@ -301,6 +299,7 @@ fn append_core_dump_report(String &output, Allocator allocator,
 
 constexpr i64 DEFAULT_LOG_ENTRY_COUNT = 5;
 constexpr usize MAGIC_BYTE_COUNT = 8;
+constexpr usize FORMAT_BATCH_COUNT = 64;
 
 constexpr StringView LOG_DIRECTORIES[] = {
     "/var/log",       "/var/log/journal", "/run/log/journal",
@@ -316,12 +315,12 @@ struct log_entry
   StringView format_label;
 };
 
-pure fn label_of_magic(const unsigned char *bytes, usize byte_count) wontthrow
+pure fn label_of_magic(const char *bytes, usize byte_count) wontthrow
     -> StringView
 {
   if (byte_count == 0) return "empty";
 
-  switch (bytes[0]) {
+  switch (static_cast<unsigned char>(bytes[0])) {
   case 'L':
     if (byte_count >= 8 && std::memcmp(bytes, "LPKSHHRH", 8) == 0) {
       return "journal";
@@ -333,7 +332,8 @@ pure fn label_of_magic(const unsigned char *bytes, usize byte_count) wontthrow
     }
     break;
   case 0x1f:
-    if (byte_count >= 2 && bytes[1] == 0x8b) return "gzip";
+    if (byte_count >= 2 && static_cast<unsigned char>(bytes[1]) == 0x8b)
+      return "gzip";
     break;
   case 0xfd:
     if (byte_count >= 6 && std::memcmp(bytes,
@@ -345,8 +345,9 @@ pure fn label_of_magic(const unsigned char *bytes, usize byte_count) wontthrow
     }
     break;
   case 0x28:
-    if (byte_count >= 4 && bytes[1] == 0xb5 && bytes[2] == 0x2f &&
-        bytes[3] == 0xfd)
+    if (byte_count >= 4 && static_cast<unsigned char>(bytes[1]) == 0xb5 &&
+        static_cast<unsigned char>(bytes[2]) == 0x2f &&
+        static_cast<unsigned char>(bytes[3]) == 0xfd)
     {
       return "zstd";
     }
@@ -355,8 +356,9 @@ pure fn label_of_magic(const unsigned char *bytes, usize byte_count) wontthrow
     if (byte_count >= 3 && std::memcmp(bytes, "BZh", 3) == 0) return "bzip2";
     break;
   case 0x04:
-    if (byte_count >= 4 && bytes[1] == 0x22 && bytes[2] == 0x4d &&
-        bytes[3] == 0x18)
+    if (byte_count >= 4 && static_cast<unsigned char>(bytes[1]) == 0x22 &&
+        static_cast<unsigned char>(bytes[2]) == 0x4d &&
+        static_cast<unsigned char>(bytes[3]) == 0x18)
     {
       return "lz4";
     }
@@ -365,7 +367,7 @@ pure fn label_of_magic(const unsigned char *bytes, usize byte_count) wontthrow
   }
 
   for (usize index = 0; index < byte_count; index++) {
-    let const byte = bytes[index];
+    let const byte = static_cast<unsigned char>(bytes[index]);
     if (byte == 0) return "binary";
 
     if (byte < 0x09 || (byte > 0x0d && byte < 0x20)) return "binary";
@@ -374,18 +376,12 @@ pure fn label_of_magic(const unsigned char *bytes, usize byte_count) wontthrow
   return "text";
 }
 
-fn sniff_format(StringView path) throws -> StringView
+struct format_probe
 {
-  let const opened = os::open_file_descriptor(path, os::file_open_mode::Read);
-  if (!opened.has_value()) return "unreadable";
-
-  unsigned char bytes[MAGIC_BYTE_COUNT] = {};
-  let const read_count = os::read_fd(*opened, bytes, MAGIC_BYTE_COUNT);
-  unused(os::close_fd(*opened));
-  if (!read_count.has_value()) return "unreadable";
-
-  return label_of_magic(bytes, *read_count);
-}
+  os::descriptor descriptor{KOSH_INVALID_FD};
+  usize entry_position{0};
+  char bytes[MAGIC_BYTE_COUNT]{};
+};
 
 fn collect_log_entries(StringView directory, Allocator allocator) throws
     -> ArrayList<log_entry>
@@ -395,6 +391,30 @@ fn collect_log_entries(StringView directory, Allocator allocator) throws
   if (!children.has_value()) return entries;
 
   entries.reserve(children->count());
+  format_probe probes[FORMAT_BATCH_COUNT]{};
+  usize probe_count = 0;
+  let batch = os::Batch{allocator};
+  let results = ArrayList<os::BatchResult>{allocator};
+  batch.reserve(FORMAT_BATCH_COUNT);
+  results.reserve(FORMAT_BATCH_COUNT);
+  let const do_flush_probes = [&]() throws -> void {
+    batch.clear();
+    for (usize index = 0; index < probe_count; index++) {
+      batch.add(os::BatchOperation::read(
+          probes[index].descriptor, probes[index].bytes, MAGIC_BYTE_COUNT));
+    }
+    batch.execute(results);
+    for (usize index = 0; index < probe_count; index++) {
+      let const &result = results[index];
+      if (result.error_number == 0) {
+        entries[probes[index].entry_position].format_label =
+            label_of_magic(probes[index].bytes, result.transferred_byte_count);
+      }
+      unused(os::close_fd(probes[index].descriptor));
+    }
+    probe_count = 0;
+  };
+
   for (usize index = 0; index < children->count(); index++) {
     let const &child_entry = (*children)[index];
     if (!child_entry.has_status) continue;
@@ -407,11 +427,23 @@ fn collect_log_entries(StringView directory, Allocator allocator) throws
     entry.name = String{allocator, child.name.view()};
     entry.size = child_entry.status.size;
     entry.modification_time = child_entry.status.modification_time;
-    entry.format_label = os::file_type_letter(child_entry.status.mode) == 'd'
-                             ? StringView{"directory"}
-                             : sniff_format(child_path.text());
+    let const is_directory =
+        os::file_type_letter(child_entry.status.mode) == 'd';
+    entry.format_label =
+        is_directory ? StringView{"directory"} : StringView{"unreadable"};
     entries.push(steal(entry));
+    if (is_directory) continue;
+
+    let const opened =
+        os::open_file_descriptor(child_path.text(), os::file_open_mode::Read);
+    if (!opened.has_value()) continue;
+
+    probes[probe_count].descriptor = *opened;
+    probes[probe_count].entry_position = entries.count() - 1;
+    probe_count++;
+    if (probe_count == FORMAT_BATCH_COUNT) do_flush_probes();
   }
+  if (probe_count != 0) do_flush_probes();
 
   entries.sort([](const log_entry &left, const log_entry &right) {
     if (left.modification_time != right.modification_time) {
@@ -427,9 +459,6 @@ fn collect_log_entries(StringView directory, Allocator allocator) throws
 fn append_log_report(String &output, Allocator allocator,
                      bool should_color) throws -> void
 {
-  append_report_text(output, "LOGS", colors::ansi::BOLD_BLUE, should_color);
-  output += "\n";
-
   usize directory_count = 0;
   for (let const directory : LOG_DIRECTORIES) {
     if (!os::path_is_directory(directory)) continue;
@@ -478,7 +507,7 @@ fn append_log_report(String &output, Allocator allocator,
   if (directory_count == 0) output += "No log directories were found\n";
 }
 
-}
+} /* namespace */
 
 EvilLogs::EvilLogs() = default;
 
@@ -507,20 +536,36 @@ fn EvilLogs::execute(
   let const should_color = colors::stdout_wants_color();
   let const has_filter =
       FLAG_EVILLOGS_CORES.is_enabled() || FLAG_EVILLOGS_LOGS.is_enabled();
+  let const should_show_titles =
+      !has_filter ||
+      (FLAG_EVILLOGS_CORES.is_enabled() && FLAG_EVILLOGS_LOGS.is_enabled());
   if (!has_filter || FLAG_EVILLOGS_CORES.is_enabled()) {
     let section = String{allocator};
     append_core_dump_report(section, allocator, should_color);
-    append_indented_report(output, section.view());
+    if (should_show_titles) {
+      append_report_text(output, "CORES", colors::ansi::BOLD_BLUE,
+                         should_color);
+      output += "\n";
+      append_report_body(output, section.view());
+    } else {
+      output += section.view();
+    }
   }
   if (!has_filter || FLAG_EVILLOGS_LOGS.is_enabled()) {
     if (!output.is_empty()) output += "\n";
     let section = String{allocator};
     append_log_report(section, allocator, should_color);
-    append_indented_report(output, section.view());
+    if (should_show_titles) {
+      append_report_text(output, "LOGS", colors::ansi::BOLD_BLUE, should_color);
+      output += "\n";
+      append_report_body(output, section.view());
+    } else {
+      output += section.view();
+    }
   }
 
   ec.print_to_stdout(output);
   return 0;
 }
 
-}
+} /* namespace koshka::koshkit */

@@ -146,10 +146,10 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
 
   let output = String{cxt.scratch_allocator()};
   let const should_color = colors::stdout_wants_color();
-  append_report_text(output, "FILESYSTEMS", colors::ansi::BOLD_BLUE,
-                     should_color);
-  output += "\n";
   if (FLAG_EVILFS_ALL.is_enabled()) {
+    append_report_text(output, "FILESYSTEMS", colors::ansi::BOLD_BLUE,
+                       should_color);
+    output += "\n";
     for (let const &mount : mounts) {
       if (!output.is_empty()) output += "\n";
       append_detailed_filesystem(output, mount, cxt.scratch_allocator(),
@@ -159,7 +159,6 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
     return mounts.is_empty() ? 1 : 0;
   }
 
-  output += "  ";
   append_report_column(output, "SOURCE", source_width, false,
                        colors::ansi::BOLD_CYAN, should_color);
   output += "  ";
@@ -173,7 +172,6 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
   output += "\n";
 
   for (let const &mount : mounts) {
-    output += "  ";
     append_report_column(output, mount.source.view(), source_width, false,
                          colors::ansi::GREEN, should_color);
     output += "  ";
@@ -192,4 +190,4 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
   return mounts.is_empty() ? 1 : 0;
 }
 
-}
+} /* namespace koshka::koshkit */

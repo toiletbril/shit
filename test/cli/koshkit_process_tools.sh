@@ -142,6 +142,34 @@ case $process_tree in
 esac
 printf 'evilps-single-title=%s\n' "$process_title"
 
+filesystem_report=$("$BIN" -c 'koshkit evilfs')
+case $filesystem_report in
+  SOURCE*TARGET*TYPE*OPTIONS*) filesystem_title=omitted ;;
+  *) filesystem_title=present ;;
+esac
+printf 'evilfs-single-title=%s\n' "$filesystem_title"
+
+filesystem_all_report=$("$BIN" -c 'koshkit evilfs --all')
+case $filesystem_all_report in
+  FILESYSTEMS*) filesystem_all_title=present ;;
+  *) filesystem_all_title=missing ;;
+esac
+printf 'evilfs-multiple-titles=%s\n' "$filesystem_all_title"
+
+cores_report=$("$BIN" -c 'koshkit evillogs --cores')
+case $cores_report in
+  CORES*|*LOGS*) cores_title=present ;;
+  *) cores_title=omitted ;;
+esac
+printf 'evillogs-single-title=%s\n' "$cores_title"
+
+logs_report=$("$BIN" -c 'koshkit evillogs --cores --logs')
+case $logs_report in
+  CORES*LOGS*) logs_titles=present ;;
+  *) logs_titles=missing ;;
+esac
+printf 'evillogs-multiple-titles=%s\n' "$logs_titles"
+
 "$BIN" -c 'koshkit evilio --all --cumulative --color never' \
   > "$TEST_NULL_DEVICE" 2>&1
 printf 'evilio-conflict=%s\n' "$?"

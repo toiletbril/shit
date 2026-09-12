@@ -1891,10 +1891,11 @@ Open files are listed for visible processes. The
 .BR \-p ,
 .BR \-u ,
 .BR \-c ,
+.BR \-i ,
 and
 .B \-t
-options filter by process, owner, command prefix, and terse process identifier
-output.
+options filter by process, owner, command prefix, socket descriptor, and terse
+process identifier output.
 .TP
 .B evilfs
 Mounted filesystem sources, targets, types, and options are printed in a sorted
@@ -1905,7 +1906,8 @@ Current memory, swap, and cumulative disk I/O counters are printed without
 waiting. The
 .B \-a
 option adds processor usage, paging, scheduler state, pressure stalls, disk
-activity, and swap rates from a one second sample. The
+activity, and swap rates from a one second sample.
+Nonzero stall rates and disk failures are highlighted. The
 .B \-\-cumulative
 option prints only disk byte rates and IOPS. An optional duration selects the
 sample interval and defaults to one second. With
@@ -1931,6 +1933,7 @@ options select one report.
 Assigned IPv4 and IPv6 addresses are printed in a sorted table. The
 .B \-a
 option adds interface traffic, packet errors, packet drops, and TCP totals.
+Nonzero error, drop, and failure counters are also reported as warnings.
 .TP
 .B goodnode
 Inode identity, allocation, known filesystem capabilities, verification state,

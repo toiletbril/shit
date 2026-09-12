@@ -342,7 +342,9 @@ fn append_stall_field(String &body, StringView name, Maybe<u64> rate,
   value += " us/s (";
   value += percent_text(*rate, 1000000, allocator).view();
   value += ")";
-  append_report_field(body, name, value.view(), colors::ansi::BOLD_CYAN,
+  append_report_field(body, name, value.view(),
+                      *rate == 0 ? colors::ansi::BOLD_CYAN
+                                 : colors::ansi::BOLD_RED,
                       should_color);
 }
 
@@ -439,7 +441,7 @@ fn append_process_io_report(String &output, const ArrayList<io_row> &rows,
   }
 }
 
-}
+} /* namespace */
 
 EvilIO::EvilIO() = default;
 
@@ -1209,21 +1211,27 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
           &os::disk_io_status::read_error_count,
           &os::disk_io_status::write_error_count);
       output += "  ";
-      append_report_column(output,
-                           error_count.has_value()
-                               ? String::from(*error_count, allocator).view()
-                               : StringView{"-"},
-                           8, true, {}, should_color);
+      append_report_column(
+          output,
+          error_count.has_value() ? String::from(*error_count, allocator).view()
+                                  : StringView{"-"},
+          8, true,
+          error_count.has_value() && *error_count != 0 ? colors::ansi::BOLD_RED
+                                                       : colors::ansi::GREEN,
+          should_color);
       let const retry_count = do_failure_total(
           os::disk_io_field::ReadRetries, os::disk_io_field::WriteRetries,
           &os::disk_io_status::read_retry_count,
           &os::disk_io_status::write_retry_count);
       output += "  ";
-      append_report_column(output,
-                           retry_count.has_value()
-                               ? String::from(*retry_count, allocator).view()
-                               : StringView{"-"},
-                           8, true, {}, should_color);
+      append_report_column(
+          output,
+          retry_count.has_value() ? String::from(*retry_count, allocator).view()
+                                  : StringView{"-"},
+          8, true,
+          retry_count.has_value() && *retry_count != 0 ? colors::ansi::BOLD_RED
+                                                       : colors::ansi::GREEN,
+          should_color);
       output += "\n";
     }
     output += "\n";
@@ -1295,4 +1303,4 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   return 0;
 }
 
-}
+} /* namespace koshka::koshkit */
