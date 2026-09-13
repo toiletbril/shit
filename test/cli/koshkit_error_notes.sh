@@ -9,6 +9,15 @@ echo "=== killall arg count ==="
 echo "=== seq zero increment ==="
 "$BIN" -c 'koshkit seq 1 0 10' 2>&1
 
+echo "=== seq integer location ==="
+"$BIN" -c 'koshkit seq nope' 2>&1
+
+echo "=== seq negative location preservation ==="
+"$BIN" -c 'koshkit seq -2 nope' 2>&1
+
+echo "=== seq extra operand location ==="
+"$BIN" -c 'koshkit seq 1 2 3 4' 2>&1
+
 echo "=== ln without -s ==="
 "$BIN" -c 'koshkit ln a b' 2>&1
 

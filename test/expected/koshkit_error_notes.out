@@ -4,10 +4,25 @@
        |                    ^
 note: pass one name, e.g. `killall firefox`.
 === seq zero increment ===
-1:1: error: seq: the increment must not be zero.
+1:15: error: seq: the increment must not be zero.
      1 |  koshkit seq 1 0 10
-       |  ^~~~~~~~~~~~~~~~~~
-note: Give a non-zero step, e.g. `seq 1 2 10`.
+       |                ^
+note: use a nonzero step, such as `seq 1 2 10`.
+=== seq integer location ===
+1:13: error: seq: invalid integer argument 'nope'.
+     1 |  koshkit seq nope
+       |              ^~~~
+note: use a decimal integer from -9223372036854775808 through 9223372036854775807.
+=== seq negative location preservation ===
+1:16: error: seq: invalid integer argument 'nope'.
+     1 |  koshkit seq -2 nope
+       |                 ^~~~
+note: use a decimal integer from -9223372036854775808 through 9223372036854775807.
+=== seq extra operand location ===
+1:19: error: seq: extra operand '4'.
+     1 |  koshkit seq 1 2 3 4
+       |                    ^
+note: use `seq LAST`, `seq FIRST LAST`, or `seq FIRST STEP LAST`.
 === ln without -s ===
 1:1: error: ln: cannot create link 'b': No such file or directory.
      1 |  koshkit ln a b

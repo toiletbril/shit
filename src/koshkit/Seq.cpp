@@ -28,18 +28,6 @@ namespace koshka {
 
 namespace koshkit {
 
-static fn parse_integer(StringView text, Allocator allocator) throws -> i64
-{
-  let const parsed = text.to<i64>();
-  if (parsed.is_error())
-    throw ErrorWithDetails{
-        "seq: invalid integer argument '" + String{allocator, text}
-          + "'",
-        "Each argument must be a whole or fractional number"
-    };
-  return parsed.value();
-}
-
 static fn is_negative_number_token(StringView token) wontthrow -> bool
 {
   return token.count() >= 2 && token[0] == '-' &&
@@ -75,20 +63,29 @@ fn Seq::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  unused(arg_locations);
   ArrayList<String> patched_args{cxt.scratch_allocator()};
+  ArrayList<SourceLocation> patched_arg_locations{cxt.scratch_allocator()};
   let const negative_position = find_leading_negative_position(args);
   if (negative_position.has_value()) {
     patched_args.reserve(args.count() + 1);
+    patched_arg_locations.reserve(arg_locations.count() + 1);
     for (usize i = 0; i < args.count(); i++) {
-      if (i == *negative_position) patched_args.push_managed(StringView{"--"});
+      if (i == *negative_position) {
+        patched_args.push_managed(StringView{"--"});
+        patched_arg_locations.push(SourceLocation{});
+      }
       patched_args.push_managed(args[i].view());
+      patched_arg_locations.push(arg_locations[i]);
     }
   }
 
   let const &effective_args =
       negative_position.has_value() ? patched_args : args;
-  let const operands = parse_util_operands(FLAG_LIST, effective_args);
+  let const &effective_arg_locations =
+      negative_position.has_value() ? patched_arg_locations : arg_locations;
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands = parse_util_operands(
+      FLAG_LIST, effective_args, &effective_arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -98,25 +95,45 @@ fn Seq::execute(const ExecContext &ec, EvalContext &cxt,
   i64 first = 1;
   i64 increment = 1;
   i64 last = 0;
-  let const allocator = cxt.scratch_allocator();
+  let const do_parse_integer = [&](usize operand_position, i64 &value)
+                                   throws -> bool {
+    let const parsed = operands[operand_position].view().to<i64>();
+    if (parsed.is_error()) {
+      KOSHKIT_REPORT_ERROR_AT(
+          operand_locations[operand_position],
+          "invalid integer argument '" + operands[operand_position] + "'",
+          "use a decimal integer from -9223372036854775808 through "
+          "9223372036854775807");
+      return false;
+    }
+
+    value = parsed.value();
+    return true;
+  };
+
   if (operands.count() == 1) {
-    last = parse_integer(operands[0].view(), allocator);
+    if (!do_parse_integer(0, last)) return 1;
   } else if (operands.count() == 2) {
-    first = parse_integer(operands[0].view(), allocator);
-    last = parse_integer(operands[1].view(), allocator);
+    if (!do_parse_integer(0, first) || !do_parse_integer(1, last)) return 1;
   } else if (operands.count() == 3) {
-    first = parse_integer(operands[0].view(), allocator);
-    increment = parse_integer(operands[1].view(), allocator);
-    last = parse_integer(operands[2].view(), allocator);
+    if (!do_parse_integer(0, first) || !do_parse_integer(1, increment) ||
+        !do_parse_integer(2, last))
+    {
+      return 1;
+    }
   } else {
-    throw ErrorWithDetails{
-        "seq expects one to three integer operands",
-        "Use `seq LAST`, `seq FIRST LAST`, or `seq FIRST STEP LAST`"};
+    KOSHKIT_REPORT_ERROR_AT(
+        operand_locations[3], "extra operand '" + operands[3] + "'",
+        "use `seq LAST`, `seq FIRST LAST`, or `seq FIRST STEP LAST`");
+    return 1;
   }
 
-  if (increment == 0)
-    throw ErrorWithDetails{"seq: the increment must not be zero",
-                           "Give a non-zero step, e.g. `seq 1 2 10`"};
+  if (increment == 0) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[1],
+                            "the increment must not be zero",
+                            "use a nonzero step, such as `seq 1 2 10`");
+    return 1;
+  }
 
   let output = String{cxt.scratch_allocator()};
   static constexpr usize OUTPUT_BUFFER_LENGTH = 64 * 1024;
