@@ -2,3 +2,4 @@ error-color=passed
 source-colors=passed
 caret-color=passed
 note-color=passed
+warning-color=passed

@@ -1,2 +1,10 @@
 koshkit retry -n 2 -d 0 -q printf retry-ok
 echo
+
+attempt=0
+retry_once()
+{
+  attempt=$((attempt + 1))
+  [ "$attempt" -eq 2 ]
+}
+koshkit retry -n 2 -d 0 retry_once

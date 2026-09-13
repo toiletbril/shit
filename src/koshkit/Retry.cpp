@@ -8,7 +8,6 @@
  */
 
 #include "../CLI.hpp"
-#include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
@@ -160,7 +159,6 @@ fn Retry::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const source = build_command_source(operands, allocator);
   i32 status = 0;
-  let const should_color = colors::stderr_wants_color();
 
   let const saved_terminal_exec = cxt.terminal_exec_allowed();
   cxt.set_terminal_exec_allowed(false);
@@ -180,18 +178,13 @@ fn Retry::execute(const ExecContext &ec, EvalContext &cxt,
 
     if (!FLAG_RETRY_QUIET.is_enabled()) {
       let line = String{allocator};
-      append_report_text(line, "retry", colors::ansi::BOLD_YELLOW,
-                         should_color);
-      line += ": attempt ";
-      append_report_text(line, String::from(attempt, allocator).view(),
-                         colors::ansi::YELLOW, should_color);
+      line += "retry attempt ";
+      line += String::from(attempt, allocator).view();
       line += " of ";
       line += String::from(attempt_limit, allocator).view();
       line += " failed with status ";
-      append_report_text(line, String::from(status, allocator).view(),
-                         colors::ansi::BOLD_RED, should_color);
-      line += "\n";
-      ec.print_to_stderr(line);
+      line += String::from(status, allocator).view();
+      show_message(Warning{line.view()}.to_string());
     }
 
     if (delay_seconds > 0.0 && !sleep_interruptibly(delay_seconds)) {

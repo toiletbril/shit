@@ -3,6 +3,18 @@
     [SimpleCommand "koshkit" "retry" "-n" "2" "-d" "0" "-q" "printf" "retry-ok"]
   [CompoundListCondition, None]
     [SimpleCommand "echo"]
+  [CompoundListCondition, None]
+    [Assign attempt=0]
+  [CompoundListCondition, None]
+    [FunctionDefinition "retry_once"]
+      [BraceGroup]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [Assign attempt=$((attempt + 1))]
+          [CompoundListCondition, None]
+            [SimpleCommand "[" "$attempt" "-eq" "2" "]"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "retry" "-n" "2" "-d" "0" "retry_once"]
 [Word
   Unquoted "koshkit"
 ]
@@ -33,4 +45,57 @@
 [Word
   Unquoted "echo"
 ]
+[Word
+  Unquoted "attempt=0"
+]
+[Word
+  Unquoted "retry_once"
+]
+[Word
+  Unquoted "{"
+]
+[Word
+  Unquoted "attempt="
+  ArithmeticExpansion "attempt + 1"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "attempt"
+]
+[Word
+  Unquoted "-eq"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "}"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "retry"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "retry_once"
+]
 retry-ok
+warning: retry attempt 1 of 2 failed with status 1.
