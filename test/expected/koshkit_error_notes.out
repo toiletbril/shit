@@ -84,6 +84,11 @@ note: use a decimal integer from -2147483648 through 2147483647.
      1 |  koshkit renice -n 2147483648 1
        |                    ^~~~~~~~~~
 note: use a decimal integer from -2147483648 through 2147483647.
+=== paste delimiter location ===
+1:18: error: paste: delimiter list is empty.
+     1 |  koshkit paste -d ''
+       |                   ^~
+note: provide one or more delimiter characters.
 === date operand location ===
 1:14: error: date: setting the system clock is unsupported.
      1 |  koshkit date 2026

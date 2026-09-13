@@ -55,6 +55,9 @@ echo "=== renice increment location ==="
 echo "=== renice increment range ==="
 "$BIN" -c 'koshkit renice -n 2147483648 1' 2>&1
 
+echo "=== paste delimiter location ==="
+"$BIN" -c "koshkit paste -d ''" 2>&1
+
 echo "=== date operand location ==="
 "$BIN" -c 'koshkit date 2026' 2>&1
 

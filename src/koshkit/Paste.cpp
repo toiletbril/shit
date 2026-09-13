@@ -31,8 +31,6 @@ namespace koshka::koshkit {
 static fn parse_paste_delimiters(StringView text, Allocator allocator) throws
     -> String
 {
-  if (text.is_empty()) throw Error{"paste: delimiter list is empty"};
-
   String delimiters{allocator};
   for (usize position = 0; position < text.length; position++) {
     let byte = text[position];
@@ -67,15 +65,22 @@ fn Paste::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let const operands = PARSE_KOSHKIT_ARGS(args, arg_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
-  let const delimiters = parse_paste_delimiters(
-      FLAG_PASTE_DELIMITERS.is_set() ? FLAG_PASTE_DELIMITERS.value()
-                                     : StringView{"\t"},
-      cxt.scratch_allocator());
+  let const delimiter_text = FLAG_PASTE_DELIMITERS.is_set()
+                                 ? FLAG_PASTE_DELIMITERS.value()
+                                 : StringView{"\t"};
+  if (delimiter_text.is_empty()) {
+    KOSHKIT_REPORT_ERROR_AT(FLAG_PASTE_DELIMITERS.value_location(),
+                            "delimiter list is empty",
+                            "provide one or more delimiter characters");
+    return 1;
+  }
+
+  let const delimiters =
+      parse_paste_delimiters(delimiter_text, cxt.scratch_allocator());
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator());
   let contents = ArrayList<String>{cxt.scratch_allocator()};
