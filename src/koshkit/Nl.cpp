@@ -44,14 +44,6 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Nl);
 
 namespace koshka::koshkit {
 
-static fn parse_nl_unsigned(StringView value, StringView name) throws -> u64
-{
-  let const parsed = utils::parse_decimal_u64(value);
-  if (parsed.is_error())
-    throw Error{"nl: invalid " + String{name} + " '" + String{value} + "'"};
-  return parsed.value();
-}
-
 enum class nl_style : uchar
 {
   All,
@@ -137,7 +129,14 @@ fn Nl::execute(const ExecContext &ec, EvalContext &cxt,
   if (!body_style.has_value() || !header_style.has_value() ||
       !footer_style.has_value())
   {
-    throw Error{"nl: unsupported numbering style"};
+    let const *invalid_flag = !body_style.has_value()     ? &FLAG_NL_BODY
+                              : !header_style.has_value() ? &FLAG_NL_HEADER
+                                                          : &FLAG_NL_FOOTER;
+    KOSHKIT_REPORT_ERROR_AT(
+        invalid_flag->value_location(),
+        "unsupported numbering style '" + invalid_flag->value() + "'",
+        "use a for all lines, t for nonempty lines, or n for no lines");
+    return 1;
   }
 
   let const number_format_name =
@@ -150,33 +149,79 @@ fn Nl::execute(const ExecContext &ec, EvalContext &cxt,
   };
   static constexpr StaticStringMap NUMBER_FORMATS{NUMBER_FORMAT_ENTRIES};
   let const number_format = NUMBER_FORMATS.find(number_format_name);
-  if (!number_format.has_value()) throw Error{"nl: invalid number format"};
+  if (!number_format.has_value()) {
+    KOSHKIT_REPORT_ERROR_AT(FLAG_NL_FORMAT.value_location(),
+                            "invalid number format '" + FLAG_NL_FORMAT.value() +
+                                "'",
+                            "use ln, rn, or rz");
+    return 1;
+  }
 
-  let const increment =
-      FLAG_NL_INCREMENT.is_set()
-          ? parse_nl_unsigned(FLAG_NL_INCREMENT.value(), "increment")
-          : 1;
-  let const blank_group =
-      FLAG_NL_BLANK_GROUP.is_set()
-          ? parse_nl_unsigned(FLAG_NL_BLANK_GROUP.value(), "blank group")
-          : 1;
-  let const width_value =
-      FLAG_NL_WIDTH.is_set() ? parse_nl_unsigned(FLAG_NL_WIDTH.value(), "width")
-                             : 6;
-  if (blank_group == 0 || width_value == 0 || width_value > SIZE_MAX)
-    throw Error{"nl: numeric option is outside its valid range"};
+  u64 increment = 1;
+  if (FLAG_NL_INCREMENT.is_set()) {
+    let const parsed = utils::parse_decimal_u64(FLAG_NL_INCREMENT.value());
+    if (parsed.is_error() || parsed.value() > INT64_MAX) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_NL_INCREMENT.value_location(),
+          "invalid increment '" + FLAG_NL_INCREMENT.value() + "'",
+          "use a decimal integer from 0 through 9223372036854775807");
+      return 1;
+    }
 
-  let const start_value =
-      FLAG_NL_START.is_set() ? parse_nl_unsigned(FLAG_NL_START.value(), "start")
-                             : 1;
-  if (start_value > INT64_MAX || increment > INT64_MAX)
-    throw Error{"nl: line number is too large"};
+    increment = parsed.value();
+  }
+
+  u64 blank_group = 1;
+  if (FLAG_NL_BLANK_GROUP.is_set()) {
+    let const parsed = utils::parse_decimal_u64(FLAG_NL_BLANK_GROUP.value());
+    if (parsed.is_error() || parsed.value() == 0) {
+      KOSHKIT_REPORT_ERROR_AT(FLAG_NL_BLANK_GROUP.value_location(),
+                              "invalid blank group '" +
+                                  FLAG_NL_BLANK_GROUP.value() + "'",
+                              "use a positive decimal integer");
+      return 1;
+    }
+
+    blank_group = parsed.value();
+  }
+
+  u64 width_value = 6;
+  if (FLAG_NL_WIDTH.is_set()) {
+    let const parsed = utils::parse_decimal_u64(FLAG_NL_WIDTH.value());
+    if (parsed.is_error() || parsed.value() == 0 || parsed.value() > SIZE_MAX) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_NL_WIDTH.value_location(),
+          "invalid width '" + FLAG_NL_WIDTH.value() + "'",
+          "use a positive decimal integer within the platform size limit");
+      return 1;
+    }
+
+    width_value = parsed.value();
+  }
+
+  u64 start_value = 1;
+  if (FLAG_NL_START.is_set()) {
+    let const parsed = utils::parse_decimal_u64(FLAG_NL_START.value());
+    if (parsed.is_error() || parsed.value() > INT64_MAX) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_NL_START.value_location(),
+          "invalid starting line number '" + FLAG_NL_START.value() + "'",
+          "use a decimal integer from 0 through 9223372036854775807");
+      return 1;
+    }
+
+    start_value = parsed.value();
+  }
 
   let const separator =
       FLAG_NL_SEPARATOR.is_set() ? FLAG_NL_SEPARATOR.value() : StringView{"\t"};
   let const delimiter = FLAG_NL_DELIMITER.is_set() ? FLAG_NL_DELIMITER.value()
                                                    : StringView{"\\:"};
-  if (delimiter.length != 2) throw Error{"nl: delimiter must be two bytes"};
+  if (delimiter.length != 2) {
+    KOSHKIT_REPORT_ERROR_AT(FLAG_NL_DELIMITER.value_location(),
+                            "the section delimiter must be two bytes");
+    return 1;
+  }
 
   let const source = operands.is_empty() ? StringView{"-"} : operands[0].view();
   let const input = open_named_or_stdin(ec, source);

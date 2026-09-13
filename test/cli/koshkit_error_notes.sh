@@ -65,6 +65,36 @@ echo "=== nice increment range ==="
 echo "=== nice command location ==="
 "$BIN" -c 'koshkit nice KOSH_MISSING_COMMAND' 2>&1
 
+echo "=== nl body style location ==="
+"$BIN" -c 'koshkit nl -b invalid' 2>&1
+
+echo "=== nl header style location ==="
+"$BIN" -c 'koshkit nl -h invalid' 2>&1
+
+echo "=== nl footer style location ==="
+"$BIN" -c 'koshkit nl -f invalid' 2>&1
+
+echo "=== nl number format location ==="
+"$BIN" -c 'koshkit nl -n invalid' 2>&1
+
+echo "=== nl increment location ==="
+"$BIN" -c 'koshkit nl -i invalid' 2>&1
+
+echo "=== nl increment limit ==="
+"$BIN" -c 'koshkit nl -i 9223372036854775808' 2>&1
+
+echo "=== nl blank group location ==="
+"$BIN" -c 'koshkit nl -l 0' 2>&1
+
+echo "=== nl width location ==="
+"$BIN" -c 'koshkit nl -w 0' 2>&1
+
+echo "=== nl start limit ==="
+"$BIN" -c 'koshkit nl -v 9223372036854775808' 2>&1
+
+echo "=== nl delimiter location ==="
+"$BIN" -c 'koshkit nl -d :' 2>&1
+
 echo "=== grep pattern location ==="
 "$BIN" -c "koshkit grep '['" 2>&1
 echo "=== grep file location ==="

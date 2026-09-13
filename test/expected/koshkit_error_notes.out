@@ -99,6 +99,55 @@ note: use a decimal integer from -2147483648 through 2147483647.
 1:14: error: nice: cannot run 'KOSH_MISSING_COMMAND': No such file or directory.
      1 |  koshkit nice KOSH_MISSING_COMMAND
        |               ^~~~~~~~~~~~~~~~~~~~
+=== nl body style location ===
+1:15: error: nl: unsupported numbering style 'invalid'.
+     1 |  koshkit nl -b invalid
+       |                ^~~~~~~
+note: use a for all lines, t for nonempty lines, or n for no lines.
+=== nl header style location ===
+1:15: error: nl: unsupported numbering style 'invalid'.
+     1 |  koshkit nl -h invalid
+       |                ^~~~~~~
+note: use a for all lines, t for nonempty lines, or n for no lines.
+=== nl footer style location ===
+1:15: error: nl: unsupported numbering style 'invalid'.
+     1 |  koshkit nl -f invalid
+       |                ^~~~~~~
+note: use a for all lines, t for nonempty lines, or n for no lines.
+=== nl number format location ===
+1:15: error: nl: invalid number format 'invalid'.
+     1 |  koshkit nl -n invalid
+       |                ^~~~~~~
+note: use ln, rn, or rz.
+=== nl increment location ===
+1:15: error: nl: invalid increment 'invalid'.
+     1 |  koshkit nl -i invalid
+       |                ^~~~~~~
+note: use a decimal integer from 0 through 9223372036854775807.
+=== nl increment limit ===
+1:15: error: nl: invalid increment '9223372036854775808'.
+     1 |  koshkit nl -i 9223372036854775808
+       |                ^~~~~~~~~~~~~~~~~~~
+note: use a decimal integer from 0 through 9223372036854775807.
+=== nl blank group location ===
+1:15: error: nl: invalid blank group '0'.
+     1 |  koshkit nl -l 0
+       |                ^
+note: use a positive decimal integer.
+=== nl width location ===
+1:15: error: nl: invalid width '0'.
+     1 |  koshkit nl -w 0
+       |                ^
+note: use a positive decimal integer within the platform size limit.
+=== nl start limit ===
+1:15: error: nl: invalid starting line number '9223372036854775808'.
+     1 |  koshkit nl -v 9223372036854775808
+       |                ^~~~~~~~~~~~~~~~~~~
+note: use a decimal integer from 0 through 9223372036854775807.
+=== nl delimiter location ===
+1:15: error: nl: the section delimiter must be two bytes.
+     1 |  koshkit nl -d :
+       |                ^
 === grep pattern location ===
 1:14: error: grep: the pattern '[' is not a valid regex.
      1 |  koshkit grep '['
