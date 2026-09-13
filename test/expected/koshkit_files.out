@@ -64,7 +64,7 @@ rmdir-parents=missing
 unlink rc=0
 0
 --- unlink a directory fails ---
-1:1: error: unlink: cannot unlink 'a': it is a directory.
+1:16: error: unlink: cannot unlink 'a': it is a directory.
      1 |  koshkit unlink a
-       |  ^~~~~~~~~~~~~~~~
+       |                 ^
 rc=1
