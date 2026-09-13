@@ -181,22 +181,22 @@ note: use [+]OCTAL, [+]DECIMAL., or either form followed by b.
 1:15: error: od: unsupported output type 'invalid'.
      1 |  koshkit od -t invalid
        |                ^~~~~~~
-note: use c, d, o, u, or x with an optional width of 1, 2, 4, or 8.
+note: use c, d, o, u, or x with an optional width of 1, 2, 4, 8, C, S, I, or L.
 === od trailing output type location ===
 1:15: error: od: unsupported output type 'x12'.
      1 |  koshkit od -t x12
        |                ^~~
-note: use c, d, o, u, or x with an optional width of 1, 2, 4, or 8.
+note: use c, d, o, u, or x with an optional width of 1, 2, 4, 8, C, S, I, or L.
 === od integer width location ===
 1:15: error: od: unsupported integer width in 'x3'.
      1 |  koshkit od -t x3
        |                ^~
-note: use a width of 1, 2, 4, or 8.
+note: use 1, 2, 4, 8, C, S, I, or L.
 === od repeated output type location ===
 1:21: error: od: unsupported output type 'invalid'.
      1 |  koshkit od -t x1 -t invalid
        |                      ^~~~~~~
-note: use c, d, o, u, or x with an optional width of 1, 2, 4, or 8.
+note: use c, d, o, u, or x with an optional width of 1, 2, 4, 8, C, S, I, or L.
 === pr page number location ===
 1:12: error: pr: invalid page number '+0'.
      1 |  koshkit pr +0

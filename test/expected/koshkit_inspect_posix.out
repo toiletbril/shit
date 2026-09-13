@@ -158,6 +158,18 @@ flash|FWS]
     [Pipeline]
       [SimpleCommand "printf" "abcdefghijklmnop"]
       [SimpleCommand "koshkit" "od" "-A" "n" "-t" "c" "-j" "0xb" "-N" "1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "\377\200\177\0"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "od" "-A" "n" "-t" "dC" "od-signed"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "od" "-A" "n" "-t" "dS" "-t" "dI" "-t" "dL" "od-signed"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "od-symbolic-widths=$?"]
 [Word
   Unquoted "root="
   CommandSubstitution "mktemp -d"
@@ -1120,6 +1132,79 @@ flash|FWS"
 [Word
   Unquoted "1"
 ]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "\377\200\177\0"
+]
+[Word
+  Unquoted "od-signed"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "-A"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "dC"
+]
+[Word
+  Unquoted "od-signed"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "-A"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "dS"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "dI"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "dL"
+]
+[Word
+  Unquoted "od-signed"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "od-symbolic-widths="
+  Variable "?"
+]
 empty: empty
 text: text
 binary: data
@@ -1168,14 +1253,14 @@ abcde
         31 32 33 34 35 36 37 38 39 30 61 62 63 64 65 66
         31 32 33 34 35 36 37 38 39 30 61 62 63 64 65 66
         soh stx etx eot enq ack bel  \b
-        000513 001027 001541 002055
-        001001 002003 003005 004007
-        000513 001027 001541 002055
-        0201 0403 0605 0807
-        001 002 003 004 005 006 007 008
-        000513 001027 001541 002055
-        000067305985 000134678021
-        000000578437695752307201
+           67305985   134678021
+        00400601001 01001603005
+            67305985    134678021
+        04030201 08070605
+           1    2    3    4    5    6    7    8
+           513   1027   1541   2055
+           67305985   134678021
+          578437695752307201
 0000001 066145 067554 000012
 0000006
 0000001 066145 067554 000012
@@ -1188,3 +1273,5 @@ od-modern-plus-file=1
           a   b   c   d
           a   b   c   d
           l
+          -1 -128  127    0
+od-symbolic-widths=0
