@@ -448,6 +448,9 @@ echo "=== killall signal location ==="
 echo "=== pkill signal location ==="
 "$BIN" -c 'koshkit pkill --signal KOSH_MISSING_SIGNAL process' 2>&1
 
+echo "=== pkill signal range location ==="
+"$BIN" -c 'koshkit pkill --signal 999999999999999999999 process' 2>&1
+
 echo "=== sed implicit script location ==="
 "$BIN" -c "koshkit sed 's/a'" 2>&1
 

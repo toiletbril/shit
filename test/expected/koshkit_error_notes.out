@@ -716,6 +716,11 @@ note: Use a signal name such as TERM or a number such as 15.
      1 |  koshkit pkill --signal KOSH_MISSING_SIGNAL process
        |                         ^~~~~~~~~~~~~~~~~~~
 note: Use a signal name such as TERM or a number such as 15.
+=== pkill signal range location ===
+1:24: error: koshkit pkill: signal number is out of range.
+     1 |  koshkit pkill --signal 999999999999999999999 process
+       |                         ^~~~~~~~~~~~~~~~~~~~~
+note: Use a signal name such as TERM or a number such as 15.
 === sed implicit script location ===
 1:13: error: sed: unterminated delimited expression.
      1 |  koshkit sed 's/a'
