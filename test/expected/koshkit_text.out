@@ -158,10 +158,10 @@ abc
 --- tr -d digits ---
 abc
 --- tr reverse range ---
-1:1: error: tr rejects a reverse range in a set.
+1:16: error: tr: reverse range in set 'z-x'.
      1 |  koshkit tr a-c z-x
-       |  ^~~~~~~~~~~~~~~~~~
-note: Order the range endpoints so the low byte precedes the high byte.
+       |                 ^~~
+note: order the endpoints from the lower byte to the higher byte.
 --- seq into head ---
 1
 2
