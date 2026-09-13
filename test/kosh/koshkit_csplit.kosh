@@ -1,0 +1,73 @@
+root=$(mktemp -d)
+cd "$root"
+
+printf 'one\ntwo\nthree\nfour\n' > lines
+koshkit csplit -s lines 3
+koshkit wc -c xx00 xx01
+
+printf 'a\nmark\nb\nmark\nc\n' > repeated
+koshkit csplit -s -f piece repeated '/mark/' '{1}'
+koshkit wc -c piece00 piece01 piece02
+koshkit csplit -s -f offset repeated '/mark/+1'
+koshkit wc -c offset00 offset01
+(koshkit csplit -s -f rejected repeated 3 99) 2> "$TEST_NULL_DEVICE"
+test ! -e rejected00
+echo "csplit-cleanup=$?"
+
+printf 'a/b\nnext\n' > slash-input
+koshkit csplit -s -f slash slash-input '/a\/b/'
+koshkit wc -c slash00 slash01
+
+printf '%s\n' zero 'a%b' end > percent-input
+koshkit csplit -s -f percent percent-input '%a\%b%'
+koshkit wc -c percent00
+
+printf 'one\nmark\nmark\nend\n' > regex-input
+koshkit csplit -s -f regex regex-input '/mark/' '/mark/'
+koshkit wc -c regex00 regex01 regex02
+
+printf 'hit\nend\n' > first-line-input
+(koshkit csplit -s -f first-line first-line-input 1 '/hit/') 2>&1
+test ! -e first-line00
+echo "csplit-first-line-clean=$?"
+
+printf 'a\nb\nmark\nc\nd\n' > offset-input
+koshkit csplit -s -f offset-minus offset-input '/mark/-1'
+koshkit wc -c offset-minus00 offset-minus01
+koshkit csplit -s -f offset-plus offset-input '/mark/+1'
+koshkit wc -c offset-plus00 offset-plus01
+koshkit csplit -s -f offset-unsigned offset-input '/mark/1'
+koshkit wc -c offset-unsigned00 offset-unsigned01
+
+koshkit seq 1 21 > width-input
+(koshkit csplit -k -s -n 1 -f width width-input 2 '{9}') 2>&1
+test -e width0
+echo "csplit-width-first=$?"
+test -e width9
+echo "csplit-width-last=$?"
+test ! -e width10
+echo "csplit-width-exhausted=$?"
+
+koshkit csplit -s -f zero-repeat lines 3 '{0}'
+echo "csplit-zero-repeat=$?"
+koshkit csplit -s -f star-repeat width-input 2 '{*}'
+echo "csplit-star-repeat=$?"
+
+printf 'a\nmark\nend\n' > stagnant-input
+koshkit csplit -s -f stagnant stagnant-input '/mark/-1' '{*}'
+koshkit wc -c stagnant00 stagnant01
+
+(koshkit csplit -s lines '{1}') 2>&1
+(koshkit csplit -s -f consecutive lines 3 '{0}' '{0}') 2>&1
+(koshkit csplit -s lines '/one/+999999999999999999999') 2>&1
+
+name_limit=$(koshkit getconf NAME_MAX .)
+long_prefix=
+prefix_index=0
+while [ "$prefix_index" -lt "$name_limit" ]; do
+  long_prefix=${long_prefix}x
+  prefix_index=$((prefix_index + 1))
+done
+(koshkit csplit -s -n 1 -f "$long_prefix" lines 3) 2>&1
+test ! -e "${long_prefix}0"
+echo "csplit-name-limit-clean=$?"

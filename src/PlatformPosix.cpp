@@ -1954,6 +1954,11 @@ fn path_configuration(StringView path, path_configuration_key key) wontthrow
   return static_cast<i64>(value);
 }
 
+fn path_component_length(StringView component) wontthrow -> Maybe<usize>
+{
+  return component.length;
+}
+
 fn sleep_for_seconds(double seconds) wontthrow -> void
 {
   if (seconds <= 0.0) return;

@@ -1,0 +1,1108 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign root=$(mktemp -d)]
+  [CompoundListCondition, None]
+    [SimpleCommand "cd" "$root"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "one\ntwo\nthree\nfour\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "lines" "3"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "wc" "-c" "xx00" "xx01"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "a\nmark\nb\nmark\nc\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "-f" "piece" "repeated" "/mark/" "{1}"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "wc" "-c" "piece00" "piece01" "piece02"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "-f" "offset" "repeated" "/mark/+1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "wc" "-c" "offset00" "offset01"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "csplit" "-s" "-f" "rejected" "repeated" "3" "99"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "!" "-e" "rejected00"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "csplit-cleanup=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "a/b\nnext\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "-f" "slash" "slash-input" "/a\/b/"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "wc" "-c" "slash00" "slash01"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "%s\n" "zero" "a%b" "end"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "-f" "percent" "percent-input" "%a\%b%"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "wc" "-c" "percent00"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "one\nmark\nmark\nend\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "-f" "regex" "regex-input" "/mark/" "/mark/"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "wc" "-c" "regex00" "regex01" "regex02"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "hit\nend\n"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "csplit" "-s" "-f" "first-line" "first-line-input" "1" "/hit/"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "!" "-e" "first-line00"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "csplit-first-line-clean=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "a\nb\nmark\nc\nd\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "-f" "offset-minus" "offset-input" "/mark/-1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "wc" "-c" "offset-minus00" "offset-minus01"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "-f" "offset-plus" "offset-input" "/mark/+1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "wc" "-c" "offset-plus00" "offset-plus01"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "-f" "offset-unsigned" "offset-input" "/mark/1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "wc" "-c" "offset-unsigned00" "offset-unsigned01"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "seq" "1" "21"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "csplit" "-k" "-s" "-n" "1" "-f" "width" "width-input" "2" "{9}"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "-e" "width0"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "csplit-width-first=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "-e" "width9"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "csplit-width-last=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "!" "-e" "width10"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "csplit-width-exhausted=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "-f" "zero-repeat" "lines" "3" "{0}"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "csplit-zero-repeat=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "-f" "star-repeat" "width-input" "2" "{*}"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "csplit-star-repeat=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "a\nmark\nend\n"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "csplit" "-s" "-f" "stagnant" "stagnant-input" "/mark/-1" "{*}"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "wc" "-c" "stagnant00" "stagnant01"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "csplit" "-s" "lines" "{1}"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "csplit" "-s" "-f" "consecutive" "lines" "3" "{0}" "{0}"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "csplit" "-s" "lines" "/one/+999999999999999999999"]
+  [CompoundListCondition, None]
+    [Assign name_limit=$(koshkit getconf NAME_MAX .)]
+  [CompoundListCondition, None]
+    [Assign long_prefix=]
+  [CompoundListCondition, None]
+    [Assign prefix_index=0]
+  [CompoundListCondition, None]
+    [WhileLoop]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$prefix_index" "-lt" "$name_limit" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign long_prefix=$long_prefixx]
+        [CompoundListCondition, None]
+          [Assign prefix_index=$((prefix_index + 1))]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "csplit" "-s" "-n" "1" "-f" "$long_prefix" "lines" "3"]
+  [CompoundListCondition, None]
+    [SimpleCommand "test" "!" "-e" "$long_prefix0"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "csplit-name-limit-clean=$?"]
+[Word
+  Unquoted "root="
+  CommandSubstitution "mktemp -d"
+]
+[Word
+  Unquoted "cd"
+]
+[Word
+  Variable "root"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "one\ntwo\nthree\nfour\n"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "xx00"
+]
+[Word
+  Unquoted "xx01"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\nmark\nb\nmark\nc\n"
+]
+[Word
+  Unquoted "repeated"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "piece"
+]
+[Word
+  Unquoted "repeated"
+]
+[Word
+  Literal "/mark/"
+]
+[Word
+  Literal "{1}"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "piece00"
+]
+[Word
+  Unquoted "piece01"
+]
+[Word
+  Unquoted "piece02"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "offset"
+]
+[Word
+  Unquoted "repeated"
+]
+[Word
+  Literal "/mark/+1"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "offset00"
+]
+[Word
+  Unquoted "offset01"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "rejected"
+]
+[Word
+  Unquoted "repeated"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "99"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "rejected00"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "csplit-cleanup="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a/b\nnext\n"
+]
+[Word
+  Unquoted "slash-input"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "slash"
+]
+[Word
+  Unquoted "slash-input"
+]
+[Word
+  Literal "/a\/b/"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "slash00"
+]
+[Word
+  Unquoted "slash01"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Unquoted "zero"
+]
+[Word
+  Literal "a%b"
+]
+[Word
+  Unquoted "end"
+]
+[Word
+  Unquoted "percent-input"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "percent"
+]
+[Word
+  Unquoted "percent-input"
+]
+[Word
+  Literal "%a\%b%"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "percent00"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "one\nmark\nmark\nend\n"
+]
+[Word
+  Unquoted "regex-input"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "regex"
+]
+[Word
+  Unquoted "regex-input"
+]
+[Word
+  Literal "/mark/"
+]
+[Word
+  Literal "/mark/"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "regex00"
+]
+[Word
+  Unquoted "regex01"
+]
+[Word
+  Unquoted "regex02"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "hit\nend\n"
+]
+[Word
+  Unquoted "first-line-input"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "first-line"
+]
+[Word
+  Unquoted "first-line-input"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Literal "/hit/"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "first-line00"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "csplit-first-line-clean="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\nb\nmark\nc\nd\n"
+]
+[Word
+  Unquoted "offset-input"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "offset-minus"
+]
+[Word
+  Unquoted "offset-input"
+]
+[Word
+  Literal "/mark/-1"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "offset-minus00"
+]
+[Word
+  Unquoted "offset-minus01"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "offset-plus"
+]
+[Word
+  Unquoted "offset-input"
+]
+[Word
+  Literal "/mark/+1"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "offset-plus00"
+]
+[Word
+  Unquoted "offset-plus01"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "offset-unsigned"
+]
+[Word
+  Unquoted "offset-input"
+]
+[Word
+  Literal "/mark/1"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "offset-unsigned00"
+]
+[Word
+  Unquoted "offset-unsigned01"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "seq"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "21"
+]
+[Word
+  Unquoted "width-input"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-k"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "width"
+]
+[Word
+  Unquoted "width-input"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Literal "{9}"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "width0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "csplit-width-first="
+  Variable "?"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "width9"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "csplit-width-last="
+  Variable "?"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Unquoted "width10"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "csplit-width-exhausted="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "zero-repeat"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Literal "{0}"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "csplit-zero-repeat="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "star-repeat"
+]
+[Word
+  Unquoted "width-input"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Literal "{*}"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "csplit-star-repeat="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "a\nmark\nend\n"
+]
+[Word
+  Unquoted "stagnant-input"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "stagnant"
+]
+[Word
+  Unquoted "stagnant-input"
+]
+[Word
+  Literal "/mark/-1"
+]
+[Word
+  Literal "{*}"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "wc"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "stagnant00"
+]
+[Word
+  Unquoted "stagnant01"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Literal "{1}"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Unquoted "consecutive"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Literal "{0}"
+]
+[Word
+  Literal "{0}"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Literal "/one/+999999999999999999999"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "name_limit="
+  CommandSubstitution "koshkit getconf NAME_MAX ."
+]
+[Word
+  Unquoted "long_prefix="
+]
+[Word
+  Unquoted "prefix_index=0"
+]
+[Word
+  Unquoted "while"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  Variable "prefix_index"
+]
+[Word
+  Unquoted "-lt"
+]
+[Word
+  Variable "name_limit"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "long_prefix="
+  Variable "long_prefix"
+  Unquoted "x"
+]
+[Word
+  Unquoted "prefix_index="
+  ArithmeticExpansion "prefix_index + 1"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "csplit"
+]
+[Word
+  Unquoted "-s"
+]
+[Word
+  Unquoted "-n"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "-f"
+]
+[Word
+  Variable "long_prefix"
+]
+[Word
+  Unquoted "lines"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "test"
+]
+[Word
+  Unquoted "!"
+]
+[Word
+  Unquoted "-e"
+]
+[Word
+  Variable "long_prefix"
+  DoubleQuoted "0"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "csplit-name-limit-clean="
+  Variable "?"
+]
+ 8 xx00
+11 xx01
+19 total
+ 2 piece00
+ 7 piece01
+ 7 piece02
+16 total
+ 7 offset00
+ 9 offset01
+16 total
+csplit-cleanup=0
+0 slash00
+9 slash01
+9 total
+8 percent00
+ 4 regex00
+ 5 regex01
+ 9 regex02
+18 total
+30:53: error: koshkit csplit: regular expression did not match.
+    30 |  (koshkit csplit -s -f first-line first-line-input 1 '/hit/') 2>&1
+       |                                                      ^~~~~~~
+note: use a pattern that matches a remaining input line.
+csplit-first-line-clean=0
+ 2 offset-minus00
+11 offset-minus01
+13 total
+ 9 offset-plus00
+ 4 offset-plus01
+13 total
+ 9 offset-unsigned00
+ 4 offset-unsigned01
+13 total
+43:26: error: koshkit csplit: output file suffixes are exhausted.
+    43 |  (koshkit csplit -k -s -n 1 -f width width-input 2 '{9}') 2>&1
+       |                           ^
+note: increase the suffix width with -n.
+csplit-width-first=0
+csplit-width-last=0
+csplit-width-exhausted=0
+csplit-zero-repeat=0
+csplit-star-repeat=0
+ 0 stagnant00
+11 stagnant01
+11 total
+60:26: error: koshkit csplit: repeat has no preceding line or regular expression pattern.
+    60 |  (koshkit csplit -s lines '{1}') 2>&1
+       |                           ^~~~~
+note: place the repeat immediately after the pattern it repeats.
+61:49: error: koshkit csplit: repeat has no preceding line or regular expression pattern.
+    61 |  (koshkit csplit -s -f consecutive lines 3 '{0}' '{0}') 2>&1
+       |                                                  ^~~~~
+note: place the repeat immediately after the pattern it repeats.
+62:26: error: koshkit csplit: invalid regular expression offset.
+    62 |  (koshkit csplit -s lines '/one/+999999999999999999999') 2>&1
+       |                           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+note: use an optional signed decimal offset after the closing delimiter.
+71:28: error: csplit: the output filename component is too long.
+    71 |  (koshkit csplit -s -n 1 -f "$long_prefix" lines 3) 2>&1
+       |                             ^~~~~~~~~~~~~~
+note: shorten the output prefix or reduce the suffix width.
+csplit-name-limit-clean=0

@@ -36,17 +36,6 @@ printf 'ab\n' | koshkit sed 's/a*/x/g'
 koshkit split -l 2 lines part
 koshkit cat partaa partab
 
-koshkit csplit -s lines 3
-koshkit wc -c xx00 xx01
-printf 'a\nmark\nb\nmark\nc\n' > repeated
-koshkit csplit -s -f piece repeated '/mark/' '{1}'
-koshkit wc -c piece00 piece01 piece02
-koshkit csplit -s -f offset repeated '/mark/+1'
-koshkit wc -c offset00 offset01
-(koshkit csplit -s -f rejected repeated 3 99) 2> "$TEST_NULL_DEVICE"
-test ! -e rejected00
-echo "csplit-cleanup=$?"
-
 koshkit pr -t lines
 koshkit pr -t -w 20 -s : -2 lines
 koshkit pr -t -a -w 20 -s : -2 lines

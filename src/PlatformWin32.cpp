@@ -1293,6 +1293,21 @@ fn path_configuration(StringView path, path_configuration_key key) wontthrow
   return None;
 }
 
+fn path_component_length(StringView component) wontthrow -> Maybe<usize>
+{
+  if (component.length > static_cast<usize>(INT_MAX)) {
+    SetLastError(ERROR_FILENAME_EXCED_RANGE);
+    return None;
+  }
+  if (component.is_empty()) return 0;
+
+  let const wide_length =
+      MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, component.data,
+                          static_cast<int>(component.length), nullptr, 0);
+  if (wide_length <= 0) return None;
+  return static_cast<usize>(wide_length);
+}
+
 fn get_resource_limit(resource_kind kind, resource_limit &out) wontthrow -> bool
 {
   unused(kind);

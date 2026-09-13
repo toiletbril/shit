@@ -886,6 +886,7 @@ enum class path_configuration_key : u8
 fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>;
 fn path_configuration(StringView path, path_configuration_key key) wontthrow
     -> Maybe<i64>;
+fn path_component_length(StringView component) wontthrow -> Maybe<usize>;
 
 fn sleep_for_seconds(double seconds) wontthrow -> void;
 
