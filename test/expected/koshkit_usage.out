@@ -69,6 +69,42 @@ rc=2
        |  ^~~~~~~~~~~~~
 note: Try `watch --help` for more info.
 rc=2
+--- goodcore locates an invalid process id ---
+1:24: error: goodcore: invalid process id.
+     1 |  koshkit goodcore --pid nope
+       |                         ^~~~
+note: the process id must be a positive integer.
+rc=1
+--- goodcore locates conflicting flags ---
+1:35: error: goodcore: conflicting flags.
+     1 |  koshkit goodcore --pid 1 --binary program
+       |                                    ^~~~~~~
+note: --binary applies only when packaging an existing core file.
+rc=2
+--- goodcore locates conflicting input ---
+1:26: error: goodcore: conflicting input.
+     1 |  koshkit goodcore --pid 1 core
+       |                           ^~~~
+note: pass either one running pid or one core file.
+rc=2
+--- goodcore locates an extra core operand ---
+1:24: error: goodcore: extra operand 'second'.
+     1 |  koshkit goodcore first second
+       |                         ^~~~~~
+note: pass exactly one core file.
+rc=2
+--- goodnode locates an invalid inode ---
+1:26: error: goodnode: invalid inode.
+     1 |  koshkit goodnode --inode nope
+       |                           ^~~~
+note: the inode must be a non-negative integer.
+rc=1
+--- goodnode locates an invalid color mode ---
+1:26: error: goodnode: invalid color mode.
+     1 |  koshkit goodnode --color rainbow .
+       |                           ^~~~~~~
+note: use always, auto, or never.
+rc=1
 --- koshkit sync data mode with no file ---
 1:1: error: sync: Not enough arguments.
      1 |  koshkit sync -d

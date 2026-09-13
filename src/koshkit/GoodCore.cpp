@@ -222,7 +222,9 @@ fn GoodCore::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -233,15 +235,30 @@ fn GoodCore::execute(
     return report_usage_error(ec, cxt, args[0].view());
   }
 
-  if (has_pid == !operands.is_empty() || operands.count() > 1) {
-    report_soft_koshkit_error(ec, cxt, "goodcore: invalid input",
-                              "pass exactly one running pid or one core file");
+  if (has_pid && !operands.is_empty()) {
+    let conflict_location = FLAG_GOODCORE_PID.value_location();
+    if (operand_locations[0].position > conflict_location.position)
+      conflict_location = operand_locations[0];
+    KOSHKIT_REPORT_ERROR_AT(conflict_location, "conflicting input",
+                            "pass either one running pid or one core file");
+    return 2;
+  }
+  if (operands.count() > 1) {
+    KOSHKIT_REPORT_ERROR_AT(operand_locations[1],
+                            "extra operand '" + operands[1] + "'",
+                            "pass exactly one core file");
     return 2;
   }
 
   if (has_pid && FLAG_GOODCORE_BINARY.is_set()) {
-    report_soft_koshkit_error(
-        ec, cxt, "goodcore: invalid input",
+    let conflict_location = FLAG_GOODCORE_PID.value_location();
+    if (FLAG_GOODCORE_BINARY.value_location().position >
+        conflict_location.position)
+    {
+      conflict_location = FLAG_GOODCORE_BINARY.value_location();
+    }
+    KOSHKIT_REPORT_ERROR_AT(
+        conflict_location, "conflicting flags",
         "--binary applies only when packaging an existing core file");
     return 2;
   }
@@ -251,8 +268,9 @@ fn GoodCore::execute(
     let const parsed = utils::parse_integer_in_base(FLAG_GOODCORE_PID.value(),
                                                     int_base::decimal);
     if (parsed.is_error() || parsed.value() <= 0) {
-      report_soft_koshkit_error(ec, cxt, "goodcore: invalid process id",
-                                "the process id must be a positive integer");
+      KOSHKIT_REPORT_ERROR_AT(FLAG_GOODCORE_PID.value_location(),
+                              "invalid process id",
+                              "the process id must be a positive integer");
       return 1;
     }
     process_id = parsed.value();

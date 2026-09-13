@@ -228,8 +228,9 @@ fn GoodNode::execute(
     let const parsed = utils::parse_integer_in_base(FLAG_GOODNODE_INODE.value(),
                                                     int_base::decimal);
     if (parsed.is_error() || parsed.value() < 0) {
-      report_soft_koshkit_error(ec, cxt, "goodnode: invalid inode",
-                                "the inode must be a non-negative integer");
+      KOSHKIT_REPORT_ERROR_AT(FLAG_GOODNODE_INODE.value_location(),
+                              "invalid inode",
+                              "the inode must be a non-negative integer");
       return 1;
     }
 
@@ -264,8 +265,9 @@ fn GoodNode::execute(
 
     if (found.is_empty()) {
       if (os::INTERRUPT_REQUESTED) return 130;
-      report_soft_koshkit_error(ec, cxt, "goodnode: inode was not found",
-                                "choose a narrower or different search root");
+      KOSHKIT_REPORT_ERROR_AT(FLAG_GOODNODE_INODE.value_location(),
+                              "inode was not found",
+                              "choose a narrower or different search root");
       return 1;
     }
     paths.push(steal(found));
@@ -279,8 +281,9 @@ fn GoodNode::execute(
   if (FLAG_GOODNODE_COLOR.is_set()) {
     let const parsed = parse_cli_color_mode(FLAG_GOODNODE_COLOR.value());
     if (!parsed.has_value()) {
-      report_soft_koshkit_error(ec, cxt, "goodnode: invalid color mode",
-                                "use always, auto, or never");
+      KOSHKIT_REPORT_ERROR_AT(FLAG_GOODNODE_COLOR.value_location(),
+                              "invalid color mode",
+                              "use always, auto, or never");
       return 1;
     }
     color_mode = *parsed;
