@@ -56,8 +56,7 @@ fn Unexpand::execute(
     const ExecContext &ec, EvalContext &cxt, const ArrayList<String> &args,
     const ArrayList<SourceLocation> &arg_locations) const throws -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let const operands = PARSE_KOSHKIT_ARGS(args, arg_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -65,7 +64,13 @@ fn Unexpand::execute(
   if (FLAG_UNEXPAND_TABS.is_set()) {
     let const parsed = parse_tab_stop_list(FLAG_UNEXPAND_TABS.value(),
                                            cxt.scratch_allocator());
-    if (!parsed.has_value()) throw Error{"unexpand: invalid tab list"};
+    if (!parsed.has_value()) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_UNEXPAND_TABS.value_location(), "invalid tab list",
+          "use increasing positive columns separated by commas or blanks");
+      return 1;
+    }
+
     tab_stops = steal(*parsed);
   }
 

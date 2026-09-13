@@ -82,6 +82,9 @@ echo "=== tput row location ==="
 echo "=== tput column limit ==="
 "$BIN" -c 'koshkit tput cup 1 18446744073709551615' 2>&1
 
+echo "=== unexpand tab list location ==="
+"$BIN" -c 'koshkit unexpand -t 8,4' 2>&1
+
 echo "=== date operand location ==="
 "$BIN" -c 'koshkit date 2026' 2>&1
 

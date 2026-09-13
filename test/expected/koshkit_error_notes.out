@@ -129,6 +129,11 @@ note: use a decimal integer from 0 through 18446744073709551614.
      1 |  koshkit tput cup 1 18446744073709551615
        |                     ^~~~~~~~~~~~~~~~~~~~
 note: use a decimal integer from 0 through 18446744073709551614.
+=== unexpand tab list location ===
+1:21: error: unexpand: invalid tab list.
+     1 |  koshkit unexpand -t 8,4
+       |                      ^~~
+note: use increasing positive columns separated by commas or blanks.
 === date operand location ===
 1:14: error: date: setting the system clock is unsupported.
      1 |  koshkit date 2026
