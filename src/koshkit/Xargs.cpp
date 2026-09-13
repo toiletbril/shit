@@ -46,12 +46,20 @@ struct xargs_item
   usize line_number;
 };
 
-static fn parse_xargs_limit(StringView value, StringView name) throws -> usize
+static fn parse_xargs_limit(const ExecContext &ec, EvalContext &cxt,
+                            const FlagString &flag, StringView name,
+                            StringView note, usize &limit) throws -> bool
 {
-  let const parsed = utils::parse_decimal_u64(value);
-  if (parsed.is_error() || parsed.value() == 0 || parsed.value() > SIZE_MAX)
-    throw Error{"xargs: invalid " + String{name} + " '" + String{value} + "'"};
-  return static_cast<usize>(parsed.value());
+  let const parsed = utils::parse_decimal_u64(flag.value());
+  if (parsed.is_error() || parsed.value() == 0 || parsed.value() > SIZE_MAX) {
+    report_soft_koshkit_util_error(
+        ec, cxt, flag.value_location(), "xargs",
+        "invalid " + String{name} + " '" + String{flag.value()} + "'", note);
+    return false;
+  }
+
+  limit = static_cast<usize>(parsed.value());
+  return true;
 }
 
 static fn parse_xargs_items(StringView input, Allocator allocator) throws
@@ -226,19 +234,35 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
   let const base_size = xargs_command_size(base);
-  let const maximum_arguments =
-      FLAG_XARGS_MAX_ARGUMENTS.is_set()
-          ? parse_xargs_limit(FLAG_XARGS_MAX_ARGUMENTS.value(),
-                              "argument count")
-          : SIZE_MAX;
-  let const maximum_lines =
-      FLAG_XARGS_MAX_LINES.is_set()
-          ? parse_xargs_limit(FLAG_XARGS_MAX_LINES.value(), "line count")
-          : SIZE_MAX;
-  let const maximum_size =
-      FLAG_XARGS_MAX_SIZE.is_set()
-          ? parse_xargs_limit(FLAG_XARGS_MAX_SIZE.value(), "byte count")
-          : usize{131072};
+  usize maximum_arguments = SIZE_MAX;
+  if (FLAG_XARGS_MAX_ARGUMENTS.is_set() &&
+      !parse_xargs_limit(ec, cxt, FLAG_XARGS_MAX_ARGUMENTS, "argument count",
+                         "use a positive decimal integer for the maximum "
+                         "arguments per command",
+                         maximum_arguments))
+  {
+    return 1;
+  }
+
+  usize maximum_lines = SIZE_MAX;
+  if (FLAG_XARGS_MAX_LINES.is_set() &&
+      !parse_xargs_limit(ec, cxt, FLAG_XARGS_MAX_LINES, "line count",
+                         "use a positive decimal integer for the maximum "
+                         "input lines per command",
+                         maximum_lines))
+  {
+    return 1;
+  }
+
+  usize maximum_size = 131072;
+  if (FLAG_XARGS_MAX_SIZE.is_set() &&
+      !parse_xargs_limit(ec, cxt, FLAG_XARGS_MAX_SIZE, "byte count",
+                         "use a positive decimal integer for the maximum "
+                         "command size in bytes",
+                         maximum_size))
+  {
+    return 1;
+  }
 
   usize item_position = 0;
   bool should_run_empty = items.is_empty();

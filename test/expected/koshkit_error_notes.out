@@ -791,3 +791,18 @@ note: list each stop after the previous stop and no later than column 160.
      1 |  koshkit tabs 4,8 extra
        |                   ^~~~~
 note: pass one tab interval, stop list, or named template.
+=== xargs argument count location ===
+1:18: error: xargs: invalid argument count 'nope'.
+     1 |  koshkit xargs -n nope
+       |                   ^~~~
+note: use a positive decimal integer for the maximum arguments per command.
+=== xargs line count location ===
+1:18: error: xargs: invalid line count '18446744073709551616'.
+     1 |  koshkit xargs -L 18446744073709551616
+       |                   ^~~~~~~~~~~~~~~~~~~~
+note: use a positive decimal integer for the maximum input lines per command.
+=== xargs byte count location ===
+1:18: error: xargs: invalid byte count '0'.
+     1 |  koshkit xargs -s 0
+       |                   ^
+note: use a positive decimal integer for the maximum command size in bytes.

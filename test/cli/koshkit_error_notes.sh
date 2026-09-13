@@ -492,3 +492,12 @@ echo "=== tabs relative stop limit ==="
 
 echo "=== tabs extra operand location ==="
 "$BIN" -c 'koshkit tabs 4,8 extra' 2>&1
+
+echo "=== xargs argument count location ==="
+"$BIN" -c 'koshkit xargs -n nope' 2>&1
+
+echo "=== xargs line count location ==="
+"$BIN" -c 'koshkit xargs -L 18446744073709551616' 2>&1
+
+echo "=== xargs byte count location ==="
+"$BIN" -c 'koshkit xargs -s 0' 2>&1
