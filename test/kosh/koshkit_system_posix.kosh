@@ -11,8 +11,6 @@ echo "cal-large-year=$?"
 
 koshkit date -u +%Y >/dev/null
 echo "date=$?"
-koshkit getconf ARG_MAX >/dev/null
-echo "getconf=$?"
 koshkit id -u >/dev/null
 echo "id=$?"
 LC_ALL=C koshkit locale charmap >/dev/null

@@ -24,10 +24,6 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "date=$?"]
   [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "getconf" "ARG_MAX"]
-  [CompoundListCondition, None]
-    [SimpleCommand "echo" "getconf=$?"]
-  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "id" "-u"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "id=$?"]
@@ -181,25 +177,6 @@
 ]
 [Word
   DoubleQuoted "date="
-  Variable "?"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "getconf"
-]
-[Word
-  Unquoted "ARG_MAX"
-]
-[Word
-  Unquoted "/dev/null"
-]
-[Word
-  Unquoted "echo"
-]
-[Word
-  DoubleQuoted "getconf="
   Variable "?"
 ]
 [Word
@@ -414,7 +391,6 @@ cal-monday-first=0
 cal-today-description=0
 cal-large-year=0
 date=0
-getconf=0
 id=0
 locale=0
 LC_NUMERIC

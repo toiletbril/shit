@@ -1907,19 +1907,59 @@ fn groupname_to_gid(StringView groupname) throws -> Maybe<u32>
   return lookup_id_by_name("/etc/group", groupname, 2);
 }
 
+static constexpr int SYSTEM_CONFIGURATION_KEYS[] = {
+    _SC_AIO_LISTIO_MAX,
+    _SC_AIO_MAX,
+    _SC_AIO_PRIO_DELTA_MAX,
+    _SC_ARG_MAX,
+    _SC_ATEXIT_MAX,
+    _SC_BC_BASE_MAX,
+    _SC_BC_DIM_MAX,
+    _SC_BC_SCALE_MAX,
+    _SC_BC_STRING_MAX,
+    _SC_CHILD_MAX,
+    _SC_CLK_TCK,
+    _SC_COLL_WEIGHTS_MAX,
+    _SC_DELAYTIMER_MAX,
+    _SC_EXPR_NEST_MAX,
+    _SC_GETGR_R_SIZE_MAX,
+    _SC_NGROUPS_MAX,
+    _SC_HOST_NAME_MAX,
+    _SC_IOV_MAX,
+    _SC_LINE_MAX,
+    _SC_LOGIN_NAME_MAX,
+    _SC_MQ_OPEN_MAX,
+    _SC_MQ_PRIO_MAX,
+    _SC_OPEN_MAX,
+    _SC_PAGESIZE,
+    _SC_GETPW_R_SIZE_MAX,
+    _SC_PASS_MAX,
+    _SC_PHYS_PAGES,
+    _SC_VERSION,
+    _SC_NPROCESSORS_CONF,
+    _SC_NPROCESSORS_ONLN,
+    _SC_RE_DUP_MAX,
+    _SC_RTSIG_MAX,
+    _SC_SEM_NSEMS_MAX,
+    _SC_SEM_VALUE_MAX,
+    _SC_SIGQUEUE_MAX,
+    _SC_STREAM_MAX,
+    _SC_SYMLOOP_MAX,
+    _SC_THREAD_THREADS_MAX,
+    _SC_THREAD_DESTRUCTOR_ITERATIONS,
+    _SC_THREAD_KEYS_MAX,
+    _SC_THREAD_STACK_MIN,
+    _SC_TIMER_MAX,
+    _SC_TTY_NAME_MAX,
+    _SC_TZNAME_MAX,
+};
+static_assert(countof(SYSTEM_CONFIGURATION_KEYS) ==
+              static_cast<usize>(system_configuration_key::Count));
+
 fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
 {
-  int native_key = 0;
-  switch (key) {
-  case system_configuration_key::ArgMax: native_key = _SC_ARG_MAX; break;
-  case system_configuration_key::ChildMax: native_key = _SC_CHILD_MAX; break;
-  case system_configuration_key::ClockTicks: native_key = _SC_CLK_TCK; break;
-  case system_configuration_key::GroupsMax: native_key = _SC_NGROUPS_MAX; break;
-  case system_configuration_key::OpenMax: native_key = _SC_OPEN_MAX; break;
-  case system_configuration_key::PageSize: native_key = _SC_PAGESIZE; break;
-  case system_configuration_key::StreamMax: native_key = _SC_STREAM_MAX; break;
-  case system_configuration_key::PosixVersion: native_key = _SC_VERSION; break;
-  }
+  if (key == system_configuration_key::Count) return None;
+  let const native_key = SYSTEM_CONFIGURATION_KEYS[static_cast<usize>(key)];
 
   errno = 0;
   let const value = sysconf(native_key);
@@ -1927,25 +1967,23 @@ fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
   return static_cast<i64>(value);
 }
 
+static constexpr int PATH_CONFIGURATION_KEYS[] = {
+    _PC_ALLOC_SIZE_MIN,    _PC_ASYNC_IO,           _PC_CHOWN_RESTRICTED,
+    _PC_VDISABLE,          _PC_FILESIZEBITS,       _PC_LINK_MAX,
+    _PC_MAX_CANON,         _PC_MAX_INPUT,          _PC_NAME_MAX,
+    _PC_NO_TRUNC,          _PC_PATH_MAX,           _PC_PIPE_BUF,
+    _PC_PRIO_IO,           _PC_REC_INCR_XFER_SIZE, _PC_REC_MAX_XFER_SIZE,
+    _PC_REC_MIN_XFER_SIZE, _PC_REC_XFER_ALIGN,     _PC_SYMLINK_MAX,
+    _PC_SYNC_IO,           _PC_2_SYMLINKS,
+};
+static_assert(countof(PATH_CONFIGURATION_KEYS) ==
+              static_cast<usize>(path_configuration_key::Count));
+
 fn path_configuration(StringView path, path_configuration_key key) wontthrow
     -> Maybe<i64>
 {
-  int native_key = 0;
-  switch (key) {
-  case path_configuration_key::LinkMax: native_key = _PC_LINK_MAX; break;
-  case path_configuration_key::MaxCanonical: native_key = _PC_MAX_CANON; break;
-  case path_configuration_key::MaxInput: native_key = _PC_MAX_INPUT; break;
-  case path_configuration_key::NameMax: native_key = _PC_NAME_MAX; break;
-  case path_configuration_key::PathMax: native_key = _PC_PATH_MAX; break;
-  case path_configuration_key::PipeBuffer: native_key = _PC_PIPE_BUF; break;
-  case path_configuration_key::ChownRestricted:
-    native_key = _PC_CHOWN_RESTRICTED;
-    break;
-  case path_configuration_key::NoTrunc: native_key = _PC_NO_TRUNC; break;
-  case path_configuration_key::DisableCharacter:
-    native_key = _PC_VDISABLE;
-    break;
-  }
+  if (key == path_configuration_key::Count) return None;
+  let const native_key = PATH_CONFIGURATION_KEYS[static_cast<usize>(key)];
 
   let const path_text = String{heap_allocator(), path};
   errno = 0;

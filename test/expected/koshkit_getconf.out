@@ -1,0 +1,303 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [Assign system_status=0]
+  [CompoundListCondition, None]
+    [ForLoop "variable"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "koshkit" "getconf" "$variable"]
+        [CompoundListCondition, ||]
+          [Assign system_status=1]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "getconf-system=$system_status"]
+  [CompoundListCondition, None]
+    [Assign path_status=0]
+  [CompoundListCondition, None]
+    [ForLoop "variable"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "koshkit" "getconf" "$variable" "."]
+        [CompoundListCondition, ||]
+          [Assign path_status=1]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "getconf-path=$path_status"]
+[Word
+  Unquoted "system_status=0"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "variable"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "AIO_LISTIO_MAX"
+]
+[Word
+  Unquoted "AIO_MAX"
+]
+[Word
+  Unquoted "AIO_PRIO_DELTA_MAX"
+]
+[Word
+  Unquoted "ARG_MAX"
+]
+[Word
+  Unquoted "ATEXIT_MAX"
+]
+[Word
+  Unquoted "BC_BASE_MAX"
+]
+[Word
+  Unquoted "BC_DIM_MAX"
+]
+[Word
+  Unquoted "BC_SCALE_MAX"
+]
+[Word
+  Unquoted "BC_STRING_MAX"
+]
+[Word
+  Unquoted "CHILD_MAX"
+]
+[Word
+  Unquoted "CLK_TCK"
+]
+[Word
+  Unquoted "COLL_WEIGHTS_MAX"
+]
+[Word
+  Unquoted "DELAYTIMER_MAX"
+]
+[Word
+  Unquoted "EXPR_NEST_MAX"
+]
+[Word
+  Unquoted "GETGR_R_SIZE_MAX"
+]
+[Word
+  Unquoted "GETPW_R_SIZE_MAX"
+]
+[Word
+  Unquoted "HOST_NAME_MAX"
+]
+[Word
+  Unquoted "IOV_MAX"
+]
+[Word
+  Unquoted "LINE_MAX"
+]
+[Word
+  Unquoted "LOGIN_NAME_MAX"
+]
+[Word
+  Unquoted "MQ_OPEN_MAX"
+]
+[Word
+  Unquoted "MQ_PRIO_MAX"
+]
+[Word
+  Unquoted "NGROUPS_MAX"
+]
+[Word
+  Unquoted "NPROCESSORS_CONF"
+]
+[Word
+  Unquoted "NPROCESSORS_ONLN"
+]
+[Word
+  Unquoted "OPEN_MAX"
+]
+[Word
+  Unquoted "PAGESIZE"
+]
+[Word
+  Unquoted "PAGE_SIZE"
+]
+[Word
+  Unquoted "PASS_MAX"
+]
+[Word
+  Unquoted "PHYS_PAGES"
+]
+[Word
+  Unquoted "PTHREAD_DESTRUCTOR_ITERATIONS"
+]
+[Word
+  Unquoted "PTHREAD_KEYS_MAX"
+]
+[Word
+  Unquoted "PTHREAD_STACK_MIN"
+]
+[Word
+  Unquoted "PTHREAD_THREADS_MAX"
+]
+[Word
+  Unquoted "RE_DUP_MAX"
+]
+[Word
+  Unquoted "RTSIG_MAX"
+]
+[Word
+  Unquoted "SEM_NSEMS_MAX"
+]
+[Word
+  Unquoted "SEM_VALUE_MAX"
+]
+[Word
+  Unquoted "SIGQUEUE_MAX"
+]
+[Word
+  Unquoted "STREAM_MAX"
+]
+[Word
+  Unquoted "SYMLOOP_MAX"
+]
+[Word
+  Unquoted "TIMER_MAX"
+]
+[Word
+  Unquoted "TTY_NAME_MAX"
+]
+[Word
+  Unquoted "TZNAME_MAX"
+]
+[Word
+  Unquoted "_POSIX_VERSION"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "getconf"
+]
+[Word
+  Variable "variable"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "system_status=1"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "getconf-system="
+  Variable "system_status"
+]
+[Word
+  Unquoted "path_status=0"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "variable"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "FILESIZEBITS"
+]
+[Word
+  Unquoted "LINK_MAX"
+]
+[Word
+  Unquoted "MAX_CANON"
+]
+[Word
+  Unquoted "MAX_INPUT"
+]
+[Word
+  Unquoted "NAME_MAX"
+]
+[Word
+  Unquoted "PATH_MAX"
+]
+[Word
+  Unquoted "PIPE_BUF"
+]
+[Word
+  Unquoted "POSIX2_SYMLINKS"
+]
+[Word
+  Unquoted "POSIX_ALLOC_SIZE_MIN"
+]
+[Word
+  Unquoted "POSIX_REC_INCR_XFER_SIZE"
+]
+[Word
+  Unquoted "POSIX_REC_MAX_XFER_SIZE"
+]
+[Word
+  Unquoted "POSIX_REC_MIN_XFER_SIZE"
+]
+[Word
+  Unquoted "POSIX_REC_XFER_ALIGN"
+]
+[Word
+  Unquoted "SYMLINK_MAX"
+]
+[Word
+  Unquoted "_POSIX_ASYNC_IO"
+]
+[Word
+  Unquoted "_POSIX_CHOWN_RESTRICTED"
+]
+[Word
+  Unquoted "_POSIX_NO_TRUNC"
+]
+[Word
+  Unquoted "_POSIX_PRIO_IO"
+]
+[Word
+  Unquoted "_POSIX_SYNC_IO"
+]
+[Word
+  Unquoted "_POSIX_VDISABLE"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "getconf"
+]
+[Word
+  Variable "variable"
+]
+[Word
+  Unquoted "."
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "path_status=1"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "getconf-path="
+  Variable "path_status"
+]
+getconf-system=0
+getconf-path=0

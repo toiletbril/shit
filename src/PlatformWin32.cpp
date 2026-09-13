@@ -1244,15 +1244,53 @@ fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
   SYSTEM_INFO system_info{};
   GetSystemInfo(&system_info);
   switch (key) {
+  case system_configuration_key::AioListIoMax:
+  case system_configuration_key::AioMax:
+  case system_configuration_key::AioPriorityDeltaMax: return None;
   case system_configuration_key::ArgMax: return 32767;
-  case system_configuration_key::ChildMax: return None;
-  case system_configuration_key::ClockTicks: return None;
-  case system_configuration_key::GroupsMax: return None;
+  case system_configuration_key::AtExitMax:
+  case system_configuration_key::BcBaseMax:
+  case system_configuration_key::BcDimensionMax:
+  case system_configuration_key::BcScaleMax:
+  case system_configuration_key::BcStringMax:
+  case system_configuration_key::ChildMax:
+  case system_configuration_key::ClockTicks:
+  case system_configuration_key::CollationWeightsMax:
+  case system_configuration_key::DelayTimerMax:
+  case system_configuration_key::ExpressionNestMax:
+  case system_configuration_key::GroupBufferSizeMax:
+  case system_configuration_key::GroupsMax:
+  case system_configuration_key::HostNameMax:
+  case system_configuration_key::IoVectorMax:
+  case system_configuration_key::LineMax:
+  case system_configuration_key::LoginNameMax:
+  case system_configuration_key::MessageQueueOpenMax:
+  case system_configuration_key::MessageQueuePriorityMax: return None;
   case system_configuration_key::OpenMax: return _getmaxstdio();
   case system_configuration_key::PageSize:
     return static_cast<i64>(system_info.dwPageSize);
-  case system_configuration_key::StreamMax: return _getmaxstdio();
+  case system_configuration_key::PasswordBufferSizeMax:
+  case system_configuration_key::PasswordMax:
+  case system_configuration_key::PhysicalPages:
   case system_configuration_key::PosixVersion: return None;
+  case system_configuration_key::ProcessorConfigured:
+  case system_configuration_key::ProcessorOnline:
+    return static_cast<i64>(GetActiveProcessorCount(ALL_PROCESSOR_GROUPS));
+  case system_configuration_key::RegexDupMax:
+  case system_configuration_key::RealtimeSignalMax:
+  case system_configuration_key::SemaphoreCountMax:
+  case system_configuration_key::SemaphoreValueMax:
+  case system_configuration_key::SignalQueueMax: return None;
+  case system_configuration_key::StreamMax: return _getmaxstdio();
+  case system_configuration_key::SymbolicLinkLoopMax:
+  case system_configuration_key::ThreadCountMax:
+  case system_configuration_key::ThreadDestructorIterations:
+  case system_configuration_key::ThreadKeysMax:
+  case system_configuration_key::ThreadStackMin:
+  case system_configuration_key::TimerMax:
+  case system_configuration_key::TtyNameMax:
+  case system_configuration_key::TimeZoneNameMax:
+  case system_configuration_key::Count: return None;
   }
   return None;
 }
@@ -1265,8 +1303,13 @@ fn path_configuration(StringView path, path_configuration_key key) wontthrow
       GetFileAttributesW(path_text->begin()) == INVALID_FILE_ATTRIBUTES)
     return None;
   switch (key) {
+  case path_configuration_key::AllocationSizeMin:
+  case path_configuration_key::AsyncIo: return None;
+  case path_configuration_key::ChownRestricted: return 1;
+  case path_configuration_key::DisableCharacter:
+  case path_configuration_key::FileSizeBits: return None;
   case path_configuration_key::LinkMax: return 1024;
-  case path_configuration_key::MaxCanonical: return None;
+  case path_configuration_key::MaxCanonical:
   case path_configuration_key::MaxInput: return None;
   case path_configuration_key::NameMax: {
     wchar_t volume_path[MAX_PATH];
@@ -1284,11 +1327,18 @@ fn path_configuration(StringView path, path_configuration_key key) wontthrow
     }
     return static_cast<i64>(maximum_component_length);
   }
-  case path_configuration_key::PathMax: return 32767;
-  case path_configuration_key::PipeBuffer: return None;
-  case path_configuration_key::ChownRestricted: return 1;
   case path_configuration_key::NoTrunc: return 1;
-  case path_configuration_key::DisableCharacter: return None;
+  case path_configuration_key::PathMax: return 32767;
+  case path_configuration_key::PipeBuffer:
+  case path_configuration_key::PriorityIo:
+  case path_configuration_key::RecommendedIncrementTransferSize:
+  case path_configuration_key::RecommendedMaxTransferSize:
+  case path_configuration_key::RecommendedMinTransferSize:
+  case path_configuration_key::RecommendedTransferAlignment:
+  case path_configuration_key::SymbolicLinkMax:
+  case path_configuration_key::SyncIo:
+  case path_configuration_key::TwoSymbolicLinks:
+  case path_configuration_key::Count: return None;
   }
   return None;
 }
