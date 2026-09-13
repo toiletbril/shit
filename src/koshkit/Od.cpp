@@ -93,6 +93,50 @@ struct od_format
   bool is_character;
 };
 
+static fn parse_od_byte_count(StringView text, bool has_unit_suffix) throws
+    -> Maybe<u64>
+{
+  let const is_hexadecimal =
+      text.length >= 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X');
+  u64 multiplier = 1;
+  if (has_unit_suffix && !text.is_empty()) {
+    switch (text[text.length - 1]) {
+    case 'b':
+      if (!is_hexadecimal) {
+        multiplier = 512;
+        text = text.substring_of_length(0, text.length - 1);
+      }
+      break;
+
+    case 'k':
+      multiplier = 1024;
+      text = text.substring_of_length(0, text.length - 1);
+      break;
+
+    case 'm':
+      multiplier = 1048576;
+      text = text.substring_of_length(0, text.length - 1);
+      break;
+
+    default: break;
+    }
+  }
+
+  int_base base = int_base::decimal;
+  if (is_hexadecimal) {
+    base = int_base::hex;
+    text = text.substring(2);
+  } else if (text.length > 1 && text[0] == '0') {
+    base = int_base::octal;
+  }
+  if (text.is_empty()) return {};
+
+  let const parsed = utils::parse_integer_in_base_u64(text, base);
+  if (parsed.is_error() || parsed.value() > UINT64_MAX / multiplier) return {};
+
+  return parsed.value() * multiplier;
+}
+
 Od::Od() = default;
 
 pure fn Od::kind() const wontthrow -> Utility::Kind { return Kind::Od; }
@@ -136,29 +180,31 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
 
   u64 skip_count = 0;
   if (FLAG_OD_SKIP.is_set()) {
-    let const parsed = utils::parse_decimal_u64(FLAG_OD_SKIP.value());
-    if (parsed.is_error()) {
+    let const parsed = parse_od_byte_count(FLAG_OD_SKIP.value(), true);
+    if (!parsed.has_value()) {
       KOSHKIT_REPORT_ERROR_AT(FLAG_OD_SKIP.value_location(),
                               "invalid skip count '" + FLAG_OD_SKIP.value() +
                                   "'",
-                              "use a nonnegative decimal byte count");
+                              "use decimal, leading-zero octal, or 0x "
+                              "hexadecimal, with optional b, k, or m units");
       return 1;
     }
 
-    skip_count = parsed.value();
+    skip_count = *parsed;
   }
   u64 byte_limit = UINT64_MAX;
   if (FLAG_OD_COUNT.is_set()) {
-    let const parsed = utils::parse_decimal_u64(FLAG_OD_COUNT.value());
-    if (parsed.is_error()) {
+    let const parsed = parse_od_byte_count(FLAG_OD_COUNT.value(), false);
+    if (!parsed.has_value()) {
       KOSHKIT_REPORT_ERROR_AT(FLAG_OD_COUNT.value_location(),
                               "invalid byte count '" + FLAG_OD_COUNT.value() +
                                   "'",
-                              "use a nonnegative decimal byte count");
+                              "use decimal, leading-zero octal, or 0x "
+                              "hexadecimal bytes");
       return 1;
     }
 
-    byte_limit = parsed.value();
+    byte_limit = *parsed;
   }
 
   let input_operands = ArrayList<String>{cxt.scratch_allocator()};

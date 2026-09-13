@@ -146,6 +146,18 @@ flash|FWS]
             [SimpleCommand "koshkit" "od" "-A" "n" "text" "+1"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "od-modern-plus-file=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "abcdef"]
+      [SimpleCommand "koshkit" "od" "-A" "n" "-t" "c" "-j" "0k" "-N" "0x4"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "abcdef"]
+      [SimpleCommand "koshkit" "od" "-A" "n" "-t" "c" "-j" "00b" "-N" "04"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "abcdefghijklmnop"]
+      [SimpleCommand "koshkit" "od" "-A" "n" "-t" "c" "-j" "0xb" "-N" "1"]
 [Word
   Unquoted "root="
   CommandSubstitution "mktemp -d"
@@ -1000,6 +1012,114 @@ flash|FWS"
   DoubleQuoted "od-modern-plus-file="
   Variable "?"
 ]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "abcdef"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "-A"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "-j"
+]
+[Word
+  Unquoted "0k"
+]
+[Word
+  Unquoted "-N"
+]
+[Word
+  Unquoted "0x4"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "abcdef"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "-A"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "-j"
+]
+[Word
+  Unquoted "00b"
+]
+[Word
+  Unquoted "-N"
+]
+[Word
+  Unquoted "04"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "abcdefghijklmnop"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "-A"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "c"
+]
+[Word
+  Unquoted "-j"
+]
+[Word
+  Unquoted "0xb"
+]
+[Word
+  Unquoted "-N"
+]
+[Word
+  Unquoted "1"
+]
 empty: empty
 text: text
 binary: data
@@ -1065,3 +1185,6 @@ abcde
 0000001 066145 067554 000012
 0000006
 od-modern-plus-file=1
+          a   b   c   d
+          a   b   c   d
+          l

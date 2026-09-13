@@ -104,6 +104,12 @@ echo "=== od skip count location ==="
 echo "=== od byte count location ==="
 "$BIN" -c 'koshkit od -N invalid' 2>&1
 
+echo "=== od octal skip location ==="
+"$BIN" -c 'koshkit od -j 08' 2>&1
+
+echo "=== od hexadecimal byte count location ==="
+"$BIN" -c 'koshkit od -N 0xg' 2>&1
+
 echo "=== od legacy offset location ==="
 "$BIN" -c 'koshkit od +8q' 2>&1
 

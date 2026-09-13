@@ -83,3 +83,6 @@ koshkit od text +0b
 koshkit od text 1
 (koshkit od -A n text +1) > "$TEST_NULL_DEVICE" 2>&1
 echo "od-modern-plus-file=$?"
+printf 'abcdef' | koshkit od -A n -t c -j 0k -N 0x4
+printf 'abcdef' | koshkit od -A n -t c -j 00b -N 04
+printf 'abcdefghijklmnop' | koshkit od -A n -t c -j 0xb -N 1

@@ -156,12 +156,22 @@ note: use a decimal integer from 0 through 9223372036854775807.
 1:15: error: od: invalid skip count 'invalid'.
      1 |  koshkit od -j invalid
        |                ^~~~~~~
-note: use a nonnegative decimal byte count.
+note: use decimal, leading-zero octal, or 0x hexadecimal, with optional b, k, or m units.
 === od byte count location ===
 1:15: error: od: invalid byte count 'invalid'.
      1 |  koshkit od -N invalid
        |                ^~~~~~~
-note: use a nonnegative decimal byte count.
+note: use decimal, leading-zero octal, or 0x hexadecimal bytes.
+=== od octal skip location ===
+1:15: error: od: invalid skip count '08'.
+     1 |  koshkit od -j 08
+       |                ^~
+note: use decimal, leading-zero octal, or 0x hexadecimal, with optional b, k, or m units.
+=== od hexadecimal byte count location ===
+1:15: error: od: invalid byte count '0xg'.
+     1 |  koshkit od -N 0xg
+       |                ^~~
+note: use decimal, leading-zero octal, or 0x hexadecimal bytes.
 === od legacy offset location ===
 1:12: error: od: invalid legacy offset '+8q'.
      1 |  koshkit od +8q
