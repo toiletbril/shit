@@ -1,20 +1,7 @@
 unset KOSH_FLAGS
+. ./capture-terminal-command.sh
 
 BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
-
-capture_help()
-{
-  command_text=$1
-  if script -q -c true /dev/null >/dev/null 2>&1; then
-    NO_COLOR= TERM=xterm script -q -c "$command_text" /dev/null 2>/dev/null |
-      tr -d '\r'
-  elif script -q /dev/null /usr/bin/true >/dev/null 2>&1; then
-    NO_COLOR= TERM=xterm script -q /dev/null /bin/sh -c "$command_text" \
-      2>/dev/null | tr -d '\r'
-  else
-    return 1
-  fi
-}
 
 check_contains()
 {
@@ -39,9 +26,10 @@ check_excludes()
 }
 
 escape=$(printf '\033')
-main_help=$(capture_help "exec \"$BIN\" --help") || exit 1
-builtin_help=$(capture_help "exec \"$BIN\" -c 'help set'") || exit 1
-koshkit_help=$(capture_help \
+main_help=$(NO_COLOR= capture_terminal_command "exec \"$BIN\" --help") || exit 1
+builtin_help=$(NO_COLOR= capture_terminal_command \
+  "exec \"$BIN\" -c 'help set'") || exit 1
+koshkit_help=$(NO_COLOR= capture_terminal_command \
   "exec \"$BIN\" -c 'koshkit goodnode --help'") || exit 1
 
 check_contains "$main_help" \

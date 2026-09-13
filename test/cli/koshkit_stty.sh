@@ -1,4 +1,5 @@
 unset KOSH_FLAGS
+. ./capture-terminal-command.sh
 
 BIN=$(CDPATH= cd -- "$(dirname -- "$BIN")" && pwd)/$(basename -- "$BIN")
 d=$(mktemp -d)
@@ -20,12 +21,4 @@ after=\$(koshkit stty -g) || exit
 if [ \"\$before\" = \"\$after\" ]; then echo restore=passed; else echo restore=failed; fi'"
 
 output_pattern='^(3:14: error: stty: invalid terminal setting\.|     3 \|  koshkit stty KOSH_MISSING_SETTING|       \|               \^~~~~~~~~~~~~~~~~~~~|note: read the current terminal settings with `stty -a`\.|(invalid|modes|changed|restore)=)'
-if script -q -c true /dev/null >/dev/null 2>&1; then
-  NO_COLOR=1 script -q -c "$command_text" /dev/null | tr -d '\r' |
-    grep -E "$output_pattern"
-elif script -q /dev/null /usr/bin/true >/dev/null 2>&1; then
-  NO_COLOR=1 script -q /dev/null /bin/sh -c "$command_text" | tr -d '\r' |
-    grep -E "$output_pattern"
-else
-  exit 1
-fi
+NO_COLOR=1 capture_terminal_command "$command_text" | grep -E "$output_pattern"

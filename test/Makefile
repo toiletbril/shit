@@ -175,6 +175,7 @@ WINDOWS_SKIPPED_CLI_NAMES := \
 	cli_suspend_behavior \
 	cli_trap_during_blocking_builtin \
 	cli_trap_startup_ignored \
+	cli_unknown_flag_color \
 	cli_wait_on_stopped_job
 
 $(WINDOWS_SKIPPED_CLI_NAMES):
