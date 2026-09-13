@@ -477,3 +477,18 @@ echo "=== sed substitution flag location ==="
 
 echo "=== sed script file location ==="
 "$BIN" -c "koshkit sed -f KOSH_MISSING_SCRIPT" 2>&1
+
+echo "=== tabs interval location ==="
+"$BIN" -c 'koshkit tabs -0' 2>&1
+
+echo "=== tabs stop location ==="
+"$BIN" -c 'koshkit tabs 4,nope' 2>&1
+
+echo "=== tabs descending stop location ==="
+"$BIN" -c 'koshkit tabs 4,3' 2>&1
+
+echo "=== tabs relative stop limit ==="
+"$BIN" -c 'koshkit tabs 4,+18446744073709551615' 2>&1
+
+echo "=== tabs extra operand location ==="
+"$BIN" -c 'koshkit tabs 4,8 extra' 2>&1

@@ -766,3 +766,28 @@ note: use g to replace every match or p to print changed lines.
      1 |  koshkit sed -f KOSH_MISSING_SCRIPT
        |                 ^~~~~~~~~~~~~~~~~~~
 note: pass a readable sed script file after -f.
+=== tabs interval location ===
+1:14: error: tabs: invalid tab interval '-0'.
+     1 |  koshkit tabs -0
+       |               ^~
+note: use - followed by a decimal interval from 1 through 160.
+=== tabs stop location ===
+1:14: error: tabs: invalid tab stop in '4,nope'.
+     1 |  koshkit tabs 4,nope
+       |               ^~~~~~
+note: use a named template or comma-separated positive decimal columns, with + for relative stops.
+=== tabs descending stop location ===
+1:14: error: tabs: tab stops do not increase within column 160 in '4,3'.
+     1 |  koshkit tabs 4,3
+       |               ^~~
+note: list each stop after the previous stop and no later than column 160.
+=== tabs relative stop limit ===
+1:14: error: tabs: tab stops do not increase within column 160 in '4,+18446744073709551615'.
+     1 |  koshkit tabs 4,+18446744073709551615
+       |               ^~~~~~~~~~~~~~~~~~~~~~~
+note: list each stop after the previous stop and no later than column 160.
+=== tabs extra operand location ===
+1:18: error: tabs: extra operand 'extra'.
+     1 |  koshkit tabs 4,8 extra
+       |                   ^~~~~
+note: pass one tab interval, stop list, or named template.

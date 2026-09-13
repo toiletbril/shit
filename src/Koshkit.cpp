@@ -198,14 +198,22 @@ fn run_as_multicall(StringView util_name, ArrayList<String> operands,
 
   ArrayList<String> args{heap_allocator()};
   args.reserve(operands.count() + 1);
-  args.push(String{util_name});
-  for (String &operand : operands)
-    args.push(steal(operand));
-
   let arg_locations = ArrayList<SourceLocation>{heap_allocator()};
+  arg_locations.reserve(operands.count() + 1);
+  usize source_length = util_name.length;
+  args.push(String{util_name});
+  arg_locations.push(SourceLocation{0, util_name.length});
+  for (String &operand : operands) {
+    source_length++;
+    arg_locations.push(SourceLocation{source_length, operand.length()});
+    source_length += operand.length();
+    args.push(steal(operand));
+  }
+
   let ec = ExecContext::from_resolved(
-      SourceLocation{}, ResolvedCommand::from_builtin(Builtin::Kind::Koshkit),
-      steal(args), steal(arg_locations));
+      SourceLocation{0, source_length},
+      ResolvedCommand::from_builtin(Builtin::Kind::Koshkit), steal(args),
+      steal(arg_locations));
   ec.is_multicall = true;
 
   try {
@@ -913,27 +921,29 @@ fn parse_koshkit_duration_seconds(StringView text, SourceLocation location,
   return value * multiplier;
 }
 
+cold static fn show_soft_koshkit_error(const ExecContext &ec, EvalContext &cxt,
+                                       SourceLocation location,
+                                       StringView message) throws -> void
+{
+  const ErrorWithLocation located{steal(location), message};
+  if (const String *source = cxt.current_source(); source != nullptr) {
+    show_message(located.to_string(source->view(), &cxt));
+    return;
+  }
+  if (ec.is_multicall) {
+    let const source = utils::merge_args_to_string(ec.args());
+    show_message(located.to_string(source.view(), &cxt));
+    return;
+  }
+
+  print_error(String{message} + "\n");
+}
+
 cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
                                            EvalContext &cxt,
                                            StringView message) throws -> void
 {
-  /* The fallback line covers the rare case with no source to caret against. */
-  const ErrorWithLocation located{ec.source_location(), message};
-  if (const String *source = cxt.current_source(); source != nullptr)
-    show_message(located.to_string(source->view(), &cxt));
-  else
-    print_error(String{message} + "\n");
-}
-
-cold noinline fn report_soft_koshkit_error(EvalContext &cxt,
-                                           SourceLocation location,
-                                           StringView message) throws -> void
-{
-  const ErrorWithLocation located{steal(location), message};
-  if (const String *source = cxt.current_source(); source != nullptr)
-    show_message(located.to_string(source->view(), &cxt));
-  else
-    print_error(String{message} + "\n");
+  show_soft_koshkit_error(ec, cxt, ec.source_location(), message);
 }
 
 cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
@@ -954,11 +964,11 @@ cold noinline fn report_soft_koshkit_util_error(const ExecContext &ec,
 }
 
 cold noinline fn report_soft_koshkit_util_error(
-    const ExecContext &, EvalContext &cxt, SourceLocation location,
+    const ExecContext &ec, EvalContext &cxt, SourceLocation location,
     StringView utility_name, StringView message) throws -> void
 {
   let const prefixed = String{utility_name} + ": " + message;
-  report_soft_koshkit_error(cxt, steal(location), prefixed.view());
+  show_soft_koshkit_error(ec, cxt, steal(location), prefixed.view());
 }
 
 cold noinline fn report_soft_koshkit_util_error(

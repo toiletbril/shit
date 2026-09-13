@@ -34,8 +34,12 @@ fn Tabs::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  unused(arg_locations);
-  if (args.count() > 2) return report_usage_error(ec, cxt, args[0].view());
+  if (args.count() > 2) {
+    KOSHKIT_REPORT_ERROR_AT(
+        arg_locations[2], "extra operand '" + args[2] + "'",
+        "pass one tab interval, stop list, or named template");
+    return 1;
+  }
   if (args.count() == 2 && args[1].view() == "--help") {
     print_util_help(ec, args[0].view(), HELP_SYNOPSIS[0], HELP_DESCRIPTION,
                     FLAG_LIST);
@@ -61,8 +65,12 @@ fn Tabs::execute(const ExecContext &ec, EvalContext &cxt,
       specification[1] >= '0' && specification[1] <= '9')
   {
     let const parsed = utils::parse_decimal_u64(specification.substring(1));
-    if (parsed.is_error() || parsed.value() == 0 || parsed.value() > 160)
-      throw Error{"tabs: invalid tab interval"};
+    if (parsed.is_error() || parsed.value() == 0 || parsed.value() > 160) {
+      KOSHKIT_REPORT_ERROR_AT(
+          arg_locations[1], "invalid tab interval '" + args[1] + "'",
+          "use - followed by a decimal interval from 1 through 160");
+      return 1;
+    }
     for (u64 stop = parsed.value() + 1; stop <= 160; stop += parsed.value())
       stops.push(stop);
   } else {
@@ -76,12 +84,28 @@ fn Tabs::execute(const ExecContext &ec, EvalContext &cxt,
       let const is_relative = !item.is_empty() && item[0] == '+';
       if (is_relative) item = item.substring(1);
       let const parsed = utils::parse_decimal_u64(item);
-      if (parsed.is_error() || parsed.value() == 0)
-        throw Error{"tabs: invalid tab stop"};
-      let const stop =
-          is_relative ? previous_stop + parsed.value() : parsed.value();
-      if (stop <= previous_stop || stop > 160)
-        throw Error{"tabs: tab stops must increase through column 160"};
+      if (parsed.is_error() || parsed.value() == 0) {
+        KOSHKIT_REPORT_ERROR_AT(
+            arg_locations[1], "invalid tab stop in '" + args[1] + "'",
+            "use a named template or comma-separated positive decimal columns"
+            ", with + for relative stops");
+        return 1;
+      }
+      let stop = parsed.value();
+      if (is_relative) {
+        if (stop > 160 - previous_stop)
+          stop = 161;
+        else
+          stop += previous_stop;
+      }
+      if (stop <= previous_stop || stop > 160) {
+        KOSHKIT_REPORT_ERROR_AT(
+            arg_locations[1],
+            "tab stops do not increase within column 160 in '" + args[1] + "'",
+            "list each stop after the previous stop and no later than column "
+            "160");
+        return 1;
+      }
       stops.push(stop);
       previous_stop = stop;
       if (item_length == remaining.length) break;

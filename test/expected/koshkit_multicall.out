@@ -22,6 +22,11 @@ DESCRIPTION
      1 |  sleep invalid
        |        ^~~~~~~
 note: Use a non-negative number with an optional `s`, `m`, `h`, or `d` suffix, such as `5` or `0.25s`.
+--- a specialized utility locates an invalid operand ---
+1:6: error: tabs: invalid tab stop in '4,nope'.
+     1 |  tabs 4,nope
+       |       ^~~~~~
+note: use a named template or comma-separated positive decimal columns, with + for relative stops.
 == a symlink was installed for head:
 head-linked
 == a symlinked head routes its own -c flag to the utility:

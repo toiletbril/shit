@@ -727,10 +727,6 @@ cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
                                            EvalContext &cxt,
                                            StringView message) throws -> void;
 
-cold noinline fn report_soft_koshkit_error(EvalContext &cxt,
-                                           SourceLocation location,
-                                           StringView message) throws -> void;
-
 cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
                                            EvalContext &cxt, StringView message,
                                            StringView note) throws -> void;

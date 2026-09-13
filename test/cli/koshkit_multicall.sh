@@ -34,6 +34,11 @@ ln -s "$BIN" sleep
 echo "--- a symlinked utility locates an invalid operand ---"
 ./sleep invalid 2>&1
 
+ln -s "$BIN" tabs
+
+echo "--- a specialized utility locates an invalid operand ---"
+./tabs 4,nope 2>&1
+
 unset KOSH_FLAGS
 # koshkit --assimilate installs a symlink to the binary named for each utility
 # into a directory, the busybox-style install. A symlinked invocation routes its
