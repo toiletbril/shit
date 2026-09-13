@@ -16,3 +16,9 @@ status=2
 --- repeated standard input ---
 left
 right
+--- interleaved script options preserve order ---
+B
+--- adjacent script files share a boundary ---
+A
+--- empty explicit script ---
+unchanged

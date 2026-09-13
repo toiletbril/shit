@@ -441,3 +441,39 @@ echo "=== killall signal location ==="
 
 echo "=== pkill signal location ==="
 "$BIN" -c 'koshkit pkill --signal KOSH_MISSING_SIGNAL process' 2>&1
+
+echo "=== sed implicit script location ==="
+"$BIN" -c "koshkit sed 's/a'" 2>&1
+
+echo "=== sed expression location ==="
+"$BIN" -c "koshkit sed -e p -e Z" 2>&1
+
+echo "=== sed expression boundary location ==="
+"$BIN" -c "koshkit sed -e '1' -e p" 2>&1
+
+echo "=== sed regular expression location ==="
+"$BIN" -c "koshkit sed -e's/[//'" 2>&1
+
+echo "=== sed line address limit ==="
+"$BIN" -c "koshkit sed -e 18446744073709551616p" 2>&1
+
+echo "=== sed zero line address ==="
+"$BIN" -c "koshkit sed -e 0p" 2>&1
+
+echo "=== sed second address location ==="
+"$BIN" -c "koshkit sed -e 1,p" 2>&1
+
+echo "=== sed translation delimiter location ==="
+"$BIN" -c "koshkit sed -e y" 2>&1
+
+echo "=== sed translation length location ==="
+"$BIN" -c "koshkit sed -e y/a/bc/" 2>&1
+
+echo "=== sed substitution delimiter location ==="
+"$BIN" -c "koshkit sed -e s" 2>&1
+
+echo "=== sed substitution flag location ==="
+"$BIN" -c "koshkit sed -e s/a/b/x" 2>&1
+
+echo "=== sed script file location ==="
+"$BIN" -c "koshkit sed -f KOSH_MISSING_SCRIPT" 2>&1

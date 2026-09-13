@@ -27,3 +27,22 @@ echo "--- multiple data files with a missing operand ---"
 
 echo "--- repeated standard input ---"
 printf 'left\nright\n' | "$BIN" -c 'koshkit sed -n "1,3p" - -'
+
+sed_order=$TEST_TEMP_DIRECTORY/koshkit-sed-order
+printf 's/a/A/\n' > "$sed_order"
+
+echo "--- interleaved script options preserve order ---"
+printf 'a\n' | "$BIN" -c 'koshkit sed -f "$1" -e "s/A/B/"' \
+  sed-test "$sed_order"
+
+sed_left=$TEST_TEMP_DIRECTORY/koshkit-sed-left
+sed_right=$TEST_TEMP_DIRECTORY/koshkit-sed-right
+printf 's/a' > "$sed_left"
+printf '/A/' > "$sed_right"
+
+echo "--- adjacent script files share a boundary ---"
+printf 'a\n' | "$BIN" -c 'koshkit sed -f "$1" -f "$2"' \
+  sed-test "$sed_left" "$sed_right"
+
+echo "--- empty explicit script ---"
+printf 'unchanged\n' | "$BIN" -c "koshkit sed -e ''"

@@ -478,7 +478,7 @@ note: scale must evaluate to an integer from 0 through 100000.
 1:20: error: cal: extra operand 'extra'.
      1 |  koshkit cal 1 2024 extra
        |                     ^~~~~
-note: use `cal [month] year`.
+note: use `cal [-a] [month] year`.
 === cal month location ===
 1:13: error: cal: invalid month '13'.
      1 |  koshkit cal 13 2024
@@ -706,3 +706,63 @@ note: Use a signal name such as TERM or a number such as 15.
      1 |  koshkit pkill --signal KOSH_MISSING_SIGNAL process
        |                         ^~~~~~~~~~~~~~~~~~~
 note: Use a signal name such as TERM or a number such as 15.
+=== sed implicit script location ===
+1:13: error: sed: unterminated delimited expression.
+     1 |  koshkit sed 's/a'
+       |              ^~~~~
+note: close the expression with the delimiter that opened it.
+=== sed expression location ===
+1:21: error: sed: unsupported command 'Z'.
+     1 |  koshkit sed -e p -e Z
+       |                      ^
+note: use a, c, d, i, p, q, s, y, =, or a supported address.
+=== sed expression boundary location ===
+1:16: error: sed: missing command.
+     1 |  koshkit sed -e '1' -e p
+       |                 ^~~
+note: write a sed command after the address.
+=== sed regular expression location ===
+1:13: error: sed: invalid regular expression '['.
+     1 |  koshkit sed -e's/[//'
+       |              ^~~~~~~~~
+note: use a valid basic regular expression.
+=== sed line address limit ===
+1:16: error: sed: line address is too large.
+     1 |  koshkit sed -e 18446744073709551616p
+       |                 ^~~~~~~~~~~~~~~~~~~~~
+note: use a decimal line number from 1 through 18446744073709551615.
+=== sed zero line address ===
+1:16: error: sed: line addresses begin at one.
+     1 |  koshkit sed -e 0p
+       |                 ^~
+note: use a positive decimal line number.
+=== sed second address location ===
+1:16: error: sed: missing second address.
+     1 |  koshkit sed -e 1,p
+       |                 ^~~
+note: write an address after the comma.
+=== sed translation delimiter location ===
+1:16: error: sed: translation lacks a delimiter.
+     1 |  koshkit sed -e y
+       |                 ^
+note: write a delimiter and two translation strings after y.
+=== sed translation length location ===
+1:16: error: sed: translation strings have different lengths.
+     1 |  koshkit sed -e y/a/bc/
+       |                 ^~~~~~~
+note: use translation strings with the same number of bytes.
+=== sed substitution delimiter location ===
+1:16: error: sed: substitution lacks a delimiter.
+     1 |  koshkit sed -e s
+       |                 ^
+note: write a delimiter, a pattern, and a replacement after s.
+=== sed substitution flag location ===
+1:16: error: sed: unsupported substitution flag 'x'.
+     1 |  koshkit sed -e s/a/b/x
+       |                 ^~~~~~~
+note: use g to replace every match or p to print changed lines.
+=== sed script file location ===
+1:16: error: sed: cannot read script file 'KOSH_MISSING_SCRIPT': No such file or directory.
+     1 |  koshkit sed -f KOSH_MISSING_SCRIPT
+       |                 ^~~~~~~~~~~~~~~~~~~
+note: pass a readable sed script file after -f.

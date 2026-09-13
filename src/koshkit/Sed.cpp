@@ -75,6 +75,45 @@ struct sed_command
   bool is_range_active{false};
 };
 
+struct sed_script_part
+{
+  usize start_position;
+  usize end_position;
+  SourceLocation location;
+  bool is_expression;
+};
+
+class SedParseError : public ErrorWithDetails
+{
+public:
+  SedParseError(usize position, StringView message, StringView note)
+      : ErrorWithDetails(message, note), m_position(position)
+  {}
+
+  pure fn get_position() const wontthrow -> usize { return m_position; }
+
+private:
+  usize m_position;
+};
+
+static fn free_sed_address(sed_address &address) wontthrow -> void
+{
+  if (!address.has_expression) return;
+
+  os::free_regex(address.expression);
+  address.has_expression = false;
+}
+
+static fn free_sed_command(sed_command &command) wontthrow -> void
+{
+  free_sed_address(command.address);
+  free_sed_address(command.second_address);
+  if (!command.has_expression) return;
+
+  os::free_regex(command.expression);
+  command.has_expression = false;
+}
+
 static fn parse_sed_delimited(StringView script, usize &position,
                               char delimiter, Allocator allocator) throws
     -> String
@@ -84,6 +123,10 @@ static fn parse_sed_delimited(StringView script, usize &position,
   while (position < script.length) {
     let const byte = script[position++];
     if (byte == delimiter) return text;
+    if (byte == '\n')
+      throw SedParseError{
+          position - 1, "unterminated delimited expression",
+          "close the expression before the end of the script line"};
     if (byte == '\\' && position < script.length) {
       let const escaped = script[position++];
       if (escaped == delimiter)
@@ -97,19 +140,25 @@ static fn parse_sed_delimited(StringView script, usize &position,
     }
   }
 
-  throw Error{"sed: unterminated delimited expression"};
+  throw SedParseError{position, "unterminated delimited expression",
+                      "close the expression with the delimiter that opened it"};
 }
 
 static fn compile_sed_expression(StringView expression, bool is_extended,
-                                 os::compiled_regex &compiled) throws -> void
+                                 os::compiled_regex &compiled,
+                                 usize position) throws -> void
 {
   let const result =
       is_extended ? os::compile_regex(expression,
                                       os::case_sensitivity::Sensitive, compiled)
                   : os::compile_basic_regex(
                         expression, os::case_sensitivity::Sensitive, compiled);
-  if (result != os::regex_compile_result::Ok)
-    throw Error{"sed: invalid regular expression '" + String{expression} + "'"};
+  if (result != os::regex_compile_result::Ok) {
+    throw SedParseError{
+        position, "invalid regular expression '" + String{expression} + "'",
+        is_extended ? "use a valid extended regular expression"
+                    : "use a valid basic regular expression"};
+  }
 }
 
 static fn parse_sed_address(StringView script, usize &position,
@@ -123,12 +172,17 @@ static fn parse_sed_address(StringView script, usize &position,
     while (position < script.length && script[position] >= '0' &&
            script[position] <= '9')
     {
+      let const digit_position = position;
       let const digit = static_cast<u64>(script[position++] - '0');
       if (line_number > (UINT64_MAX - digit) / 10)
-        throw Error{"sed: line address is too large"};
+        throw SedParseError{
+            digit_position, "line address is too large",
+            "use a decimal line number from 1 through 18446744073709551615"};
       line_number = line_number * 10 + digit;
     }
-    if (line_number == 0) throw Error{"sed: line addresses begin at one"};
+    if (line_number == 0)
+      throw SedParseError{position - 1, "line addresses begin at one",
+                          "use a positive decimal line number"};
     address.kind = sed_address_kind::Line;
     address.line_number = line_number;
     return true;
@@ -140,10 +194,12 @@ static fn parse_sed_address(StringView script, usize &position,
   }
   if (script[position] == '/') {
     position++;
+    let const expression_position = position;
     let const expression =
         parse_sed_delimited(script, position, '/', allocator);
     address.kind = sed_address_kind::Regex;
-    compile_sed_expression(expression.view(), is_extended, address.expression);
+    compile_sed_expression(expression.view(), is_extended, address.expression,
+                           expression_position);
     address.has_expression = true;
     return true;
   }
@@ -151,9 +207,9 @@ static fn parse_sed_address(StringView script, usize &position,
 }
 
 static fn parse_sed_script(StringView script, bool is_extended,
-                           Allocator allocator) throws -> ArrayList<sed_command>
+                           Allocator allocator,
+                           ArrayList<sed_command> &commands) throws -> void
 {
-  let commands = ArrayList<sed_command>{allocator};
   usize position = 0;
 
   while (position < script.length) {
@@ -169,15 +225,19 @@ static fn parse_sed_script(StringView script, bool is_extended,
     }
 
     sed_address address{};
+    defer { free_sed_address(address); };
     unused(
         parse_sed_address(script, position, is_extended, allocator, address));
     sed_address second_address{};
+    defer { free_sed_address(second_address); };
     bool has_second_address = false;
     if (position < script.length && script[position] == ',') {
       position++;
       has_second_address = parse_sed_address(script, position, is_extended,
                                              allocator, second_address);
-      if (!has_second_address) throw Error{"sed: missing second address"};
+      if (!has_second_address)
+        throw SedParseError{position, "missing second address",
+                            "write an address after the comma"};
     }
 
     while (position < script.length &&
@@ -191,8 +251,12 @@ static fn parse_sed_script(StringView script, bool is_extended,
              (script[position] == ' ' || script[position] == '\t'))
         position++;
     }
-    if (position == script.length) throw Error{"sed: missing command"};
+    if (position == script.length || script[position] == '\n') {
+      throw SedParseError{position, "missing command",
+                          "write a sed command after the address"};
+    }
 
+    let const command_position = position;
     let const command_byte = script[position++];
     sed_command command{steal(address),
                         steal(second_address),
@@ -205,6 +269,9 @@ static fn parse_sed_script(StringView script, bool is_extended,
                         is_negated,
                         has_second_address,
                         false};
+    address.has_expression = false;
+    second_address.has_expression = false;
+    defer { free_sed_command(command); };
     switch (command_byte) {
     case 'd': command.kind = sed_command_kind::Delete; break;
     case 'p': command.kind = sed_command_kind::Print; break;
@@ -231,28 +298,35 @@ static fn parse_sed_script(StringView script, bool is_extended,
     case 'y': {
       command.kind = sed_command_kind::Translate;
       if (position == script.length)
-        throw Error{"sed: translation lacks a delimiter"};
+        throw SedParseError{
+            position, "translation lacks a delimiter",
+            "write a delimiter and two translation strings after y"};
       let const delimiter = script[position++];
       command.replacement =
           parse_sed_delimited(script, position, delimiter, allocator);
       let const destination =
           parse_sed_delimited(script, position, delimiter, allocator);
       if (command.replacement.length() != destination.length())
-        throw Error{"sed: translation strings have different lengths"};
+        throw SedParseError{
+            position, "translation strings have different lengths",
+            "use translation strings with the same number of bytes"};
       command.replacement += destination.view();
       break;
     }
     case 's': {
       command.kind = sed_command_kind::Substitute;
       if (position == script.length)
-        throw Error{"sed: substitution lacks a delimiter"};
+        throw SedParseError{
+            position, "substitution lacks a delimiter",
+            "write a delimiter, a pattern, and a replacement after s"};
       let const delimiter = script[position++];
+      let const expression_position = position;
       let const expression =
           parse_sed_delimited(script, position, delimiter, allocator);
       command.replacement =
           parse_sed_delimited(script, position, delimiter, allocator);
-      compile_sed_expression(expression.view(), is_extended,
-                             command.expression);
+      compile_sed_expression(expression.view(), is_extended, command.expression,
+                             expression_position);
       command.has_expression = true;
 
       while (position < script.length && script[position] != ';' &&
@@ -263,23 +337,46 @@ static fn parse_sed_script(StringView script, bool is_extended,
         else if (script[position] == 'p')
           command.should_print = true;
         else if (script[position] != ' ' && script[position] != '\t')
-          throw Error{"sed: unsupported substitution flag"};
+          throw SedParseError{
+              position,
+              "unsupported substitution flag '" +
+                  String{allocator, script.substring_of_length(position, 1)}
+                  +
+                  "'",
+              "use g to replace every match or p to print changed lines"
+          };
         position++;
       }
       break;
     }
     default:
-      throw Error{
-          "sed: unsupported command '" +
-          String{allocator, StringView{&command_byte, 1}}
-          + "'"
+      throw SedParseError{
+          command_position,
+          "unsupported command '" +
+              String{allocator, StringView{&command_byte, 1}}
+              + "'",
+          "use a, c, d, i, p, q, s, y, =, or a supported address"
       };
     }
 
     commands.push(steal(command));
+    command.address.has_expression = false;
+    command.second_address.has_expression = false;
+    command.has_expression = false;
+  }
+}
+
+static fn get_sed_script_location(const ArrayList<sed_script_part> &parts,
+                                  usize position) wontthrow -> SourceLocation
+{
+  ASSERT(!parts.is_empty());
+
+  for (let const &part : parts) {
+    if (position >= part.start_position && position < part.end_position)
+      return part.location;
   }
 
-  return commands;
+  return parts.back().location;
 }
 
 static fn sed_address_matches(sed_address &address, StringView line,
@@ -414,44 +511,83 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
                 const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   String script{cxt.scratch_allocator()};
-  for (usize index = 0; index < FLAG_SED_EXPRESSION.count(); index++) {
-    if (!script.is_empty()) script += '\n';
-    script += FLAG_SED_EXPRESSION.get(index);
-  }
-  for (usize index = 0; index < FLAG_SED_FILE.count(); index++) {
-    let const file_script = read_named_or_stdin(ec, FLAG_SED_FILE.get(index));
-    if (!file_script.has_value())
-      throw Error{"sed: cannot read script file '" +
-                  String{FLAG_SED_FILE.get(index)} + "'"};
-    if (!script.is_empty()) script += '\n';
-    script += file_script->view();
+  let script_parts = ArrayList<sed_script_part>{cxt.scratch_allocator()};
+  script_parts.reserve(FLAG_SED_EXPRESSION.count() + FLAG_SED_FILE.count() + 1);
+  let do_append_script = [&](StringView addition, SourceLocation location,
+                             bool is_expression) throws -> void {
+    if (!script_parts.is_empty() && script_parts.back().is_expression) {
+      script += '\n';
+      script_parts.back().end_position = script.length();
+    }
+
+    let const start_position = script.length();
+    script += addition;
+    script_parts.push(sed_script_part{start_position, script.length(), location,
+                                      is_expression});
+  };
+
+  usize expression_index = 0;
+  usize file_index = 0;
+  while (expression_index < FLAG_SED_EXPRESSION.count() ||
+         file_index < FLAG_SED_FILE.count())
+  {
+    let const is_expression =
+        file_index == FLAG_SED_FILE.count() ||
+        (expression_index < FLAG_SED_EXPRESSION.count() &&
+         FLAG_SED_EXPRESSION.get_position(expression_index) <
+             FLAG_SED_FILE.get_position(file_index));
+    if (is_expression) {
+      do_append_script(FLAG_SED_EXPRESSION.get(expression_index),
+                       FLAG_SED_EXPRESSION.get_location(expression_index),
+                       true);
+      expression_index++;
+      continue;
+    }
+
+    let const file_script =
+        read_named_or_stdin(ec, FLAG_SED_FILE.get(file_index));
+    if (!file_script.has_value()) {
+      KOSHKIT_REPORT_ERROR_AT(FLAG_SED_FILE.get_location(file_index),
+                              "cannot read script file '" +
+                                  String{FLAG_SED_FILE.get(file_index)} +
+                                  "': " + os::last_system_error_message(),
+                              "pass a readable sed script file after -f");
+      return 1;
+    }
+    do_append_script(file_script->view(),
+                     FLAG_SED_FILE.get_location(file_index), false);
+    file_index++;
   }
 
   usize source_start = 0;
-  if (script.is_empty()) {
+  if (script_parts.is_empty()) {
     if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
-    script += operands[0].view();
+    do_append_script(operands[0].view(), operand_locations[0], false);
     source_start = 1;
   }
 
-  let commands = parse_sed_script(script.view(), FLAG_SED_EXTENDED.is_enabled(),
-                                  cxt.scratch_allocator());
+  let commands = ArrayList<sed_command>{cxt.scratch_allocator()};
   defer
   {
-    for (let &command : commands) {
-      if (command.address.has_expression)
-        os::free_regex(command.address.expression);
-      if (command.second_address.has_expression)
-        os::free_regex(command.second_address.expression);
-      if (command.has_expression) os::free_regex(command.expression);
-    }
+    for (let &command : commands)
+      free_sed_command(command);
   };
+  try {
+    parse_sed_script(script.view(), FLAG_SED_EXTENDED.is_enabled(),
+                     cxt.scratch_allocator(), commands);
+  } catch (SedParseError &error) {
+    KOSHKIT_REPORT_ERROR_AT(
+        get_sed_script_location(script_parts, error.get_position()),
+        error.message().view(), error.detail_message());
+    return 1;
+  }
 
   let const sources = source_list_from_operands(
       operands, cxt.scratch_allocator(), source_start);
