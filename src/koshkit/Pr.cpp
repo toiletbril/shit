@@ -291,8 +291,8 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
 
       usize emitted_page_lines = 0;
       if (column_count > 1) {
-        let const row_count =
-            (page_item_count + column_count - 1) / column_count;
+        let const row_count = page_item_count / column_count +
+                              (page_item_count % column_count != 0 ? 1 : 0);
         let const separator = FLAG_PR_SEPARATOR.is_set()
                                   ? FLAG_PR_SEPARATOR.value()
                                   : StringView{"\t"};
@@ -303,7 +303,7 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
             let const relative_index = FLAG_PR_ACROSS.is_enabled()
                                            ? row * column_count + column
                                            : column * row_count + row;
-            if (relative_index >= page_item_count) continue;
+            if (relative_index >= page_item_count) break;
             if (has_output_column) output += separator;
             let const line = lines[line_index + relative_index];
             let const available_width =

@@ -50,6 +50,8 @@ echo "csplit-cleanup=$?"
 koshkit pr -t lines
 koshkit pr -t -w 20 -s : -2 lines
 koshkit pr -t -a -w 20 -s : -2 lines
+printf 'wide-one\nwide-two\n' |
+  koshkit pr -t -l 1 -18446744073709551615
 printf 'left-one\nleft-two\n' > left
 printf 'right-one\nright-two\n' > right
 koshkit pr -t -m -w 30 -s : left right

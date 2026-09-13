@@ -110,6 +110,10 @@
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "pr" "-t" "-a" "-w" "20" "-s" ":" "-2" "lines"]
   [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "wide-one\nwide-two\n"]
+      [SimpleCommand "koshkit" "pr" "-t" "-l" "1" "-18446744073709551615"]
+  [CompoundListCondition, None]
     [SimpleCommand "printf" "left-one\nleft-two\n"]
   [CompoundListCondition, None]
     [SimpleCommand "printf" "right-one\nright-two\n"]
@@ -856,6 +860,30 @@
   Unquoted "printf"
 ]
 [Word
+  Literal "wide-one\nwide-two\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "pr"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "-l"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "-18446744073709551615"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
   Literal "left-one\nleft-two\n"
 ]
 [Word
@@ -977,5 +1005,6 @@ one:three
 two:four
 one:two
 three:four
+wide-one	wide-two
 left-one:right-one
 left-two:right-two
