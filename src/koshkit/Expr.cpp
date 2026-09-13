@@ -32,8 +32,11 @@ static pure fn expr_value_is_true(StringView value) wontthrow -> bool
 class ExprParser
 {
 public:
-  ExprParser(const ArrayList<String> &tokens, Allocator allocator)
-      : m_tokens(tokens), m_allocator(allocator)
+  ExprParser(const ArrayList<String> &tokens,
+             const ArrayList<SourceLocation> &token_locations,
+             Allocator allocator)
+      : m_tokens(tokens), m_token_locations(token_locations),
+        m_allocator(allocator)
   {}
 
   fn parse() throws -> String
@@ -193,6 +196,7 @@ private:
     let left = parse_primary();
     while (peek(":")) {
       m_position++;
+      let const pattern_position = m_position;
       let const pattern = parse_primary();
       String anchored{m_allocator, "^"};
       anchored += pattern.view();
@@ -200,7 +204,11 @@ private:
       if (os::compile_basic_regex(anchored.view(),
                                   os::case_sensitivity::Sensitive,
                                   compiled) != os::regex_compile_result::Ok)
-        throw Error{"expr: invalid regular expression"};
+      {
+        throw ErrorWithLocationAndDetails{
+            m_token_locations[pattern_position], "invalid regular expression",
+            "use a valid basic regular expression"};
+      }
       defer { os::free_regex(compiled); };
 
       let spans = ArrayList<os::regex_span>{m_allocator};
@@ -258,6 +266,7 @@ private:
   }
 
   const ArrayList<String> &m_tokens;
+  const ArrayList<SourceLocation> &m_token_locations;
   Allocator m_allocator;
   usize m_position{0};
 };
@@ -271,14 +280,15 @@ fn Expr::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands =
-      parse_util_operands(FLAG_LIST, args, &arg_locations, nullptr, true);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations,
+                                           &operand_locations, true);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
-  ExprParser parser{operands, cxt.scratch_allocator()};
+  ExprParser parser{operands, operand_locations, cxt.scratch_allocator()};
   let result = parser.parse();
   let const status = expr_value_is_true(result.view()) ? 0 : 1;
   result += '\n';

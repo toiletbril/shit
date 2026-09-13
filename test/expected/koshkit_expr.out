@@ -1,0 +1,152 @@
+[CompoundList]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "expr" "2" "+" "3" "*" "4"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "expr" "7" ">" "3"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "expr" "abc" ":" "a\(.*\)"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "expr" "ababa" ":" "\(ab*\)\1a"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "expr" "0" "|" "hello"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "expr" "0"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "expr-false=$?"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "expr" "x" ":" "["]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "+"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Literal "*"
+]
+[Word
+  Unquoted "4"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
+  Unquoted "7"
+]
+[Word
+  Literal ">"
+]
+[Word
+  Unquoted "3"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
+  Unquoted "abc"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Literal "a\(.*\)"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
+  Unquoted "ababa"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Literal "\(ab*\)\1a"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Literal "|"
+]
+[Word
+  Unquoted "hello"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
+  Unquoted "0"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "expr-false="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "expr"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted ":"
+]
+[Word
+  Literal "["
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+14
+1
+bc
+ab
+hello
+expr-false=1
+9:19: error: koshkit expr: invalid regular expression.
+     9 |  (koshkit expr x : '[') 2>&1
+       |                    ^~~
+note: use a valid basic regular expression.
