@@ -41,11 +41,12 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Pr);
 
 namespace koshka::koshkit {
 
-static fn parse_pr_number(StringView text, StringView name) throws -> usize
+static fn parse_pr_number(StringView text) wontthrow -> Maybe<usize>
 {
   let const parsed = utils::parse_decimal_u64(text);
-  if (parsed.is_error() || parsed.value() > SIZE_MAX)
-    throw Error{"pr: invalid " + String{name} + " '" + String{text} + "'"};
+
+  if (parsed.is_error() || parsed.value() > SIZE_MAX) return None;
+
   return static_cast<usize>(parsed.value());
 }
 
@@ -70,6 +71,7 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
   filtered_locations.push(arg_locations[0]);
   usize column_count = 1;
   usize first_page = 1;
+  Maybe<SourceLocation> column_count_location;
   for (usize index = 1; index < args.count(); index++) {
     let const argument = args[index].view();
     let numeric = argument;
@@ -85,13 +87,27 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
       numeric = numeric.substring(1);
     }
     if (is_page || is_column) {
-      let const parsed = utils::parse_decimal_u64(numeric);
-      if (parsed.is_error() || parsed.value() == 0 || parsed.value() > SIZE_MAX)
-        throw Error{"pr: invalid numeric layout operand '" + args[index] + "'"};
-      if (is_page)
-        first_page = static_cast<usize>(parsed.value());
-      else
-        column_count = static_cast<usize>(parsed.value());
+      let const parsed = parse_pr_number(numeric);
+      if (!parsed.has_value() || *parsed == 0) {
+        KOSHKIT_REPORT_ERROR_AT(
+            arg_locations[index],
+            String{is_page ? "invalid page number '"
+                           : "invalid column count '"} +
+                args[index] + "'",
+            is_page ? "use + followed by a positive decimal integer within the "
+                      "platform size limit"
+                    : "use - followed by a positive decimal integer within the "
+                      "platform size limit");
+        return 1;
+      }
+
+      if (is_page) {
+        first_page = *parsed;
+      } else {
+        column_count = *parsed;
+        column_count_location = arg_locations[index];
+      }
+
       continue;
     }
     filtered_args.push(args[index].clone());
@@ -103,18 +119,55 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
-  let const page_length =
-      FLAG_PR_LENGTH.is_set()
-          ? parse_pr_number(FLAG_PR_LENGTH.value(), "length")
-          : 66;
-  let const page_width = FLAG_PR_WIDTH.is_set()
-                             ? parse_pr_number(FLAG_PR_WIDTH.value(), "width")
-                             : 72;
-  let const offset = FLAG_PR_OFFSET.is_set()
-                         ? parse_pr_number(FLAG_PR_OFFSET.value(), "offset")
-                         : 0;
-  if (!FLAG_PR_NO_HEADER.is_enabled() && page_length < 10)
-    throw Error{"pr: page length is too small for headers"};
+  usize page_length = 66;
+  if (FLAG_PR_LENGTH.is_set()) {
+    let const parsed = parse_pr_number(FLAG_PR_LENGTH.value());
+    if (!parsed.has_value()) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_PR_LENGTH.value_location(),
+          "invalid page length '" + FLAG_PR_LENGTH.value() + "'",
+          "use a nonnegative decimal integer within the platform size limit");
+      return 1;
+    }
+
+    page_length = *parsed;
+  }
+
+  usize page_width = 72;
+  if (FLAG_PR_WIDTH.is_set()) {
+    let const parsed = parse_pr_number(FLAG_PR_WIDTH.value());
+    if (!parsed.has_value()) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_PR_WIDTH.value_location(),
+          "invalid page width '" + FLAG_PR_WIDTH.value() + "'",
+          "use a nonnegative decimal integer within the platform size limit");
+      return 1;
+    }
+
+    page_width = *parsed;
+  }
+
+  usize offset = 0;
+  if (FLAG_PR_OFFSET.is_set()) {
+    let const parsed = parse_pr_number(FLAG_PR_OFFSET.value());
+    if (!parsed.has_value()) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_PR_OFFSET.value_location(),
+          "invalid indentation '" + FLAG_PR_OFFSET.value() + "'",
+          "use a nonnegative decimal integer within the platform size limit");
+      return 1;
+    }
+
+    offset = *parsed;
+  }
+
+  if (!FLAG_PR_NO_HEADER.is_enabled() && page_length < 10) {
+    KOSHKIT_REPORT_ERROR_AT(
+        FLAG_PR_LENGTH.value_location(),
+        "the page length leaves no room for headers",
+        "use a length of at least 10 or omit headers with -t");
+    return 1;
+  }
 
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator());
@@ -173,6 +226,27 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
     return status;
   }
 
+  let const data_line_limit =
+      FLAG_PR_NO_HEADER.is_enabled() ? page_length : page_length - 10;
+  if (data_line_limit == 0) {
+    KOSHKIT_REPORT_ERROR_AT(
+        FLAG_PR_LENGTH.value_location(),
+        "the page length leaves no room for output",
+        "use a positive page length when headers are omitted");
+    return 1;
+  }
+
+  if (column_count_location.has_value() &&
+      column_count > SIZE_MAX / data_line_limit)
+  {
+    KOSHKIT_REPORT_ERROR_AT(*column_count_location,
+                            "the column count exceeds the page capacity",
+                            "reduce the column count");
+    return 1;
+  }
+
+  let const page_capacity = data_line_limit * column_count;
+
   for (let const source : sources) {
     let const content = read_named_or_stdin(ec, source);
     if (!content.has_value()) {
@@ -189,16 +263,11 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
         utils::split_lines(content->view(), cxt.scratch_allocator(), true);
     for (let &line : lines)
       line = line.without_trailing_newline();
-    let const data_line_limit =
-        FLAG_PR_NO_HEADER.is_enabled() ? page_length : page_length - 10;
     usize line_index = 0;
     usize page_number = 1;
     u64 source_line_number = 1;
 
     while (line_index < lines.count()) {
-      if (data_line_limit == 0 || column_count > SIZE_MAX / data_line_limit)
-        throw Error{"pr: page capacity is invalid"};
-      let const page_capacity = data_line_limit * column_count;
       let const remaining_count = lines.count() - line_index;
       let const page_item_count =
           remaining_count < page_capacity ? remaining_count : page_capacity;

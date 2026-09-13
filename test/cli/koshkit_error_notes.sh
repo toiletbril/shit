@@ -119,6 +119,30 @@ echo "=== od integer width location ==="
 echo "=== od repeated output type location ==="
 "$BIN" -c 'koshkit od -t x1 -t invalid' 2>&1
 
+echo "=== pr page number location ==="
+"$BIN" -c 'koshkit pr +0' 2>&1
+
+echo "=== pr column count location ==="
+"$BIN" -c 'koshkit pr -2x' 2>&1
+
+echo "=== pr page length location ==="
+"$BIN" -c 'koshkit pr -l invalid' 2>&1
+
+echo "=== pr page width location ==="
+"$BIN" -c 'koshkit pr -w invalid' 2>&1
+
+echo "=== pr indentation location ==="
+"$BIN" -c 'koshkit pr -o invalid' 2>&1
+
+echo "=== pr header capacity location ==="
+"$BIN" -c 'koshkit pr -l 9' 2>&1
+
+echo "=== pr output capacity location ==="
+"$BIN" -c 'koshkit pr -t -l 0' 2>&1
+
+echo "=== pr column capacity location ==="
+"$BIN" -c 'koshkit pr -t -l 2 -18446744073709551615' 2>&1
+
 echo "=== grep pattern location ==="
 "$BIN" -c "koshkit grep '['" 2>&1
 echo "=== grep file location ==="

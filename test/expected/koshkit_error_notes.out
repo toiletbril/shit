@@ -187,6 +187,46 @@ note: use a width of 1, 2, 4, or 8.
      1 |  koshkit od -t x1 -t invalid
        |                      ^~~~~~~
 note: use c, d, o, u, or x with an optional width of 1, 2, 4, or 8.
+=== pr page number location ===
+1:12: error: pr: invalid page number '+0'.
+     1 |  koshkit pr +0
+       |             ^~
+note: use + followed by a positive decimal integer within the platform size limit.
+=== pr column count location ===
+1:12: error: pr: invalid column count '-2x'.
+     1 |  koshkit pr -2x
+       |             ^~~
+note: use - followed by a positive decimal integer within the platform size limit.
+=== pr page length location ===
+1:15: error: pr: invalid page length 'invalid'.
+     1 |  koshkit pr -l invalid
+       |                ^~~~~~~
+note: use a nonnegative decimal integer within the platform size limit.
+=== pr page width location ===
+1:15: error: pr: invalid page width 'invalid'.
+     1 |  koshkit pr -w invalid
+       |                ^~~~~~~
+note: use a nonnegative decimal integer within the platform size limit.
+=== pr indentation location ===
+1:15: error: pr: invalid indentation 'invalid'.
+     1 |  koshkit pr -o invalid
+       |                ^~~~~~~
+note: use a nonnegative decimal integer within the platform size limit.
+=== pr header capacity location ===
+1:15: error: pr: the page length leaves no room for headers.
+     1 |  koshkit pr -l 9
+       |                ^
+note: use a length of at least 10 or omit headers with -t.
+=== pr output capacity location ===
+1:18: error: pr: the page length leaves no room for output.
+     1 |  koshkit pr -t -l 0
+       |                   ^
+note: use a positive page length when headers are omitted.
+=== pr column capacity location ===
+1:20: error: pr: the column count exceeds the page capacity.
+     1 |  koshkit pr -t -l 2 -18446744073709551615
+       |                     ^~~~~~~~~~~~~~~~~~~~~
+note: reduce the column count.
 === grep pattern location ===
 1:14: error: grep: the pattern '[' is not a valid regex.
      1 |  koshkit grep '['
