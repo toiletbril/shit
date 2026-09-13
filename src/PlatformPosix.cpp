@@ -1952,6 +1952,110 @@ static constexpr int SYSTEM_CONFIGURATION_KEYS[] = {
     _SC_TIMER_MAX,
     _SC_TTY_NAME_MAX,
     _SC_TZNAME_MAX,
+    _SC_ADVISORY_INFO,
+    _SC_ASYNCHRONOUS_IO,
+    _SC_BARRIERS,
+    _SC_CLOCK_SELECTION,
+    _SC_CPUTIME,
+#ifdef _SC_DEVICE_CONTROL
+    _SC_DEVICE_CONTROL,
+#else
+    -1,
+#endif
+    _SC_FSYNC,
+    _SC_IPV6,
+    _SC_JOB_CONTROL,
+    _SC_MAPPED_FILES,
+    _SC_MEMLOCK,
+    _SC_MEMLOCK_RANGE,
+    _SC_MEMORY_PROTECTION,
+    _SC_MESSAGE_PASSING,
+    _SC_MONOTONIC_CLOCK,
+    _SC_2_C_BIND,
+    _SC_2_C_DEV,
+    _SC_2_CHAR_TERM,
+    _SC_2_FORT_RUN,
+    _SC_2_LOCALEDEF,
+    _SC_2_SW_DEV,
+    _SC_2_UPE,
+    _SC_2_VERSION,
+    _SC_PRIORITIZED_IO,
+    _SC_PRIORITY_SCHEDULING,
+    _SC_RAW_SOCKETS,
+    _SC_READER_WRITER_LOCKS,
+    _SC_REALTIME_SIGNALS,
+    _SC_REGEXP,
+    _SC_SAVED_IDS,
+    _SC_SEMAPHORES,
+    _SC_SHARED_MEMORY_OBJECTS,
+    _SC_SHELL,
+    _SC_SPAWN,
+    _SC_SPIN_LOCKS,
+    _SC_SPORADIC_SERVER,
+    _SC_SYNCHRONIZED_IO,
+    _SC_THREAD_ATTR_STACKADDR,
+    _SC_THREAD_ATTR_STACKSIZE,
+    _SC_THREAD_CPUTIME,
+    _SC_THREAD_PRIO_INHERIT,
+    _SC_THREAD_PRIO_PROTECT,
+    _SC_THREAD_PRIORITY_SCHEDULING,
+    _SC_THREAD_PROCESS_SHARED,
+#ifdef _SC_THREAD_ROBUST_PRIO_INHERIT
+    _SC_THREAD_ROBUST_PRIO_INHERIT,
+    _SC_THREAD_ROBUST_PRIO_PROTECT,
+#else
+    -1,
+    -1,
+#endif
+    _SC_THREAD_SAFE_FUNCTIONS,
+    _SC_THREAD_SPORADIC_SERVER,
+    _SC_THREADS,
+    _SC_TIMEOUTS,
+    _SC_TIMERS,
+    _SC_TYPED_MEMORY_OBJECTS,
+#ifdef _SC_V7_ILP32_OFF32
+    _SC_V7_ILP32_OFF32,
+    _SC_V7_ILP32_OFFBIG,
+    _SC_V7_LP64_OFF64,
+    _SC_V7_LPBIG_OFFBIG,
+#else
+    -1,
+    -1,
+    -1,
+    -1,
+#endif
+#ifdef _SC_V8_ILP32_OFF32
+    _SC_V8_ILP32_OFF32,
+#else
+    -1,
+#endif
+#ifdef _SC_V8_ILP32_OFFBIG
+    _SC_V8_ILP32_OFFBIG,
+#else
+    -1,
+#endif
+#ifdef _SC_V8_LP64_OFF64
+    _SC_V8_LP64_OFF64,
+#else
+    -1,
+#endif
+#ifdef _SC_V8_LPBIG_OFFBIG
+    _SC_V8_LPBIG_OFFBIG,
+#else
+    -1,
+#endif
+    _SC_XOPEN_CRYPT,
+    _SC_XOPEN_ENH_I18N,
+    _SC_XOPEN_REALTIME,
+    _SC_XOPEN_REALTIME_THREADS,
+    _SC_XOPEN_SHM,
+    _SC_XOPEN_UNIX,
+#ifdef _SC_XOPEN_UUCP
+    _SC_XOPEN_UUCP,
+#else
+    -1,
+#endif
+    _SC_XOPEN_VERSION,
 };
 static_assert(countof(SYSTEM_CONFIGURATION_KEYS) ==
               static_cast<usize>(system_configuration_key::Count));
@@ -1960,6 +2064,7 @@ fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
 {
   if (key == system_configuration_key::Count) return None;
   let const native_key = SYSTEM_CONFIGURATION_KEYS[static_cast<usize>(key)];
+  if (native_key < 0) return None;
 
   errno = 0;
   let const value = sysconf(native_key);
@@ -1968,13 +2073,41 @@ fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
 }
 
 static constexpr int PATH_CONFIGURATION_KEYS[] = {
-    _PC_ALLOC_SIZE_MIN,    _PC_ASYNC_IO,           _PC_CHOWN_RESTRICTED,
-    _PC_VDISABLE,          _PC_FILESIZEBITS,       _PC_LINK_MAX,
-    _PC_MAX_CANON,         _PC_MAX_INPUT,          _PC_NAME_MAX,
-    _PC_NO_TRUNC,          _PC_PATH_MAX,           _PC_PIPE_BUF,
-    _PC_PRIO_IO,           _PC_REC_INCR_XFER_SIZE, _PC_REC_MAX_XFER_SIZE,
-    _PC_REC_MIN_XFER_SIZE, _PC_REC_XFER_ALIGN,     _PC_SYMLINK_MAX,
-    _PC_SYNC_IO,           _PC_2_SYMLINKS,
+    _PC_ALLOC_SIZE_MIN,
+    _PC_ASYNC_IO,
+    _PC_CHOWN_RESTRICTED,
+    _PC_VDISABLE,
+    _PC_FILESIZEBITS,
+    _PC_LINK_MAX,
+    _PC_MAX_CANON,
+    _PC_MAX_INPUT,
+    _PC_NAME_MAX,
+    _PC_NO_TRUNC,
+    _PC_PATH_MAX,
+    _PC_PIPE_BUF,
+    _PC_PRIO_IO,
+    _PC_REC_INCR_XFER_SIZE,
+    _PC_REC_MAX_XFER_SIZE,
+    _PC_REC_MIN_XFER_SIZE,
+    _PC_REC_XFER_ALIGN,
+    _PC_SYMLINK_MAX,
+    _PC_SYNC_IO,
+    _PC_2_SYMLINKS,
+#ifdef _PC_FALLOC
+    _PC_FALLOC,
+#else
+    -1,
+#endif
+#ifdef _PC_TEXTDOMAIN_MAX
+    _PC_TEXTDOMAIN_MAX,
+#else
+    -1,
+#endif
+#ifdef _PC_TIMESTAMP_RESOLUTION
+    _PC_TIMESTAMP_RESOLUTION,
+#else
+    -1,
+#endif
 };
 static_assert(countof(PATH_CONFIGURATION_KEYS) ==
               static_cast<usize>(path_configuration_key::Count));
@@ -1984,6 +2117,7 @@ fn path_configuration(StringView path, path_configuration_key key) wontthrow
 {
   if (key == path_configuration_key::Count) return None;
   let const native_key = PATH_CONFIGURATION_KEYS[static_cast<usize>(key)];
+  if (native_key < 0) return None;
 
   let const path_text = String{heap_allocator(), path};
   errno = 0;

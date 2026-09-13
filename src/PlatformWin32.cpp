@@ -1290,6 +1290,74 @@ fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
   case system_configuration_key::TimerMax:
   case system_configuration_key::TtyNameMax:
   case system_configuration_key::TimeZoneNameMax:
+  case system_configuration_key::AdvisoryInfo:
+  case system_configuration_key::AsynchronousIo:
+  case system_configuration_key::Barriers:
+  case system_configuration_key::ClockSelection:
+  case system_configuration_key::CpuTime:
+  case system_configuration_key::DeviceControl:
+  case system_configuration_key::FileSync:
+  case system_configuration_key::IpV6:
+  case system_configuration_key::JobControl:
+  case system_configuration_key::MappedFiles:
+  case system_configuration_key::MemoryLock:
+  case system_configuration_key::MemoryLockRange:
+  case system_configuration_key::MemoryProtection:
+  case system_configuration_key::MessagePassing:
+  case system_configuration_key::MonotonicClock:
+  case system_configuration_key::Posix2CBind:
+  case system_configuration_key::Posix2CDev:
+  case system_configuration_key::Posix2CharTerminal:
+  case system_configuration_key::Posix2FortranRun:
+  case system_configuration_key::Posix2LocaleDefinition:
+  case system_configuration_key::Posix2SoftwareDevelopment:
+  case system_configuration_key::Posix2UserPortabilityUtilities:
+  case system_configuration_key::Posix2Version:
+  case system_configuration_key::PrioritizedIo:
+  case system_configuration_key::PriorityScheduling:
+  case system_configuration_key::RawSockets:
+  case system_configuration_key::ReaderWriterLocks:
+  case system_configuration_key::RealtimeSignals:
+  case system_configuration_key::RegularExpressions:
+  case system_configuration_key::SavedIds:
+  case system_configuration_key::Semaphores:
+  case system_configuration_key::SharedMemoryObjects:
+  case system_configuration_key::Shell:
+  case system_configuration_key::Spawn:
+  case system_configuration_key::SpinLocks:
+  case system_configuration_key::SporadicServer:
+  case system_configuration_key::SynchronizedIo:
+  case system_configuration_key::ThreadAttributeStackAddress:
+  case system_configuration_key::ThreadAttributeStackSize:
+  case system_configuration_key::ThreadCpuTime:
+  case system_configuration_key::ThreadPriorityInherit:
+  case system_configuration_key::ThreadPriorityProtect:
+  case system_configuration_key::ThreadPriorityScheduling:
+  case system_configuration_key::ThreadProcessShared:
+  case system_configuration_key::ThreadRobustPriorityInherit:
+  case system_configuration_key::ThreadRobustPriorityProtect:
+  case system_configuration_key::ThreadSafeFunctions:
+  case system_configuration_key::ThreadSporadicServer:
+  case system_configuration_key::Threads:
+  case system_configuration_key::Timeouts:
+  case system_configuration_key::Timers:
+  case system_configuration_key::TypedMemoryObjects:
+  case system_configuration_key::V7Ilp32Off32:
+  case system_configuration_key::V7Ilp32OffBig:
+  case system_configuration_key::V7Lp64Off64:
+  case system_configuration_key::V7LpBigOffBig:
+  case system_configuration_key::V8Ilp32Off32:
+  case system_configuration_key::V8Ilp32OffBig:
+  case system_configuration_key::V8Lp64Off64:
+  case system_configuration_key::V8LpBigOffBig:
+  case system_configuration_key::XOpenCrypt:
+  case system_configuration_key::XOpenEnhancedInternationalization:
+  case system_configuration_key::XOpenRealtime:
+  case system_configuration_key::XOpenRealtimeThreads:
+  case system_configuration_key::XOpenSharedMemory:
+  case system_configuration_key::XOpenUnix:
+  case system_configuration_key::XOpenUucp:
+  case system_configuration_key::XOpenVersion:
   case system_configuration_key::Count: return None;
   }
   return None;
@@ -1338,6 +1406,9 @@ fn path_configuration(StringView path, path_configuration_key key) wontthrow
   case path_configuration_key::SymbolicLinkMax:
   case path_configuration_key::SyncIo:
   case path_configuration_key::TwoSymbolicLinks:
+  case path_configuration_key::Fallocate:
+  case path_configuration_key::TextDomainMax:
+  case path_configuration_key::TimestampResolution:
   case path_configuration_key::Count: return None;
   }
   return None;
