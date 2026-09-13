@@ -33,29 +33,31 @@ namespace koshka {
 
 namespace koshkit {
 
-static fn parse_touch_pair(StringView text, usize position) throws -> i32
+static fn parse_touch_pair(StringView text, usize position,
+                           i32 &value) wontthrow -> bool
 {
   if (position + 2 > text.length || text[position] < '0' ||
       text[position] > '9' || text[position + 1] < '0' ||
       text[position + 1] > '9')
   {
-    throw Error{"touch: invalid time '" + String{text} + "'"};
+    return false;
   }
 
-  return static_cast<i32>((text[position] - '0') * 10 + text[position + 1] -
-                          '0');
+  value =
+      static_cast<i32>((text[position] - '0') * 10 + text[position + 1] - '0');
+  return true;
 }
 
-static fn parse_touch_time(StringView text) throws -> i64
+static fn parse_touch_time(StringView text, i64 &parsed_time) throws -> bool
 {
   let main_length = text.length;
   i32 second = 0;
   if (main_length >= 3 && text[main_length - 3] == '.') {
-    second = parse_touch_pair(text, main_length - 2);
+    if (!parse_touch_pair(text, main_length - 2, second)) return false;
+
     main_length -= 3;
   }
-  if (main_length != 8 && main_length != 10 && main_length != 12)
-    throw Error{"touch: invalid time '" + String{text} + "'"};
+  if (main_length != 8 && main_length != 10 && main_length != 12) return false;
 
   let const now = std::time(NULL);
   let const *current = std::localtime(&now);
@@ -64,22 +66,39 @@ static fn parse_touch_time(StringView text) throws -> i64
   struct tm value = *current;
   usize position = 0;
   if (main_length == 12) {
-    value.tm_year = parse_touch_pair(text, position) * 100 +
-                    parse_touch_pair(text, position + 2) - 1900;
+    i32 century;
+    i32 year;
+    if (!parse_touch_pair(text, position, century) ||
+        !parse_touch_pair(text, position + 2, year))
+    {
+      return false;
+    }
+
+    value.tm_year = century * 100 + year - 1900;
     position += 4;
   } else if (main_length == 10) {
-    let const year = parse_touch_pair(text, position);
+    i32 year;
+    if (!parse_touch_pair(text, position, year)) return false;
+
     value.tm_year = year >= 69 ? year : year + 100;
     position += 2;
   }
-  let const month = parse_touch_pair(text, position);
-  let const day = parse_touch_pair(text, position + 2);
-  let const hour = parse_touch_pair(text, position + 4);
-  let const minute = parse_touch_pair(text, position + 6);
+  i32 month;
+  i32 day;
+  i32 hour;
+  i32 minute;
+  if (!parse_touch_pair(text, position, month) ||
+      !parse_touch_pair(text, position + 2, day) ||
+      !parse_touch_pair(text, position + 4, hour) ||
+      !parse_touch_pair(text, position + 6, minute))
+  {
+    return false;
+  }
+
   if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 ||
       minute > 59 || second > 60)
   {
-    throw Error{"touch: invalid time '" + String{text} + "'"};
+    return false;
   }
 
   value.tm_mon = month - 1;
@@ -88,15 +107,16 @@ static fn parse_touch_time(StringView text) throws -> i64
   value.tm_min = minute;
   value.tm_sec = second;
   value.tm_isdst = -1;
-  let const result = std::mktime(&value);
-  if (result == static_cast<time_t>(-1) || value.tm_mon != month - 1 ||
+  let const timestamp = std::mktime(&value);
+  if (timestamp == static_cast<time_t>(-1) || value.tm_mon != month - 1 ||
       value.tm_mday != day || value.tm_hour != hour || value.tm_min != minute ||
       value.tm_sec != second)
   {
-    throw Error{"touch: invalid time '" + String{text} + "'"};
+    return false;
   }
 
-  return static_cast<i64>(result);
+  parsed_time = static_cast<i64>(timestamp);
+  return true;
 }
 
 Touch::Touch() = default;
@@ -114,20 +134,39 @@ fn Touch::execute(const ExecContext &ec, EvalContext &cxt,
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
-  if (FLAG_TOUCH_REFERENCE.is_set() && FLAG_TOUCH_TIME.is_set())
-    throw Error{"touch: -r and -t cannot be used together"};
+  if (FLAG_TOUCH_REFERENCE.is_set() && FLAG_TOUCH_TIME.is_set()) {
+    let const conflict_location =
+        FLAG_TOUCH_REFERENCE.position() > FLAG_TOUCH_TIME.position()
+            ? FLAG_TOUCH_REFERENCE.value_location()
+            : FLAG_TOUCH_TIME.value_location();
+    KOSHKIT_REPORT_ERROR_AT(conflict_location,
+                            "-r and -t cannot be used together");
+    return 1;
+  }
 
   os::file_status reference_status{};
   if (FLAG_TOUCH_REFERENCE.is_set() &&
       !os::stat_path_following(FLAG_TOUCH_REFERENCE.value(), reference_status))
   {
-    throw Error{"touch: cannot stat '" + FLAG_TOUCH_REFERENCE.value() +
-                "': " + os::last_system_error_message()};
+    KOSHKIT_REPORT_ERROR_AT(FLAG_TOUCH_REFERENCE.value_location(),
+                            "cannot stat '" + FLAG_TOUCH_REFERENCE.value() +
+                                "': " + os::last_system_error_message());
+    return 1;
   }
 
   Maybe<i64> requested_time;
-  if (FLAG_TOUCH_TIME.is_set())
-    requested_time = parse_touch_time(FLAG_TOUCH_TIME.value());
+  if (FLAG_TOUCH_TIME.is_set()) {
+    i64 parsed_time;
+    if (!parse_touch_time(FLAG_TOUCH_TIME.value(), parsed_time)) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_TOUCH_TIME.value_location(),
+          "invalid time '" + FLAG_TOUCH_TIME.value() + "'",
+          "use a valid local calendar time in [[CC]YY]MMDDhhmm[.SS] format");
+      return 1;
+    }
+
+    requested_time = parsed_time;
+  }
 
   let const should_change_access =
       FLAG_TOUCH_ACCESS.is_enabled() || !FLAG_TOUCH_MODIFICATION.is_enabled();

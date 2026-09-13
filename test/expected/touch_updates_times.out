@@ -10,3 +10,7 @@ preserved
 preserved
 == touch -t sets the requested timestamp:
 set
+== touch -t accepts an eight-digit timestamp:
+set
+== touch -t accepts a ten-digit timestamp:
+set

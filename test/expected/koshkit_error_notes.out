@@ -23,6 +23,38 @@ note: use a decimal integer from -9223372036854775808 through 922337203685477580
      1 |  koshkit seq 1 2 3 4
        |                    ^
 note: use `seq LAST`, `seq FIRST LAST`, or `seq FIRST STEP LAST`.
+=== touch time location ===
+1:18: error: touch: invalid time 'nope'.
+     1 |  koshkit touch -t nope target
+       |                   ^~~~
+note: use a valid local calendar time in [[CC]YY]MMDDhhmm[.SS] format.
+=== touch time digit validation ===
+1:18: error: touch: invalid time '2026aa010101'.
+     1 |  koshkit touch -t 2026aa010101 target
+       |                   ^~~~~~~~~~~~
+note: use a valid local calendar time in [[CC]YY]MMDDhhmm[.SS] format.
+=== touch calendar validation ===
+1:18: error: touch: invalid time '202602300101'.
+     1 |  koshkit touch -t 202602300101 target
+       |                   ^~~~~~~~~~~~
+note: use a valid local calendar time in [[CC]YY]MMDDhhmm[.SS] format.
+=== touch seconds validation ===
+1:18: error: touch: invalid time '200102030405.61'.
+     1 |  koshkit touch -t 200102030405.61 target
+       |                   ^~~~~~~~~~~~~~~
+note: use a valid local calendar time in [[CC]YY]MMDDhhmm[.SS] format.
+=== touch later time location ===
+1:31: error: touch: -r and -t cannot be used together.
+     1 |  koshkit touch -r reference -t 200102030405.06 target
+       |                                ^~~~~~~~~~~~~~~
+=== touch later reference location ===
+1:37: error: touch: -r and -t cannot be used together.
+     1 |  koshkit touch -t 200102030405.06 -r reference target
+       |                                      ^~~~~~~~~
+=== touch reference location ===
+1:18: error: touch: cannot stat 'KOSH_MISSING_REFERENCE': No such file or directory.
+     1 |  koshkit touch -r KOSH_MISSING_REFERENCE target
+       |                   ^~~~~~~~~~~~~~~~~~~~~~
 === ln without -s ===
 1:1: error: ln: cannot create link 'b': No such file or directory.
      1 |  koshkit ln a b

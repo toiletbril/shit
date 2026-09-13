@@ -18,6 +18,27 @@ echo "=== seq negative location preservation ==="
 echo "=== seq extra operand location ==="
 "$BIN" -c 'koshkit seq 1 2 3 4' 2>&1
 
+echo "=== touch time location ==="
+"$BIN" -c 'koshkit touch -t nope target' 2>&1
+
+echo "=== touch time digit validation ==="
+"$BIN" -c 'koshkit touch -t 2026aa010101 target' 2>&1
+
+echo "=== touch calendar validation ==="
+"$BIN" -c 'koshkit touch -t 202602300101 target' 2>&1
+
+echo "=== touch seconds validation ==="
+"$BIN" -c 'koshkit touch -t 200102030405.61 target' 2>&1
+
+echo "=== touch later time location ==="
+"$BIN" -c 'koshkit touch -r reference -t 200102030405.06 target' 2>&1
+
+echo "=== touch later reference location ==="
+"$BIN" -c 'koshkit touch -t 200102030405.06 -r reference target' 2>&1
+
+echo "=== touch reference location ==="
+"$BIN" -c 'koshkit touch -r KOSH_MISSING_REFERENCE target' 2>&1
+
 echo "=== ln without -s ==="
 "$BIN" -c 'koshkit ln a b' 2>&1
 

@@ -45,3 +45,11 @@ after=$(stat_atime "$dir/copied")
 echo "== touch -t sets the requested timestamp:"
 "$BIN" -c "koshkit touch -t 200102030405.06 '$dir/copied'" </dev/null
 [ "$(stat_mtime "$dir/copied")" -eq "$(stat_mtime "$dir/reference")" ] && echo set || echo different
+echo "== touch -t accepts an eight-digit timestamp:"
+touch -t 01020304 "$dir/reference"
+"$BIN" -c "koshkit touch -t 01020304 '$dir/copied'" </dev/null
+[ "$(stat_mtime "$dir/copied")" -eq "$(stat_mtime "$dir/reference")" ] && echo set || echo different
+echo "== touch -t accepts a ten-digit timestamp:"
+touch -t 0102030405 "$dir/reference"
+"$BIN" -c "koshkit touch -t 0102030405 '$dir/copied'" </dev/null
+[ "$(stat_mtime "$dir/copied")" -eq "$(stat_mtime "$dir/reference")" ] && echo set || echo different
