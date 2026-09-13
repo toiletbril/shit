@@ -153,31 +153,6 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt, const Path &path,
   }
 }
 
-static fn parse_depth_argument(const ArrayList<String> &args, usize index,
-                               StringView predicate, Allocator allocator) throws
-    -> i64
-{
-  if (index >= args.count())
-    throw Error{
-        "find: " + String{allocator, predicate}
-          + " expects a number"
-    };
-
-  /* A negative value is rejected rather than parsed, since max_depth carries -1
-     as its no-limit sentinel, so a negative -maxdepth would otherwise read as
-     an unbounded walk rather than the error find gives. */
-  let const parsed_value = args[index].view().to<i64>();
-  if (parsed_value.is_error() || parsed_value.value() < 0) {
-    throw Error{
-        "find: " + String{allocator, predicate}
-          +
-        " expects a non-negative number, got '" + args[index] + "'"
-    };
-  }
-
-  return parsed_value.value();
-}
-
 Find::Find() = default;
 
 pure fn Find::kind() const wontthrow -> Utility::Kind { return Kind::Find; }
@@ -187,8 +162,6 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  unused(arg_locations);
-
   ArrayList<StringView> roots{cxt.scratch_allocator()};
   ArrayList<StringView> name_patterns{cxt.scratch_allocator()};
   find_options options{};
@@ -211,12 +184,14 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
   for (; index < args.count(); index++) {
     let const predicate = args[index].view();
     let const predicate_kind = FIND_PREDICATES.find(predicate);
-    if (!predicate_kind.has_value())
-      throw Error{
-          "find: unknown predicate '" +
-          String{cxt.scratch_allocator(), predicate}
-          + "'"
-      };
+    if (!predicate_kind.has_value()) {
+      KOSHKIT_REPORT_ERROR_AT(
+          arg_locations[index],
+          "unknown predicate '" + String{cxt.scratch_allocator(), predicate} +
+              "'",
+          "Use `-name`, `-type`, `-maxdepth`, `-mindepth`, or `-print`");
+      return 1;
+    }
 
     switch (*predicate_kind) {
     case find_predicate_kind::Help:
@@ -228,37 +203,61 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
          and needs no action. */
       break;
     case find_predicate_kind::Name:
-      if (index + 1 >= args.count())
-        throw ErrorWithDetails{"find: -name expects a pattern",
-                               "Pass a glob after `-name`, e.g. `-name '*.c'`"};
+      if (index + 1 >= args.count()) {
+        KOSHKIT_REPORT_ERROR_AT(
+            arg_locations[index], "-name expects a pattern",
+            "Pass a glob after `-name`, e.g. `-name '*.c'`");
+        return 1;
+      }
       name_patterns.push(args[index + 1].view());
       index++;
       break;
     case find_predicate_kind::Type: {
-      if (index + 1 >= args.count())
-        throw ErrorWithDetails{"find: -type expects one of f, d, or l",
-                               "Pass `f`, `d`, or `l` after `-type`"};
+      if (index + 1 >= args.count()) {
+        KOSHKIT_REPORT_ERROR_AT(arg_locations[index],
+                                "-type expects one of f, d, or l",
+                                "Pass `f`, `d`, or `l` after `-type`");
+        return 1;
+      }
       let const type = args[index + 1].view();
       if (type.length != 1 ||
           (type[0] != 'f' && type[0] != 'd' && type[0] != 'l'))
       {
-        throw ErrorWithDetails{"find: -type expects one of f, d, or l",
-                               "Pass `f`, `d`, or `l` after `-type`"};
+        KOSHKIT_REPORT_ERROR_AT(arg_locations[index + 1],
+                                "-type expects one of f, d, or l",
+                                "Pass `f`, `d`, or `l` after `-type`");
+        return 1;
       }
       options.type_filter = type[0];
       index++;
       break;
     }
     case find_predicate_kind::MaximumDepth:
-      options.max_depth = parse_depth_argument(args, index + 1, predicate,
-                                               cxt.scratch_allocator());
+    case find_predicate_kind::MinimumDepth: {
+      if (index + 1 >= args.count()) {
+        KOSHKIT_REPORT_ERROR_AT(
+            arg_locations[index],
+            String{cxt.scratch_allocator(), predicate} + " expects a number",
+            "Pass a whole number greater than or equal to zero");
+        return 1;
+      }
+      let const parsed_depth = args[index + 1].view().to<i64>();
+      if (parsed_depth.is_error() || parsed_depth.value() < 0) {
+        KOSHKIT_REPORT_ERROR_AT(
+            arg_locations[index + 1],
+            String{cxt.scratch_allocator(), predicate} +
+                " expects a non-negative number, got '" + args[index + 1] + "'",
+            "Depth must be a whole number greater than or equal to zero");
+        return 1;
+      }
+      if (*predicate_kind == find_predicate_kind::MaximumDepth) {
+        options.max_depth = parsed_depth.value();
+      } else {
+        options.min_depth = parsed_depth.value();
+      }
       index++;
       break;
-    case find_predicate_kind::MinimumDepth:
-      options.min_depth = parse_depth_argument(args, index + 1, predicate,
-                                               cxt.scratch_allocator());
-      index++;
-      break;
+    }
     }
   }
 

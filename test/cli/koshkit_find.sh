@@ -32,14 +32,15 @@ echo "--- find unknown predicate ---"
 "$BIN" -c 'koshkit find . -bogus' 2>&1
 echo "--- find missing -name argument ---"
 "$BIN" -c 'koshkit find . -name' 2>&1
-
-unset KOSH_FLAGS
-# find rejects a negative -maxdepth or -mindepth rather than reading it as the
-# unlimited sentinel, so a typo'd negative depth errors instead of walking the
-# whole tree unbounded.
-echo "== -maxdepth -1 is rejected:"
-"$BIN" -c "koshkit find . -maxdepth -1" </dev/null 2>&1 | grep -c "non-negative number"
-echo "== -mindepth -3 is rejected:"
-"$BIN" -c "koshkit find . -mindepth -3" </dev/null 2>&1 | grep -c "non-negative number"
-echo "== a valid -maxdepth 0 still works (lists only the root):"
-"$BIN" -c "koshkit find . -maxdepth 0" </dev/null
+echo "--- find invalid -type argument ---"
+"$BIN" -c 'koshkit find . -type x' 2>&1
+echo "--- find missing -type argument ---"
+"$BIN" -c 'koshkit find . -type' 2>&1
+echo "--- find negative -maxdepth argument ---"
+"$BIN" -c 'koshkit find . -maxdepth -1' 2>&1
+echo "--- find invalid -mindepth argument ---"
+"$BIN" -c 'koshkit find . -mindepth many' 2>&1
+echo "--- find missing -maxdepth argument ---"
+"$BIN" -c 'koshkit find . -maxdepth' 2>&1
+echo "--- find valid -maxdepth argument ---"
+"$BIN" -c 'koshkit find . -maxdepth 0'

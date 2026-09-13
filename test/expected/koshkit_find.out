@@ -33,17 +33,39 @@ a/b
 --- find a dangling symlink root ---
 broken
 --- find unknown predicate ---
-1:1: error: find: unknown predicate '-bogus'.
+1:16: error: find: unknown predicate '-bogus'.
      1 |  koshkit find . -bogus
-       |  ^~~~~~~~~~~~~~~~~~~~~
+       |                 ^~~~~~
+note: Use `-name`, `-type`, `-maxdepth`, `-mindepth`, or `-print`.
 --- find missing -name argument ---
-1:1: error: find: -name expects a pattern.
+1:16: error: find: -name expects a pattern.
      1 |  koshkit find . -name
-       |  ^~~~~~~~~~~~~~~~~~~~
+       |                 ^~~~~
 note: Pass a glob after `-name`, e.g. `-name '*.c'`.
-== -maxdepth -1 is rejected:
-1
-== -mindepth -3 is rejected:
-1
-== a valid -maxdepth 0 still works (lists only the root):
+--- find invalid -type argument ---
+1:22: error: find: -type expects one of f, d, or l.
+     1 |  koshkit find . -type x
+       |                       ^
+note: Pass `f`, `d`, or `l` after `-type`.
+--- find missing -type argument ---
+1:16: error: find: -type expects one of f, d, or l.
+     1 |  koshkit find . -type
+       |                 ^~~~~
+note: Pass `f`, `d`, or `l` after `-type`.
+--- find negative -maxdepth argument ---
+1:26: error: find: -maxdepth expects a non-negative number, got '-1'.
+     1 |  koshkit find . -maxdepth -1
+       |                           ^~
+note: Depth must be a whole number greater than or equal to zero.
+--- find invalid -mindepth argument ---
+1:26: error: find: -mindepth expects a non-negative number, got 'many'.
+     1 |  koshkit find . -mindepth many
+       |                           ^~~~
+note: Depth must be a whole number greater than or equal to zero.
+--- find missing -maxdepth argument ---
+1:16: error: find: -maxdepth expects a number.
+     1 |  koshkit find . -maxdepth
+       |                 ^~~~~~~~~
+note: Pass a whole number greater than or equal to zero.
+--- find valid -maxdepth argument ---
 .
