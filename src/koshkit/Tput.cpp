@@ -37,8 +37,9 @@ fn Tput::execute(const ExecContext &ec, EvalContext &cxt,
                  const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      PARSE_KOSHKIT_ARGS_WITH_LOCATIONS(args, arg_locations, operand_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -93,8 +94,19 @@ fn Tput::execute(const ExecContext &ec, EvalContext &cxt,
       return report_usage_error(ec, cxt, args[0].view());
     let const row = utils::parse_decimal_u64(operands[1].view());
     let const column = utils::parse_decimal_u64(operands[2].view());
-    if (row.is_error() || column.is_error())
-      throw Error{"tput: invalid position"};
+    if (row.is_error() || row.value() == UINT64_MAX) {
+      KOSHKIT_REPORT_ERROR_AT(
+          operand_locations[1], "invalid row '" + operands[1] + "'",
+          "use a decimal integer from 0 through 18446744073709551614");
+      return 1;
+    }
+    if (column.is_error() || column.value() == UINT64_MAX) {
+      KOSHKIT_REPORT_ERROR_AT(
+          operand_locations[2], "invalid column '" + operands[2] + "'",
+          "use a decimal integer from 0 through 18446744073709551614");
+      return 1;
+    }
+
     let output = String{cxt.scratch_allocator(), "\033["};
     output += String::from(row.value() + 1, cxt.scratch_allocator());
     output += ';';

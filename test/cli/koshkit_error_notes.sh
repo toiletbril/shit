@@ -76,6 +76,12 @@ echo "=== strings minimum location ==="
 echo "=== strings radix location ==="
 "$BIN" -c 'koshkit strings -t decimal' 2>&1
 
+echo "=== tput row location ==="
+"$BIN" -c 'koshkit tput cup nope 1' 2>&1
+
+echo "=== tput column limit ==="
+"$BIN" -c 'koshkit tput cup 1 18446744073709551615' 2>&1
+
 echo "=== date operand location ==="
 "$BIN" -c 'koshkit date 2026' 2>&1
 

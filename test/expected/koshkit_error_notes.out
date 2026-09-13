@@ -119,6 +119,16 @@ note: use a positive decimal integer within the platform size limit.
      1 |  koshkit strings -t decimal
        |                     ^~~~~~~
 note: use d for decimal, o for octal, or x for hexadecimal.
+=== tput row location ===
+1:18: error: tput: invalid row 'nope'.
+     1 |  koshkit tput cup nope 1
+       |                   ^~~~
+note: use a decimal integer from 0 through 18446744073709551614.
+=== tput column limit ===
+1:20: error: tput: invalid column '18446744073709551615'.
+     1 |  koshkit tput cup 1 18446744073709551615
+       |                     ^~~~~~~~~~~~~~~~~~~~
+note: use a decimal integer from 0 through 18446744073709551614.
 === date operand location ===
 1:14: error: date: setting the system clock is unsupported.
      1 |  koshkit date 2026
