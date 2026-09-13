@@ -68,16 +68,20 @@ fn Strings::execute(const ExecContext &ec, EvalContext &cxt,
                     const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let const operands = PARSE_KOSHKIT_ARGS(args, arg_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   u64 minimum_length = 4;
   if (FLAG_STRINGS_MINIMUM.is_set()) {
     let const parsed = utils::parse_decimal_u64(FLAG_STRINGS_MINIMUM.value());
-    if (parsed.is_error() || parsed.value() == 0 || parsed.value() > SIZE_MAX)
-      throw Error{"strings: invalid minimum length"};
+    if (parsed.is_error() || parsed.value() == 0 || parsed.value() > SIZE_MAX) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_STRINGS_MINIMUM.value_location(), "invalid minimum length",
+          "use a positive decimal integer within the platform size limit");
+      return 1;
+    }
+
     minimum_length = parsed.value();
   }
   char radix = '\0';
@@ -95,8 +99,12 @@ fn Strings::execute(const ExecContext &ec, EvalContext &cxt,
       }
     }
 
-    if (!is_valid_radix)
-      throw Error{"strings: offset format must be d, o, or x"};
+    if (!is_valid_radix) {
+      KOSHKIT_REPORT_ERROR_AT(
+          FLAG_STRINGS_RADIX.value_location(), "invalid offset radix",
+          "use d for decimal, o for octal, or x for hexadecimal");
+      return 1;
+    }
 
     radix = radix_value[0];
   }

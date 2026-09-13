@@ -70,6 +70,12 @@ echo "=== split byte count location ==="
 echo "=== split line count location ==="
 "$BIN" -c 'koshkit split -l nope' 2>&1
 
+echo "=== strings minimum location ==="
+"$BIN" -c 'koshkit strings -n 0' 2>&1
+
+echo "=== strings radix location ==="
+"$BIN" -c 'koshkit strings -t decimal' 2>&1
+
 echo "=== date operand location ==="
 "$BIN" -c 'koshkit date 2026' 2>&1
 

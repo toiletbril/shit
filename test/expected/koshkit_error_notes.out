@@ -109,6 +109,16 @@ note: use a positive decimal integer.
      1 |  koshkit split -l nope
        |                   ^~~~
 note: use a positive decimal integer.
+=== strings minimum location ===
+1:20: error: strings: invalid minimum length.
+     1 |  koshkit strings -n 0
+       |                     ^
+note: use a positive decimal integer within the platform size limit.
+=== strings radix location ===
+1:20: error: strings: invalid offset radix.
+     1 |  koshkit strings -t decimal
+       |                     ^~~~~~~
+note: use d for decimal, o for octal, or x for hexadecimal.
 === date operand location ===
 1:14: error: date: setting the system clock is unsupported.
      1 |  koshkit date 2026
