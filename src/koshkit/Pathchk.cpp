@@ -82,8 +82,12 @@ fn Pathchk::execute(const ExecContext &ec, EvalContext &cxt,
       usize position = 0;
       while (position < path.length) {
         let const component = Path::next_component(path, position);
-        if (name_limit > 0 &&
-            component.text.length > static_cast<usize>(name_limit))
+        let component_length = component.text.length;
+        if (!should_check_portable) {
+          let const native_length = os::path_component_length(component.text);
+          if (native_length.has_value()) component_length = *native_length;
+        }
+        if (name_limit > 0 && component_length > static_cast<usize>(name_limit))
         {
           reason = "component too long";
           break;
