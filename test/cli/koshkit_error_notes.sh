@@ -58,6 +58,18 @@ echo "=== renice increment range ==="
 echo "=== paste delimiter location ==="
 "$BIN" -c "koshkit paste -d ''" 2>&1
 
+echo "=== split suffix location ==="
+"$BIN" -c 'koshkit split -a nope' 2>&1
+
+echo "=== split suffix limit ==="
+"$BIN" -c 'koshkit split -a 65' 2>&1
+
+echo "=== split byte count location ==="
+"$BIN" -c 'koshkit split -b 0' 2>&1
+
+echo "=== split line count location ==="
+"$BIN" -c 'koshkit split -l nope' 2>&1
+
 echo "=== date operand location ==="
 "$BIN" -c 'koshkit date 2026' 2>&1
 

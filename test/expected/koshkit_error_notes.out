@@ -89,6 +89,26 @@ note: use a decimal integer from -2147483648 through 2147483647.
      1 |  koshkit paste -d ''
        |                   ^~
 note: provide one or more delimiter characters.
+=== split suffix location ===
+1:18: error: split: invalid suffix length 'nope'.
+     1 |  koshkit split -a nope
+       |                   ^~~~
+note: use a decimal integer from 1 through 64.
+=== split suffix limit ===
+1:18: error: split: invalid suffix length '65'.
+     1 |  koshkit split -a 65
+       |                   ^~
+note: use a decimal integer from 1 through 64.
+=== split byte count location ===
+1:18: error: split: invalid byte count '0'.
+     1 |  koshkit split -b 0
+       |                   ^
+note: use a positive decimal integer.
+=== split line count location ===
+1:18: error: split: invalid line count 'nope'.
+     1 |  koshkit split -l nope
+       |                   ^~~~
+note: use a positive decimal integer.
 === date operand location ===
 1:14: error: date: setting the system clock is unsupported.
      1 |  koshkit date 2026

@@ -30,14 +30,6 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Split);
 
 namespace koshka::koshkit {
 
-static fn parse_split_count(StringView text, StringView name) throws -> u64
-{
-  let const parsed = utils::parse_decimal_u64(text);
-  if (parsed.is_error() || parsed.value() == 0)
-    throw Error{"split: invalid " + String{name} + " '" + String{text} + "'"};
-  return parsed.value();
-}
-
 static fn split_output_name(StringView prefix, usize suffix_length, u64 index,
                             Allocator allocator) throws -> String
 {
@@ -66,8 +58,7 @@ fn Split::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
-  defer { reset_flags(FLAG_LIST); };
+  let const operands = PARSE_KOSHKIT_ARGS(args, arg_locations);
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
@@ -78,12 +69,43 @@ fn Split::execute(const ExecContext &ec, EvalContext &cxt,
   let const source = operands.is_empty() ? StringView{"-"} : operands[0].view();
   let const prefix =
       operands.count() < 2 ? StringView{"x"} : operands[1].view();
-  let const suffix_length =
-      FLAG_SPLIT_SUFFIX_LENGTH.is_set()
-          ? parse_split_count(FLAG_SPLIT_SUFFIX_LENGTH.value(), "suffix length")
-          : 2;
-  if (suffix_length > SIZE_MAX)
-    throw Error{"split: suffix length is too large"};
+  let const do_parse_count = [&](const FlagString &flag, StringView name,
+                                 u64 maximum, StringView note, u64 &value)
+                                 throws -> bool {
+    let const parsed = utils::parse_decimal_u64(flag.value());
+    if (parsed.is_error() || parsed.value() == 0 || parsed.value() > maximum) {
+      KOSHKIT_REPORT_ERROR_AT(
+          flag.value_location(),
+          "invalid " + String{name} + " '" + String{flag.value()} + "'", note);
+      return false;
+    }
+
+    value = parsed.value();
+    return true;
+  };
+
+  u64 suffix_length = 2;
+  if (FLAG_SPLIT_SUFFIX_LENGTH.is_set() &&
+      !do_parse_count(FLAG_SPLIT_SUFFIX_LENGTH, "suffix length", 64,
+                      "use a decimal integer from 1 through 64", suffix_length))
+  {
+    return 1;
+  }
+
+  let const is_byte_mode = FLAG_SPLIT_BYTES.is_set();
+  u64 unit_limit = 1000;
+  if (is_byte_mode &&
+      !do_parse_count(FLAG_SPLIT_BYTES, "byte count", UINT64_MAX,
+                      "use a positive decimal integer", unit_limit))
+  {
+    return 1;
+  }
+  if (FLAG_SPLIT_LINES.is_set() &&
+      !do_parse_count(FLAG_SPLIT_LINES, "line count", UINT64_MAX,
+                      "use a positive decimal integer", unit_limit))
+  {
+    return 1;
+  }
 
   let const input = open_named_or_stdin(ec, source);
   if (!input.has_value()) {
@@ -97,13 +119,6 @@ fn Split::execute(const ExecContext &ec, EvalContext &cxt,
   {
     if (input->should_close) os::close_fd(input->descriptor);
   };
-
-  let const is_byte_mode = FLAG_SPLIT_BYTES.is_set();
-  let const unit_limit =
-      is_byte_mode ? parse_split_count(FLAG_SPLIT_BYTES.value(), "byte count")
-      : FLAG_SPLIT_LINES.is_set()
-          ? parse_split_count(FLAG_SPLIT_LINES.value(), "line count")
-          : 1000;
   os::descriptor output_descriptor = KOSH_INVALID_FD;
   defer
   {
