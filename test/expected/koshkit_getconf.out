@@ -28,6 +28,25 @@
   [CompoundListCondition, None]
     [SimpleCommand "echo" "getconf-alias=$?"]
   [CompoundListCondition, None]
+    [Assign string_status=0]
+  [CompoundListCondition, None]
+    [ForLoop "variable"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "koshkit" "getconf" "$variable"]
+        [CompoundListCondition, ||]
+          [Assign string_status=1]
+  [CompoundListCondition, None]
+    [IfClause]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [SimpleCommand "[" "$(koshkit getconf PATH)" "=" "undefined" "]"]
+      [CompoundList]
+        [CompoundListCondition, None]
+          [Assign string_status=1]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "getconf-string=$string_status"]
+  [CompoundListCondition, None]
     [Assign path_status=0]
   [CompoundListCondition, None]
     [ForLoop "variable"]
@@ -525,6 +544,172 @@
   Variable "?"
 ]
 [Word
+  Unquoted "string_status=0"
+]
+[Word
+  Unquoted "for"
+]
+[Word
+  Unquoted "variable"
+]
+[Word
+  Unquoted "in"
+]
+[Word
+  Unquoted "PATH"
+]
+[Word
+  Unquoted "POSIX_V7_ILP32_OFF32_CFLAGS"
+]
+[Word
+  Unquoted "POSIX_V7_ILP32_OFF32_LDFLAGS"
+]
+[Word
+  Unquoted "POSIX_V7_ILP32_OFF32_LIBS"
+]
+[Word
+  Unquoted "POSIX_V7_ILP32_OFFBIG_CFLAGS"
+]
+[Word
+  Unquoted "POSIX_V7_ILP32_OFFBIG_LDFLAGS"
+]
+[Word
+  Unquoted "POSIX_V7_ILP32_OFFBIG_LIBS"
+]
+[Word
+  Unquoted "POSIX_V7_LP64_OFF64_CFLAGS"
+]
+[Word
+  Unquoted "POSIX_V7_LP64_OFF64_LDFLAGS"
+]
+[Word
+  Unquoted "POSIX_V7_LP64_OFF64_LIBS"
+]
+[Word
+  Unquoted "POSIX_V7_LPBIG_OFFBIG_CFLAGS"
+]
+[Word
+  Unquoted "POSIX_V7_LPBIG_OFFBIG_LDFLAGS"
+]
+[Word
+  Unquoted "POSIX_V7_LPBIG_OFFBIG_LIBS"
+]
+[Word
+  Unquoted "POSIX_V7_THREADS_CFLAGS"
+]
+[Word
+  Unquoted "POSIX_V7_THREADS_LDFLAGS"
+]
+[Word
+  Unquoted "POSIX_V7_WIDTH_RESTRICTED_ENVS"
+]
+[Word
+  Unquoted "V7_ENV"
+]
+[Word
+  Unquoted "POSIX_V8_ILP32_OFF32_CFLAGS"
+]
+[Word
+  Unquoted "POSIX_V8_ILP32_OFF32_LDFLAGS"
+]
+[Word
+  Unquoted "POSIX_V8_ILP32_OFF32_LIBS"
+]
+[Word
+  Unquoted "POSIX_V8_ILP32_OFFBIG_CFLAGS"
+]
+[Word
+  Unquoted "POSIX_V8_ILP32_OFFBIG_LDFLAGS"
+]
+[Word
+  Unquoted "POSIX_V8_ILP32_OFFBIG_LIBS"
+]
+[Word
+  Unquoted "POSIX_V8_LP64_OFF64_CFLAGS"
+]
+[Word
+  Unquoted "POSIX_V8_LP64_OFF64_LDFLAGS"
+]
+[Word
+  Unquoted "POSIX_V8_LP64_OFF64_LIBS"
+]
+[Word
+  Unquoted "POSIX_V8_LPBIG_OFFBIG_CFLAGS"
+]
+[Word
+  Unquoted "POSIX_V8_LPBIG_OFFBIG_LDFLAGS"
+]
+[Word
+  Unquoted "POSIX_V8_LPBIG_OFFBIG_LIBS"
+]
+[Word
+  Unquoted "POSIX_V8_THREADS_CFLAGS"
+]
+[Word
+  Unquoted "POSIX_V8_THREADS_LDFLAGS"
+]
+[Word
+  Unquoted "POSIX_V8_WIDTH_RESTRICTED_ENVS"
+]
+[Word
+  Unquoted "V8_ENV"
+]
+[Word
+  Unquoted "do"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "getconf"
+]
+[Word
+  Variable "variable"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "string_status=1"
+]
+[Word
+  Unquoted "done"
+]
+[Word
+  Unquoted "if"
+]
+[Word
+  Unquoted "["
+]
+[Word
+  CommandSubstitution "koshkit getconf PATH"
+]
+[Word
+  Unquoted "="
+]
+[Word
+  Unquoted "undefined"
+]
+[Word
+  Unquoted "]"
+]
+[Word
+  Unquoted "then"
+]
+[Word
+  Unquoted "string_status=1"
+]
+[Word
+  Unquoted "fi"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "getconf-string="
+  Variable "string_status"
+]
+[Word
   Unquoted "path_status=0"
 ]
 [Word
@@ -639,4 +824,5 @@
 getconf-system=0
 getconf-capability=0
 getconf-alias=0
+getconf-string=0
 getconf-path=0

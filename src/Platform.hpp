@@ -1003,9 +1003,49 @@ enum class path_configuration_key : u8
   Count,
 };
 
+enum class string_configuration_key : u8
+{
+  Path,
+  V7Ilp32Off32CFlags,
+  V7Ilp32Off32LdFlags,
+  V7Ilp32Off32Libs,
+  V7Ilp32OffBigCFlags,
+  V7Ilp32OffBigLdFlags,
+  V7Ilp32OffBigLibs,
+  V7Lp64Off64CFlags,
+  V7Lp64Off64LdFlags,
+  V7Lp64Off64Libs,
+  V7LpBigOffBigCFlags,
+  V7LpBigOffBigLdFlags,
+  V7LpBigOffBigLibs,
+  V7ThreadsCFlags,
+  V7ThreadsLdFlags,
+  V7WidthRestrictedEnvironments,
+  V7Environment,
+  V8Ilp32Off32CFlags,
+  V8Ilp32Off32LdFlags,
+  V8Ilp32Off32Libs,
+  V8Ilp32OffBigCFlags,
+  V8Ilp32OffBigLdFlags,
+  V8Ilp32OffBigLibs,
+  V8Lp64Off64CFlags,
+  V8Lp64Off64LdFlags,
+  V8Lp64Off64Libs,
+  V8LpBigOffBigCFlags,
+  V8LpBigOffBigLdFlags,
+  V8LpBigOffBigLibs,
+  V8ThreadsCFlags,
+  V8ThreadsLdFlags,
+  V8WidthRestrictedEnvironments,
+  V8Environment,
+  Count,
+};
+
 fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>;
 fn path_configuration(StringView path, path_configuration_key key) wontthrow
     -> Maybe<i64>;
+fn string_configuration(string_configuration_key key,
+                        Allocator allocator) throws -> Maybe<String>;
 fn path_component_length(StringView component) wontthrow -> Maybe<usize>;
 
 fn sleep_for_seconds(double seconds) wontthrow -> void;

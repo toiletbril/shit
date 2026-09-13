@@ -2072,6 +2072,81 @@ fn system_configuration(system_configuration_key key) wontthrow -> Maybe<i64>
   return static_cast<i64>(value);
 }
 
+static constexpr int STRING_CONFIGURATION_KEYS[] = {
+    _CS_PATH,
+#ifdef _CS_POSIX_V7_ILP32_OFF32_CFLAGS
+    _CS_POSIX_V7_ILP32_OFF32_CFLAGS,
+    _CS_POSIX_V7_ILP32_OFF32_LDFLAGS,
+    _CS_POSIX_V7_ILP32_OFF32_LIBS,
+    _CS_POSIX_V7_ILP32_OFFBIG_CFLAGS,
+    _CS_POSIX_V7_ILP32_OFFBIG_LDFLAGS,
+    _CS_POSIX_V7_ILP32_OFFBIG_LIBS,
+    _CS_POSIX_V7_LP64_OFF64_CFLAGS,
+    _CS_POSIX_V7_LP64_OFF64_LDFLAGS,
+    _CS_POSIX_V7_LP64_OFF64_LIBS,
+    _CS_POSIX_V7_LPBIG_OFFBIG_CFLAGS,
+    _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS,
+    _CS_POSIX_V7_LPBIG_OFFBIG_LIBS,
+    _CS_POSIX_V7_THREADS_CFLAGS,
+    _CS_POSIX_V7_THREADS_LDFLAGS,
+    _CS_POSIX_V7_WIDTH_RESTRICTED_ENVS,
+    _CS_V7_ENV,
+#else
+    -1,       -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+#endif
+#ifdef _CS_POSIX_V8_ILP32_OFF32_CFLAGS
+    _CS_POSIX_V8_ILP32_OFF32_CFLAGS,
+    _CS_POSIX_V8_ILP32_OFF32_LDFLAGS,
+    _CS_POSIX_V8_ILP32_OFF32_LIBS,
+    _CS_POSIX_V8_ILP32_OFFBIG_CFLAGS,
+    _CS_POSIX_V8_ILP32_OFFBIG_LDFLAGS,
+    _CS_POSIX_V8_ILP32_OFFBIG_LIBS,
+    _CS_POSIX_V8_LP64_OFF64_CFLAGS,
+    _CS_POSIX_V8_LP64_OFF64_LDFLAGS,
+    _CS_POSIX_V8_LP64_OFF64_LIBS,
+    _CS_POSIX_V8_LPBIG_OFFBIG_CFLAGS,
+    _CS_POSIX_V8_LPBIG_OFFBIG_LDFLAGS,
+    _CS_POSIX_V8_LPBIG_OFFBIG_LIBS,
+    _CS_POSIX_V8_THREADS_CFLAGS,
+    _CS_POSIX_V8_THREADS_LDFLAGS,
+    _CS_POSIX_V8_WIDTH_RESTRICTED_ENVS,
+    _CS_V8_ENV,
+#else
+    -1,       -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+#endif
+};
+static_assert(countof(STRING_CONFIGURATION_KEYS) ==
+              static_cast<usize>(string_configuration_key::Count));
+
+fn string_configuration(string_configuration_key key,
+                        Allocator allocator) throws -> Maybe<String>
+{
+  if (key == string_configuration_key::Count) return None;
+  let const native_key = STRING_CONFIGURATION_KEYS[static_cast<usize>(key)];
+  if (native_key < 0) return None;
+
+  errno = 0;
+  usize required_size = confstr(native_key, nullptr, 0);
+  if (required_size == 0) return None;
+
+  ArrayList<char> buffer{allocator};
+  for (usize attempt_count = 0; attempt_count < 4; attempt_count++) {
+    buffer.reserve(required_size);
+    errno = 0;
+    let const actual_size = confstr(native_key, buffer.begin(), required_size);
+    if (actual_size == 0) return None;
+    if (actual_size > required_size) {
+      required_size = actual_size;
+      continue;
+    }
+
+    return String{
+        allocator, StringView{buffer.begin(), actual_size - 1}
+    };
+  }
+  return None;
+}
+
 static constexpr int PATH_CONFIGURATION_KEYS[] = {
     _PC_ALLOC_SIZE_MIN,
     _PC_ASYNC_IO,

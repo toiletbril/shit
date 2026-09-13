@@ -212,6 +212,75 @@ inline constexpr static_string_entry<os::system_configuration_key>
 inline constexpr StaticStringMap SYSTEM_CONFIGURATIONS{
     SYSTEM_CONFIGURATION_ENTRIES};
 
+inline constexpr static_string_entry<os::string_configuration_key>
+    STRING_CONFIGURATION_ENTRIES[] = {
+        {SSK("PATH"),                           os::string_configuration_key::Path         },
+        {SSK("POSIX_V7_ILP32_OFF32_CFLAGS"),
+         os::string_configuration_key::V7Ilp32Off32CFlags                                  },
+        {SSK("POSIX_V7_ILP32_OFF32_LDFLAGS"),
+         os::string_configuration_key::V7Ilp32Off32LdFlags                                 },
+        {SSK("POSIX_V7_ILP32_OFF32_LIBS"),
+         os::string_configuration_key::V7Ilp32Off32Libs                                    },
+        {SSK("POSIX_V7_ILP32_OFFBIG_CFLAGS"),
+         os::string_configuration_key::V7Ilp32OffBigCFlags                                 },
+        {SSK("POSIX_V7_ILP32_OFFBIG_LDFLAGS"),
+         os::string_configuration_key::V7Ilp32OffBigLdFlags                                },
+        {SSK("POSIX_V7_ILP32_OFFBIG_LIBS"),
+         os::string_configuration_key::V7Ilp32OffBigLibs                                   },
+        {SSK("POSIX_V7_LP64_OFF64_CFLAGS"),
+         os::string_configuration_key::V7Lp64Off64CFlags                                   },
+        {SSK("POSIX_V7_LP64_OFF64_LDFLAGS"),
+         os::string_configuration_key::V7Lp64Off64LdFlags                                  },
+        {SSK("POSIX_V7_LP64_OFF64_LIBS"),
+         os::string_configuration_key::V7Lp64Off64Libs                                     },
+        {SSK("POSIX_V7_LPBIG_OFFBIG_CFLAGS"),
+         os::string_configuration_key::V7LpBigOffBigCFlags                                 },
+        {SSK("POSIX_V7_LPBIG_OFFBIG_LDFLAGS"),
+         os::string_configuration_key::V7LpBigOffBigLdFlags                                },
+        {SSK("POSIX_V7_LPBIG_OFFBIG_LIBS"),
+         os::string_configuration_key::V7LpBigOffBigLibs                                   },
+        {SSK("POSIX_V7_THREADS_CFLAGS"),
+         os::string_configuration_key::V7ThreadsCFlags                                     },
+        {SSK("POSIX_V7_THREADS_LDFLAGS"),
+         os::string_configuration_key::V7ThreadsLdFlags                                    },
+        {SSK("POSIX_V7_WIDTH_RESTRICTED_ENVS"),
+         os::string_configuration_key::V7WidthRestrictedEnvironments                       },
+        {SSK("POSIX_V8_ILP32_OFF32_CFLAGS"),
+         os::string_configuration_key::V8Ilp32Off32CFlags                                  },
+        {SSK("POSIX_V8_ILP32_OFF32_LDFLAGS"),
+         os::string_configuration_key::V8Ilp32Off32LdFlags                                 },
+        {SSK("POSIX_V8_ILP32_OFF32_LIBS"),
+         os::string_configuration_key::V8Ilp32Off32Libs                                    },
+        {SSK("POSIX_V8_ILP32_OFFBIG_CFLAGS"),
+         os::string_configuration_key::V8Ilp32OffBigCFlags                                 },
+        {SSK("POSIX_V8_ILP32_OFFBIG_LDFLAGS"),
+         os::string_configuration_key::V8Ilp32OffBigLdFlags                                },
+        {SSK("POSIX_V8_ILP32_OFFBIG_LIBS"),
+         os::string_configuration_key::V8Ilp32OffBigLibs                                   },
+        {SSK("POSIX_V8_LP64_OFF64_CFLAGS"),
+         os::string_configuration_key::V8Lp64Off64CFlags                                   },
+        {SSK("POSIX_V8_LP64_OFF64_LDFLAGS"),
+         os::string_configuration_key::V8Lp64Off64LdFlags                                  },
+        {SSK("POSIX_V8_LP64_OFF64_LIBS"),
+         os::string_configuration_key::V8Lp64Off64Libs                                     },
+        {SSK("POSIX_V8_LPBIG_OFFBIG_CFLAGS"),
+         os::string_configuration_key::V8LpBigOffBigCFlags                                 },
+        {SSK("POSIX_V8_LPBIG_OFFBIG_LDFLAGS"),
+         os::string_configuration_key::V8LpBigOffBigLdFlags                                },
+        {SSK("POSIX_V8_LPBIG_OFFBIG_LIBS"),
+         os::string_configuration_key::V8LpBigOffBigLibs                                   },
+        {SSK("POSIX_V8_THREADS_CFLAGS"),
+         os::string_configuration_key::V8ThreadsCFlags                                     },
+        {SSK("POSIX_V8_THREADS_LDFLAGS"),
+         os::string_configuration_key::V8ThreadsLdFlags                                    },
+        {SSK("POSIX_V8_WIDTH_RESTRICTED_ENVS"),
+         os::string_configuration_key::V8WidthRestrictedEnvironments                       },
+        {SSK("V7_ENV"),                         os::string_configuration_key::V7Environment},
+        {SSK("V8_ENV"),                         os::string_configuration_key::V8Environment},
+};
+inline constexpr StaticStringMap STRING_CONFIGURATIONS{
+    STRING_CONFIGURATION_ENTRIES};
+
 inline constexpr static_string_entry<os::path_configuration_key>
     PATH_CONFIGURATION_ENTRIES[] = {
         {SSK("FILESIZEBITS"),                os::path_configuration_key::FileSizeBits    },
@@ -278,6 +347,23 @@ fn Getconf::execute(const ExecContext &ec, EvalContext &cxt,
         "unsupported specification '" +
             String{FLAG_GETCONF_SPECIFICATION.value()} + "'");
     return 2;
+  }
+
+  if (let const string_key = STRING_CONFIGURATIONS.find(operands[0].view());
+      string_key.has_value())
+  {
+    if (operands.count() != 1)
+      return report_usage_error(ec, cxt, args[0].view());
+
+    let const value =
+        os::string_configuration(*string_key, cxt.scratch_allocator());
+    if (!value.has_value()) {
+      ec.print_to_stdout("undefined\n");
+    } else {
+      ec.print_to_stdout(value->view());
+      ec.print_to_stdout("\n");
+    }
+    return 0;
   }
 
   Maybe<i64> value;

@@ -1414,6 +1414,12 @@ fn path_configuration(StringView path, path_configuration_key key) wontthrow
   return None;
 }
 
+fn string_configuration(string_configuration_key, Allocator) throws
+    -> Maybe<String>
+{
+  return None;
+}
+
 fn path_component_length(StringView component) wontthrow -> Maybe<usize>
 {
   if (component.length > static_cast<usize>(INT_MAX)) {
