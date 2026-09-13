@@ -1,4 +1,13 @@
 koshkit cal 2 2024
+cal_today=$(koshkit cal -a 2 2024)
+printf '%s\n' "$cal_today" |
+  koshkit grep '^Mo Tu We Th Fr Sa Su$' >/dev/null
+echo "cal-monday-first=$?"
+printf '%s\n' "$cal_today" |
+  koshkit grep '^Today is .*[.] It is day [0-9][0-9]* of the year[.]$' >/dev/null
+echo "cal-today-description=$?"
+koshkit cal 1 9223372036854775807 >/dev/null
+echo "cal-large-year=$?"
 
 koshkit date -u +%Y >/dev/null
 echo "date=$?"

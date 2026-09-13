@@ -1519,6 +1519,15 @@ enabled, a PATH program takes precedence over a bundled utility.
 .B basename
 The final path component is printed. An optional suffix operand is removed.
 .TP
+.B cal
+A Gregorian month or year is printed. Calendar output starts each week on
+Sunday. Month titles and weekday headings are colored on a color terminal.
+Weekend dates are red, and the current date is emphasized when it appears.
+The
+.BR \-a ", " \-\-today
+option starts each week on Monday and prints the current date in words below
+the calendar.
+.TP
 .B calc
 Arithmetic operands are evaluated. The
 .BR \-i ", " \-\-interactive

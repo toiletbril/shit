@@ -159,6 +159,7 @@ _koshkit_util_flags()
 {
   case $1 in
     bc)            echo "-l --mathlib -q --quiet" ;;
+    cal)           echo "-a --today" ;;
     calc)          echo "-i --interactive -p --pipe" ;;
     cp)            echo "-r -R -f -i -p -v" ;;
     cut)           echo "-b --bytes -c --characters -f --fields -d --delimiter -n --no-split -s --only-delimited" ;;

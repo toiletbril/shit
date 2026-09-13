@@ -2,6 +2,24 @@
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "cal" "2" "2024"]
   [CompoundListCondition, None]
+    [Assign cal_today=$(koshkit cal -a 2 2024)]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "%s\n" "$cal_today"]
+      [SimpleCommand "koshkit" "grep" "^Mo Tu We Th Fr Sa Su$"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "cal-monday-first=$?"]
+  [CompoundListCondition, None]
+    [Pipeline]
+      [SimpleCommand "printf" "%s\n" "$cal_today"]
+      [SimpleCommand "koshkit" "grep" "^Today is .*[.] It is day [0-9][0-9]* of the year[.]$"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "cal-today-description=$?"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "cal" "1" "9223372036854775807"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "cal-large-year=$?"]
+  [CompoundListCondition, None]
     [SimpleCommand "koshkit" "date" "-u" "+%Y"]
   [CompoundListCondition, None]
     [SimpleCommand "echo" "date=$?"]
@@ -60,6 +78,88 @@
 ]
 [Word
   Unquoted "2024"
+]
+[Word
+  Unquoted "cal_today="
+  CommandSubstitution "koshkit cal -a 2 2024"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Variable "cal_today"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Literal "^Mo Tu We Th Fr Sa Su$"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "cal-monday-first="
+  Variable "?"
+]
+[Word
+  Unquoted "printf"
+]
+[Word
+  Literal "%s\n"
+]
+[Word
+  Variable "cal_today"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "grep"
+]
+[Word
+  Literal "^Today is .*[.] It is day [0-9][0-9]* of the year[.]$"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "cal-today-description="
+  Variable "?"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "cal"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "9223372036854775807"
+]
+[Word
+  Unquoted "/dev/null"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "cal-large-year="
+  Variable "?"
 ]
 [Word
   Unquoted "koshkit"
@@ -310,6 +410,9 @@ Su Mo Tu We Th Fr Sa
 11 12 13 14 15 16 17
 18 19 20 21 22 23 24
 25 26 27 28 29
+cal-monday-first=0
+cal-today-description=0
+cal-large-year=0
 date=0
 getconf=0
 id=0
