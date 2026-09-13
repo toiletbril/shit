@@ -102,7 +102,9 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
                const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const operands = parse_util_operands(FLAG_LIST, args, &arg_locations);
+  let operand_locations = ArrayList<SourceLocation>{cxt.scratch_allocator()};
+  let const operands =
+      parse_util_operands(FLAG_LIST, args, &arg_locations, &operand_locations);
   defer { reset_flags(FLAG_LIST); };
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
@@ -123,7 +125,11 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
       }
     }
 
-    if (!is_valid_radix) throw Error{"od: address radix must be d, o, x, or n"};
+    if (!is_valid_radix) {
+      KOSHKIT_REPORT_ERROR_AT(FLAG_OD_ADDRESS.value_location(),
+                              "the address radix must be d, o, x, or n");
+      return 1;
+    }
 
     address_radix = radix_value[0];
   }
@@ -131,22 +137,47 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
   u64 skip_count = 0;
   if (FLAG_OD_SKIP.is_set()) {
     let const parsed = utils::parse_decimal_u64(FLAG_OD_SKIP.value());
-    if (parsed.is_error()) throw Error{"od: invalid skip count"};
+    if (parsed.is_error()) {
+      KOSHKIT_REPORT_ERROR_AT(FLAG_OD_SKIP.value_location(),
+                              "invalid skip count '" + FLAG_OD_SKIP.value() +
+                                  "'",
+                              "use a nonnegative decimal byte count");
+      return 1;
+    }
+
     skip_count = parsed.value();
   }
   u64 byte_limit = UINT64_MAX;
   if (FLAG_OD_COUNT.is_set()) {
     let const parsed = utils::parse_decimal_u64(FLAG_OD_COUNT.value());
-    if (parsed.is_error()) throw Error{"od: invalid byte count"};
+    if (parsed.is_error()) {
+      KOSHKIT_REPORT_ERROR_AT(FLAG_OD_COUNT.value_location(),
+                              "invalid byte count '" + FLAG_OD_COUNT.value() +
+                                  "'",
+                              "use a nonnegative decimal byte count");
+      return 1;
+    }
+
     byte_limit = parsed.value();
   }
 
   let input_operands = ArrayList<String>{cxt.scratch_allocator()};
   let operand_count = operands.count();
-  if (!FLAG_OD_SKIP.is_set() && !operands.is_empty() &&
-      !operands.back().is_empty() && operands.back()[0] == '+')
+  let const has_legacy_blocking_option =
+      FLAG_OD_ADDRESS.is_set() || FLAG_OD_SKIP.is_set() ||
+      FLAG_OD_COUNT.is_set() || !FLAG_OD_TYPE.is_empty() ||
+      FLAG_OD_VERBOSE.is_enabled();
+  let const has_legacy_plus_offset = !operands.is_empty() &&
+                                     !operands.back().is_empty() &&
+                                     operands.back()[0] == '+';
+  let const has_legacy_numeric_second_operand =
+      operands.count() == 2 && !operands.back().is_empty() &&
+      operands.back()[0] >= '0' && operands.back()[0] <= '9';
+  if (operand_count <= 2 && !has_legacy_blocking_option &&
+      (has_legacy_plus_offset || has_legacy_numeric_second_operand))
   {
-    let offset = operands.back().view().substring(1);
+    let offset = operands.back().view();
+    if (has_legacy_plus_offset) offset = offset.substring(1);
     u64 multiplier = 1;
     if (!offset.is_empty() && offset[offset.length - 1] == 'b') {
       multiplier = 512;
@@ -158,7 +189,11 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
     let const parsed = utils::parse_integer_in_base_u64(
         offset, is_decimal ? int_base::decimal : int_base::octal);
     if (parsed.is_error() || parsed.value() > UINT64_MAX / multiplier) {
-      throw Error{"od: invalid legacy offset"};
+      KOSHKIT_REPORT_ERROR_AT(
+          operand_locations[operand_count - 1],
+          "invalid legacy offset '" + operands.back() + "'",
+          "use [+]OCTAL, [+]DECIMAL., or either form followed by b");
+      return 1;
     }
     skip_count = parsed.value() * multiplier;
     operand_count--;
@@ -203,10 +238,32 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    let const radix = format.is_empty() ? 'o' : format[0];
+    let const format_location = type_count == 0
+                                    ? SourceLocation{}
+                                    : FLAG_OD_TYPE.get_location(format_index);
+    if (format.is_empty() || format.length > 2) {
+      KOSHKIT_REPORT_ERROR_AT(
+          format_location, "unsupported output type '" + String{format} + "'",
+          "use c, d, o, u, or x with an optional width of 1, 2, 4, or 8");
+      return 1;
+    }
+
+    let const radix = format[0];
     usize unit_size_bytes = 2;
-    if (format.length > 1 && format[1] >= '1' && format[1] <= '8') {
-      unit_size_bytes = static_cast<usize>(format[1] - '0');
+    if (format.length == 2) {
+      switch (format[1]) {
+      case '1': unit_size_bytes = 1; break;
+      case '2': break;
+      case '4': unit_size_bytes = 4; break;
+      case '8': unit_size_bytes = 8; break;
+
+      default:
+        KOSHKIT_REPORT_ERROR_AT(format_location,
+                                "unsupported integer width in '" +
+                                    String{format} + "'",
+                                "use a width of 1, 2, 4, or 8");
+        return 1;
+      }
     }
 
     int_base base = int_base::decimal;
@@ -225,14 +282,12 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
     case 'd':
     case 'u': break;
 
-    default:
-      throw Error{"od: unsupported output type '" + String{format} + "'"};
+    default: {
+      KOSHKIT_REPORT_ERROR_AT(
+          format_location, "unsupported output type '" + String{format} + "'",
+          "use c, d, o, u, or x with an optional width of 1, 2, 4, or 8");
+      return 1;
     }
-
-    if (unit_size_bytes != 1 && unit_size_bytes != 2 && unit_size_bytes != 4 &&
-        unit_size_bytes != 8)
-    {
-      throw Error{"od: unsupported integer width"};
     }
 
     formats.push(od_format{base, unit_size_bytes, width_columns, false});

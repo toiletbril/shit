@@ -95,6 +95,30 @@ echo "=== nl start limit ==="
 echo "=== nl delimiter location ==="
 "$BIN" -c 'koshkit nl -d :' 2>&1
 
+echo "=== od address radix location ==="
+"$BIN" -c 'koshkit od -A invalid' 2>&1
+
+echo "=== od skip count location ==="
+"$BIN" -c 'koshkit od -j invalid' 2>&1
+
+echo "=== od byte count location ==="
+"$BIN" -c 'koshkit od -N invalid' 2>&1
+
+echo "=== od legacy offset location ==="
+"$BIN" -c 'koshkit od +8q' 2>&1
+
+echo "=== od output type location ==="
+"$BIN" -c 'koshkit od -t invalid' 2>&1
+
+echo "=== od trailing output type location ==="
+"$BIN" -c 'koshkit od -t x12' 2>&1
+
+echo "=== od integer width location ==="
+"$BIN" -c 'koshkit od -t x3' 2>&1
+
+echo "=== od repeated output type location ==="
+"$BIN" -c 'koshkit od -t x1 -t invalid' 2>&1
+
 echo "=== grep pattern location ==="
 "$BIN" -c "koshkit grep '['" 2>&1
 echo "=== grep file location ==="

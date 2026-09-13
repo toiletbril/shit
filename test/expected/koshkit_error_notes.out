@@ -148,6 +148,45 @@ note: use a decimal integer from 0 through 9223372036854775807.
 1:15: error: nl: the section delimiter must be two bytes.
      1 |  koshkit nl -d :
        |                ^
+=== od address radix location ===
+1:15: error: od: the address radix must be d, o, x, or n.
+     1 |  koshkit od -A invalid
+       |                ^~~~~~~
+=== od skip count location ===
+1:15: error: od: invalid skip count 'invalid'.
+     1 |  koshkit od -j invalid
+       |                ^~~~~~~
+note: use a nonnegative decimal byte count.
+=== od byte count location ===
+1:15: error: od: invalid byte count 'invalid'.
+     1 |  koshkit od -N invalid
+       |                ^~~~~~~
+note: use a nonnegative decimal byte count.
+=== od legacy offset location ===
+1:12: error: od: invalid legacy offset '+8q'.
+     1 |  koshkit od +8q
+       |             ^~~
+note: use [+]OCTAL, [+]DECIMAL., or either form followed by b.
+=== od output type location ===
+1:15: error: od: unsupported output type 'invalid'.
+     1 |  koshkit od -t invalid
+       |                ^~~~~~~
+note: use c, d, o, u, or x with an optional width of 1, 2, 4, or 8.
+=== od trailing output type location ===
+1:15: error: od: unsupported output type 'x12'.
+     1 |  koshkit od -t x12
+       |                ^~~
+note: use c, d, o, u, or x with an optional width of 1, 2, 4, or 8.
+=== od integer width location ===
+1:15: error: od: unsupported integer width in 'x3'.
+     1 |  koshkit od -t x3
+       |                ^~
+note: use a width of 1, 2, 4, or 8.
+=== od repeated output type location ===
+1:21: error: od: unsupported output type 'invalid'.
+     1 |  koshkit od -t x1 -t invalid
+       |                      ^~~~~~~
+note: use c, d, o, u, or x with an optional width of 1, 2, 4, or 8.
 === grep pattern location ===
 1:14: error: grep: the pattern '[' is not a valid regex.
      1 |  koshkit grep '['

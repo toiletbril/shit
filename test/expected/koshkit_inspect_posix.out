@@ -127,7 +127,25 @@ flash|FWS]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "od" "-v" "-A" "n" "-t" "x1" "repeated"]
   [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "od" "-A" "n" "-t" "c" "text" "+1"]
+    [SimpleCommand "printf" "\1\2\3\4\5\6\7\10"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "od" "-A" "n" "-t" "c" "-t" "d" "-t" "o" "-t" "u" "-t" "x" "-t" "d1" "-t" "d2" "-t" "d4" "-t" "d8" "od-types"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "od" "text" "+1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "od" "text" "+1."]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "od" "text" "+0b"]
+  [CompoundListCondition, None]
+    [SimpleCommand "koshkit" "od" "text" "1"]
+  [CompoundListCondition, None]
+    [RedirectedCommand]
+      [Subshell]
+        [CompoundList]
+          [CompoundListCondition, None]
+            [SimpleCommand "koshkit" "od" "-A" "n" "text" "+1"]
+  [CompoundListCondition, None]
+    [SimpleCommand "echo" "od-modern-plus-file=$?"]
 [Word
   Unquoted "root="
   CommandSubstitution "mktemp -d"
@@ -823,6 +841,15 @@ flash|FWS"
   Unquoted "repeated"
 ]
 [Word
+  Unquoted "printf"
+]
+[Word
+  Literal "\1\2\3\4\5\6\7\10"
+]
+[Word
+  Unquoted "od-types"
+]
+[Word
   Unquoted "koshkit"
 ]
 [Word
@@ -841,10 +868,137 @@ flash|FWS"
   Unquoted "c"
 ]
 [Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "d"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "o"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "u"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "x"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "d1"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "d2"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "d4"
+]
+[Word
+  Unquoted "-t"
+]
+[Word
+  Unquoted "d8"
+]
+[Word
+  Unquoted "od-types"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
   Unquoted "text"
 ]
 [Word
   Unquoted "+1"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "text"
+]
+[Word
+  Unquoted "+1."
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "text"
+]
+[Word
+  Unquoted "+0b"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "text"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "od"
+]
+[Word
+  Unquoted "-A"
+]
+[Word
+  Unquoted "n"
+]
+[Word
+  Unquoted "text"
+]
+[Word
+  Unquoted "+1"
+]
+[Word
+  Variable "TEST_NULL_DEVICE"
+]
+[Word
+  Unquoted "2"
+]
+[Word
+  Unquoted "1"
+]
+[Word
+  Unquoted "echo"
+]
+[Word
+  DoubleQuoted "od-modern-plus-file="
+  Variable "?"
 ]
 empty: empty
 text: text
@@ -893,4 +1047,21 @@ abcde
 *
         31 32 33 34 35 36 37 38 39 30 61 62 63 64 65 66
         31 32 33 34 35 36 37 38 39 30 61 62 63 64 65 66
-          e   l   l   o  \n
+        soh stx etx eot enq ack bel  \b
+        000513 001027 001541 002055
+        001001 002003 003005 004007
+        000513 001027 001541 002055
+        0201 0403 0605 0807
+        001 002 003 004 005 006 007 008
+        000513 001027 001541 002055
+        000067305985 000134678021
+        000000578437695752307201
+0000001 066145 067554 000012
+0000006
+0000001 066145 067554 000012
+0000006
+0000000 062550 066154 005157
+0000006
+0000001 066145 067554 000012
+0000006
+od-modern-plus-file=1
