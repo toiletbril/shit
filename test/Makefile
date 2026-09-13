@@ -160,6 +160,7 @@ WINDOWS_SKIPPED_CLI_NAMES := \
 	cli_disown_running_only \
 	cli_exec_behavior \
 	cli_fg_terminal_handoff \
+	cli_help_colors \
 	cli_history_behavior \
 	cli_interrupt_during_blocking_open \
 	cli_job_state_running_then_stopped \

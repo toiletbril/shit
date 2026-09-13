@@ -1309,8 +1309,7 @@ cold fn make_flag_help(const FlagList &flags, bool should_color) throws
       }
     }
 
-    append_report_text(s, flag_name.view(), colors::ansi::BOLD_WHITE,
-                       should_color);
+    append_report_text(s, flag_name.view(), {}, should_color);
     append_report_text(s, flag_value.view(), colors::ansi::DIM, should_color);
 
     let const flag_width = flag_name.length() + flag_value.length();
