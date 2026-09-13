@@ -296,8 +296,13 @@ fn GoodCore::execute(
   }
 
   if (!binary.has_value() || !Path{binary->view()}.is_regular_file()) {
-    report_soft_koshkit_error(ec, cxt, "goodcore: executable not found",
-                              "pass its path with --binary");
+    let const error_location = FLAG_GOODCORE_BINARY.is_set()
+                                   ? FLAG_GOODCORE_BINARY.value_location()
+                                   : has_pid ? FLAG_GOODCORE_PID.value_location()
+                                             : operand_locations[0];
+    report_soft_koshkit_util_error(
+        ec, cxt, error_location, args[0].view(),
+        "executable not found", "pass its path with --binary");
     return 1;
   }
 
