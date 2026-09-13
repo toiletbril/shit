@@ -1,6 +1,7 @@
 3:14: error: stty: invalid terminal setting.
      3 |  koshkit stty KOSH_MISSING_SETTING 2>&1
        |               ^~~~~~~~~~~~~~~~~~~~
+note: read the current terminal settings with `stty -a`.
 invalid=passed
 modes=passed
 changed=passed

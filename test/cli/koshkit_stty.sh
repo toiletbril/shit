@@ -19,7 +19,7 @@ koshkit stty \"\$before\" || exit
 after=\$(koshkit stty -g) || exit
 if [ \"\$before\" = \"\$after\" ]; then echo restore=passed; else echo restore=failed; fi'"
 
-output_pattern='^(3:14: error: stty: invalid terminal setting\.|     3 \|  koshkit stty KOSH_MISSING_SETTING|       \|               \^~~~~~~~~~~~~~~~~~~~|(invalid|modes|changed|restore)=)'
+output_pattern='^(3:14: error: stty: invalid terminal setting\.|     3 \|  koshkit stty KOSH_MISSING_SETTING|       \|               \^~~~~~~~~~~~~~~~~~~~|note: read the current terminal settings with `stty -a`\.|(invalid|modes|changed|restore)=)'
 if script -q -c true /dev/null >/dev/null 2>&1; then
   NO_COLOR=1 script -q -c "$command_text" /dev/null | tr -d '\r' |
     grep -E "$output_pattern"

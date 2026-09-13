@@ -81,7 +81,8 @@ fn Stty::execute(const ExecContext &ec, EvalContext &cxt,
     if (result.kind == os::terminal_settings_apply_kind::InvalidSetting) {
       report_soft_koshkit_util_error(
           ec, cxt, setting_locations[result.setting_position], args[0].view(),
-          "invalid terminal setting");
+          "invalid terminal setting",
+          "read the current terminal settings with `stty -a`");
       return 1;
     }
   }
