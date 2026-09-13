@@ -12,7 +12,6 @@
 #include "../Builtin.hpp"
 #include "../CLI.hpp"
 #include "../CLIColors.hpp"
-#include "../CommandSections.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Trace.hpp"
@@ -39,6 +38,33 @@ Koshkit::Koshkit() = default;
 pure fn Koshkit::kind() const wontthrow -> Builtin::Kind
 {
   return Kind::Koshkit;
+}
+
+enum class utility_section : u8
+{
+  Posix,
+  Koshka,
+};
+
+static pure fn get_utility_section(koshkit::Utility::Kind kind) wontthrow
+    -> utility_section
+{
+  switch (kind) {
+  case koshkit::Utility::Kind::Evil:
+  case koshkit::Utility::Kind::EvilFiles:
+  case koshkit::Utility::Kind::EvilFS:
+  case koshkit::Utility::Kind::EvilNet:
+  case koshkit::Utility::Kind::GoodNode:
+  case koshkit::Utility::Kind::EvilPS:
+  case koshkit::Utility::Kind::GoodStat:
+  case koshkit::Utility::Kind::EvilDisk:
+  case koshkit::Utility::Kind::EvilIO:
+  case koshkit::Utility::Kind::EvilLogs:
+  case koshkit::Utility::Kind::GoodCore:
+  case koshkit::Utility::Kind::EvilSS:
+  case koshkit::Utility::Kind::GoodFSW: return utility_section::Koshka;
+  default: return utility_section::Posix;
+  }
 }
 
 fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
@@ -120,9 +146,8 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const kind = koshkit::find_util(name.view());
       ASSERT(kind.has_value());
       switch (get_utility_section(*kind)) {
-      case command_section::Posix: posix_names.push(name.view()); break;
-      case command_section::Koshka: koshka_names.push(name.view()); break;
-      case command_section::Bash: unreachable("bash koshkit utility section");
+      case utility_section::Posix: posix_names.push(name.view()); break;
+      case utility_section::Koshka: koshka_names.push(name.view()); break;
       }
     }
 
